@@ -1,5 +1,5 @@
-#ifndef RMEM_ALLOC_H
-#define RMEM_ALLOC_H
+#ifndef RMEM_TABLE_H
+#define RMEM_TABLE_H
 
 #include <stdlib.h>
 #include <stdint.h>
