@@ -1,4 +1,4 @@
-#include "rmem_alloc.h"
+#include "rmem_table.h"
 
 #include <stdio.h>
 #include <stdlib.h>
