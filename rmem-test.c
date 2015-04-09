@@ -1,0 +1,37 @@
+#include "rmem_alloc.h"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int main(void)
+{
+	struct rmem_table rmem;
+	char *data1, *data2, *data3, *data4;
+
+	init_rmem_table(&rmem);
+
+	data1 = rmem_alloc(&rmem, 100, 1);
+	data2 = rmem_alloc(&rmem, 50, 2);
+	data3 = rmem_alloc(&rmem, 120, 3);
+
+	memset(data1, '1', 100);
+	memset(data2, '2', 50);
+	memset(data3, '3', 120);
+
+	rmem_free(&rmem, data2);
+	data2 = rmem_alloc(&rmem, 70, 2);
+	memset(data2, '2', 70);
+
+	data4 = rmem_alloc(&rmem, 25, 4);
+	memset(data4, '4', 25);
+
+	rmem_free(&rmem, data3);
+	data3 = rmem_alloc(&rmem, 120, 3);
+	memset(data3, '3', 120);
+
+	dump_rmem_table(&rmem);
+	free_rmem_table(&rmem);
+
+	return 0;
+}
