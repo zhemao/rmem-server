@@ -33,7 +33,7 @@ struct rmem_table {
 void init_rmem_table(struct rmem_table *rmem);
 void *rmem_alloc(struct rmem_table *rmem, size_t size, tag_t tag);
 void rmem_free(struct rmem_table *rmem, void *ptr);
-void *rmem_lookup(struct rmem_table *rmem, tag_t tag, size_t *size);
+void *rmem_lookup(struct rmem_table *rmem, tag_t tag);
 void free_rmem_table(struct rmem_table *rmem);
 void dump_rmem_table(struct rmem_table *rmem);
 

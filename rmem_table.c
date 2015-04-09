@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <sys/mman.h>
 
+#define DATA_OFFSET (sizeof(struct alloc_entry *))
+
 static inline struct alloc_entry *entry_of_list(struct list_head *list)
 {
 	struct alloc_entry dummy;
@@ -155,7 +157,7 @@ static inline void reserve_entry(struct rmem_table *rmem,
 
 void *rmem_alloc(struct rmem_table *rmem, size_t size, tag_t tag)
 {
-	size_t req_size = size + sizeof(struct alloc_entry *);
+	size_t req_size = size + DATA_OFFSET;
 	struct alloc_entry *entry = NULL;
 	struct list_head *free_node;
 
@@ -172,6 +174,9 @@ void *rmem_alloc(struct rmem_table *rmem, size_t size, tag_t tag)
 	}
 
 	if (free_node == &rmem->free_list) {
+		// make sure we haven't run out of memory
+		if (rmem->alloc_size + req_size > RMEM_SIZE)
+			return NULL;
 		TEST_Z(entry = malloc(sizeof(struct alloc_entry)));
 		list_append(&rmem->list, &entry->list);
 		entry->free_list.next = &rmem->free_list;
@@ -188,7 +193,7 @@ void *rmem_alloc(struct rmem_table *rmem, size_t size, tag_t tag)
 
 	memcpy(entry->start, &entry, sizeof(struct alloc_entry *));
 
-	return entry->start + sizeof(struct alloc_entry *);
+	return entry->start + DATA_OFFSET;
 }
 
 static inline struct alloc_entry *merge_free_blocks(
@@ -264,7 +269,7 @@ static inline void dump_free_list(struct rmem_table *rmem)
 
 void rmem_free(struct rmem_table *rmem, void *ptr)
 {
-	void *start = ptr - sizeof(struct alloc_entry *);
+	void *start = ptr - DATA_OFFSET;
 	struct alloc_entry *entry;
 
 	memcpy(&entry, start, sizeof(struct alloc_entry *));
@@ -277,6 +282,23 @@ void rmem_free(struct rmem_table *rmem, void *ptr)
 	if (entry != NULL)
 		set_free_ptrs(rmem, &entry->free_list);
 	//dump_free_list(rmem);
+}
+
+void *rmem_lookup(struct rmem_table *rmem, tag_t tag)
+{
+	struct list_head *iter_node;
+	struct alloc_entry *iter_entry;
+
+	iter_node = rmem->list.next;
+
+	while (iter_node != &rmem->list) {
+		iter_entry = entry_of_list(iter_node);
+		if (iter_entry->tag == tag)
+			return iter_entry->start + DATA_OFFSET;
+		iter_node = iter_node->next;
+	}
+
+	return NULL;
 }
 
 void dump_rmem_table(struct rmem_table *rmem)
