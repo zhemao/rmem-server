@@ -1,6 +1,6 @@
 .PHONY: clean
 
-CFLAGS  := -Wall -g
+CFLAGS  := -Wall -g -fPIC
 LD      := gcc
 LDFLAGS := ${LDFLAGS} -lrdmacm -libverbs -lpthread
 
@@ -11,7 +11,7 @@ all: ${APPS}
 rmem-server: common.o rmem_table.o rmem-server.o
 	${LD} -o $@ $^ ${LDFLAGS}
 
-rmem-client: common.o rmem_table.o rmem-client.o
+rmem-client: common.o rmem.o rmem-client.o
 	${LD} -o $@ $^ ${LDFLAGS}
 
 rmem-test: common.o rmem_table.o rmem-test.o

@@ -22,5 +22,7 @@ void rc_disconnect(struct rdma_cm_id *id);
 void rc_die(const char *message);
 struct ibv_pd * rc_get_pd();
 void rc_server_loop(const char *port);
+void build_connection(struct rdma_cm_id *id);
+void build_params(struct rdma_conn_param *params);
 
 #endif
