@@ -1,0 +1,4 @@
+*.o
+/rmem-server
+/rmem-client
+/rmem-test
