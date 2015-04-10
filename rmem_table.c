@@ -227,6 +227,7 @@ static inline struct alloc_entry *merge_free_blocks(
 
 	if (entry->list.next == &rmem->list) {
 		list_delete(&entry->list);
+		list_delete(&entry->free_list);
 		rmem->alloc_size -= entry->size;
 		free(entry);
 		return NULL;
