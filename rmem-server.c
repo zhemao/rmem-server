@@ -93,7 +93,7 @@ static void on_pre_conn(struct rdma_cm_id *id)
 	posix_memalign((void **)&ctx->send_msg, sysconf(_SC_PAGESIZE), sizeof(*ctx->send_msg));
 	TEST_Z(ctx->send_msg_mr = ibv_reg_mr(
 			rc_get_pd(), ctx->send_msg, sizeof(*ctx->send_msg),
-			IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ));
+			IBV_ACCESS_LOCAL_WRITE));
 
 	post_msg_receive(id);
 }
@@ -116,6 +116,7 @@ static void on_completion(struct ibv_wc *wc)
 	struct conn_context *ctx = (struct conn_context *)id->context;
 
 	if (wc->opcode == IBV_WC_RECV_RDMA_WITH_IMM) {
+		printf("RDMA write to offset %x\n", ntohl(wc->imm_data));
 		post_rmem_receive(id);
 		return;
 	}
@@ -134,7 +135,7 @@ static void on_completion(struct ibv_wc *wc)
 			offset = ptr - rmem.mem;
 			ctx->send_msg->id = MSG_MEMRESP;
 			ctx->send_msg->data.memresp.offset = offset;
-			ctx->send_msg->data.memresp.error = (ptr != NULL);
+			ctx->send_msg->data.memresp.error = (ptr == NULL);
 			send_message(id);
 			post_msg_receive(id);
 			break;
@@ -143,7 +144,7 @@ static void on_completion(struct ibv_wc *wc)
 			offset = ptr - rmem.mem;
 			ctx->send_msg->id = MSG_MEMRESP;
 			ctx->send_msg->data.memresp.offset = offset;
-			ctx->send_msg->data.memresp.error = (ptr != NULL);
+			ctx->send_msg->data.memresp.error = (ptr == NULL);
 			send_message(id);
 			post_msg_receive(id);
 			break;
@@ -156,7 +157,7 @@ static void on_completion(struct ibv_wc *wc)
 			fprintf(stderr, "Invalid message type %d\n", msg->id);
 			exit(EXIT_FAILURE);
 		}
-	}
+	} 
 }
 
 static void on_disconnect(struct rdma_cm_id *id)
