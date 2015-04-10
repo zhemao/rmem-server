@@ -27,13 +27,13 @@ struct message {
 			uint32_t tag;
 		} alloc;
 		struct {
-			uint64_t offset;
+			uint64_t addr;
 		} free;
 		struct {
 			uint32_t tag;
 		} lookup;
 		struct {
-			uint64_t offset;
+			uint64_t addr;
 			int8_t error;
 		} memresp;
 	} data;

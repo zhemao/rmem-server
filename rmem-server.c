@@ -116,7 +116,6 @@ static void on_completion(struct ibv_wc *wc)
 	struct conn_context *ctx = (struct conn_context *)id->context;
 
 	if (wc->opcode == IBV_WC_RECV_RDMA_WITH_IMM) {
-		printf("RDMA write to offset %x\n", ntohl(wc->imm_data));
 		post_rmem_receive(id);
 		return;
 	}
@@ -124,7 +123,6 @@ static void on_completion(struct ibv_wc *wc)
 	if (wc->opcode == IBV_WC_RECV) {
 		struct message *msg = ctx->recv_msg;
 		void *ptr;
-		uint64_t offset;
 
 		switch (msg->id) {
 		case MSG_ALLOC:
@@ -132,25 +130,23 @@ static void on_completion(struct ibv_wc *wc)
 			ptr = rmem_alloc(&rmem, msg->data.alloc.size,
 					msg->data.alloc.tag);
 			TEST_NZ(pthread_mutex_unlock(&alloc_mutex));
-			offset = ptr - rmem.mem;
 			ctx->send_msg->id = MSG_MEMRESP;
-			ctx->send_msg->data.memresp.offset = offset;
+			ctx->send_msg->data.memresp.addr = (uintptr_t) ptr;
 			ctx->send_msg->data.memresp.error = (ptr == NULL);
 			send_message(id);
 			post_msg_receive(id);
 			break;
 		case MSG_LOOKUP:
 			ptr = rmem_lookup(&rmem, msg->data.lookup.tag);
-			offset = ptr - rmem.mem;
 			ctx->send_msg->id = MSG_MEMRESP;
-			ctx->send_msg->data.memresp.offset = offset;
+			ctx->send_msg->data.memresp.addr = (uintptr_t) ptr;
 			ctx->send_msg->data.memresp.error = (ptr == NULL);
 			send_message(id);
 			post_msg_receive(id);
 			break;
 		case MSG_FREE:
-			offset = msg->data.free.offset;
-			rmem_free(&rmem, rmem.mem + offset);
+			ptr = (void *) msg->data.free.addr;
+			rmem_free(&rmem, ptr);
 			post_msg_receive(id);
 			break;
 		default:
