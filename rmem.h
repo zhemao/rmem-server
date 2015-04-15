@@ -7,24 +7,24 @@
 #include <semaphore.h>
 
 struct client_context {
-	struct message *send_msg;
-	struct ibv_mr *send_msg_mr;
+    struct message *send_msg;
+    struct ibv_mr *send_msg_mr;
 
-	struct message *recv_msg;
-	struct ibv_mr *recv_msg_mr;
+    struct message *recv_msg;
+    struct ibv_mr *recv_msg_mr;
 
-	uint64_t peer_addr;
-	uint32_t peer_rkey;
+    uint64_t peer_addr;
+    uint32_t peer_rkey;
 
-	sem_t rdma_sem;
-	sem_t send_sem;
-	sem_t recv_sem;
+    sem_t rdma_sem;
+    sem_t send_sem;
+    sem_t recv_sem;
 };
 
 struct rmem {
-	struct rdma_cm_id *id;
-	struct rdma_event_channel *ec;
-	struct client_context ctx;
+    struct rdma_cm_id *id;
+    struct rdma_event_channel *ec;
+    struct client_context ctx;
 };
 
 void rmem_connect(struct rmem *rmem, const char *host, const char *port);

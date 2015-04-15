@@ -10,24 +10,24 @@
 typedef uint32_t tag_t;
 
 struct list_head {
-	struct list_head *next;
-	struct list_head *prev;
+    struct list_head *next;
+    struct list_head *prev;
 };
 
 struct alloc_entry {
-	struct list_head list;
-	struct list_head free_list;
-	void *start;
-	size_t size;
-	tag_t tag;
-	char free;
+    struct list_head list;
+    struct list_head free_list;
+    void *start;
+    size_t size;
+    tag_t tag;
+    char free;
 };
 
 struct rmem_table {
-	void *mem;
-	struct list_head list;
-	struct list_head free_list;
-	size_t alloc_size;
+    void *mem;
+    struct list_head list;
+    struct list_head free_list;
+    size_t alloc_size;
 };
 
 void init_rmem_table(struct rmem_table *rmem);
