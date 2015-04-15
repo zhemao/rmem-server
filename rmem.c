@@ -3,55 +3,6 @@
 
 static const int TIMEOUT_IN_MS = 500;
 
-static int write_remote(struct rdma_cm_id *id, uint64_t addr, uint32_t len)
-{
-	struct client_context *ctx = (struct client_context *)id->context;
-
-	struct ibv_send_wr wr, *bad_wr = NULL;
-	struct ibv_sge sge;
-
-	memset(&wr, 0, sizeof(wr));
-
-	wr.wr_id = (uintptr_t)id;
-	wr.opcode = IBV_WR_RDMA_WRITE_WITH_IMM;
-	wr.imm_data = htonl(len);
-	wr.send_flags = IBV_SEND_SIGNALED;
-	wr.wr.rdma.remote_addr = addr;
-	wr.wr.rdma.rkey = ctx->peer_rkey;
-	wr.sg_list = &sge;
-	wr.num_sge = 1;
-
-	sge.addr = (uintptr_t)ctx->buffer;
-	sge.length = len;
-	sge.lkey = ctx->buffer_mr->lkey;
-
-	return ibv_post_send(id->qp, &wr, &bad_wr);
-}
-
-static int read_remote(struct rdma_cm_id *id, uint64_t addr, uint32_t len)
-{
-	struct client_context *ctx = (struct client_context *)id->context;
-
-	struct ibv_send_wr wr, *bad_wr = NULL;
-	struct ibv_sge sge;
-
-	memset(&wr, 0, sizeof(wr));
-
-	wr.wr_id = (uintptr_t)id;
-	wr.opcode = IBV_WR_RDMA_READ;
-	wr.send_flags = IBV_SEND_SIGNALED;
-	wr.wr.rdma.remote_addr = addr;
-	wr.wr.rdma.rkey = ctx->peer_rkey;
-	wr.sg_list = &sge;
-	wr.num_sge = 1;
-
-	sge.addr = (uintptr_t)ctx->buffer;
-	sge.length = len;
-	sge.lkey = ctx->buffer_mr->lkey;
-
-	return ibv_post_send(id->qp, &wr, &bad_wr);
-}
-
 static int send_message(struct rdma_cm_id *id)
 {
 	struct client_context *ctx = (struct client_context *)id->context;
@@ -94,12 +45,8 @@ static int post_receive(struct rdma_cm_id *id)
 	return ibv_post_recv(id->qp, &wr, &bad_wr);
 }
 
-static void setup_memory(struct client_context *ctx, size_t size)
+static void setup_memory(struct client_context *ctx)
 {
-	posix_memalign((void **)&ctx->buffer, sysconf(_SC_PAGESIZE), size);
-	TEST_Z(ctx->buffer_mr = ibv_reg_mr(rc_get_pd(), ctx->buffer,
-			size, IBV_ACCESS_LOCAL_WRITE));
-
 	posix_memalign((void **)&ctx->recv_msg, sysconf(_SC_PAGESIZE),
 			sizeof(*ctx->recv_msg));
 	TEST_Z(ctx->recv_msg_mr = ibv_reg_mr(rc_get_pd(), ctx->recv_msg,
@@ -133,7 +80,7 @@ static void on_completion(struct ibv_wc *wc)
 	}
 }
 
-void rmem_connect(struct rmem *rmem, const char *host, const char *port, size_t size)
+void rmem_connect(struct rmem *rmem, const char *host, const char *port)
 {
 	struct addrinfo *addr;
 	struct rdma_conn_param cm_params;
@@ -162,7 +109,7 @@ void rmem_connect(struct rmem *rmem, const char *host, const char *port, size_t 
 
 		if (event_copy.event == RDMA_CM_EVENT_ADDR_RESOLVED) {
 			build_connection(event_copy.id);
-			setup_memory(&rmem->ctx, size);
+			setup_memory(&rmem->ctx);
 			TEST_NZ(post_receive(rmem->id));
 			TEST_NZ(rdma_resolve_route(event_copy.id, TIMEOUT_IN_MS));
 		} else if (event_copy.event == RDMA_CM_EVENT_ROUTE_RESOLVED) {
@@ -186,11 +133,9 @@ void rmem_disconnect(struct rmem *rmem)
 	TEST_NZ(sem_destroy(&rmem->ctx.send_sem));
 	TEST_NZ(sem_destroy(&rmem->ctx.recv_sem));
 
-	ibv_dereg_mr(rmem->ctx.buffer_mr);
 	ibv_dereg_mr(rmem->ctx.recv_msg_mr);
 	ibv_dereg_mr(rmem->ctx.send_msg_mr);
 
-	free(rmem->ctx.buffer);
 	free(rmem->ctx.recv_msg);
 	free(rmem->ctx.send_msg);
 
@@ -223,27 +168,65 @@ uint64_t rmem_malloc(struct rmem *rmem, size_t size, uint32_t tag)
 	return ctx->recv_msg->data.memresp.addr;
 }
 
-int rmem_put(struct rmem *rmem, uint64_t dst, void *src, size_t size)
+int rmem_put(struct rmem *rmem, uint64_t dst,
+		void *src, struct ibv_mr *src_mr, size_t size)
 {
 	int err;
+	struct client_context *ctx = &rmem->ctx;
 
-	memcpy(rmem->ctx.buffer, src, size);
-	if ((err = write_remote(rmem->id, dst, size)) != 0)
+	struct ibv_send_wr wr, *bad_wr = NULL;
+	struct ibv_sge sge;
+
+	memset(&wr, 0, sizeof(wr));
+
+	wr.wr_id = (uintptr_t) rmem->id;
+	wr.opcode = IBV_WR_RDMA_WRITE_WITH_IMM;
+	wr.imm_data = htonl(size);
+	wr.send_flags = IBV_SEND_SIGNALED;
+	wr.wr.rdma.remote_addr = dst;
+	wr.wr.rdma.rkey = ctx->peer_rkey;
+	wr.sg_list = &sge;
+	wr.num_sge = 1;
+
+	sge.addr = (uintptr_t) src;
+	sge.length = size;
+	sge.lkey = src_mr->lkey;
+
+	if ((err = ibv_post_send(rmem->id->qp, &wr, &bad_wr)) != 0)
 		return err;
-	if (sem_wait(&rmem->ctx.rdma_sem))
+	if (sem_wait(&ctx->rdma_sem))
 		return errno;
 	return 0;
 }
 
-int rmem_get(struct rmem *rmem, void *dst, uint64_t src, size_t size)
+int rmem_get(struct rmem *rmem, void *dst, struct ibv_mr *dst_mr,
+		uint64_t src, size_t size)
 {
+	struct client_context *ctx = &rmem->ctx;
 	int err;
 
-	if ((err = read_remote(rmem->id, src, size)) != 0)
+	struct ibv_send_wr wr, *bad_wr = NULL;
+	struct ibv_sge sge;
+
+	memset(&wr, 0, sizeof(wr));
+
+	wr.wr_id = (uintptr_t) rmem->id;
+	wr.opcode = IBV_WR_RDMA_READ;
+	wr.send_flags = IBV_SEND_SIGNALED;
+	wr.wr.rdma.remote_addr = src;
+	wr.wr.rdma.rkey = ctx->peer_rkey;
+	wr.sg_list = &sge;
+	wr.num_sge = 1;
+
+	sge.addr = (uintptr_t) dst;
+	sge.length = size;
+	sge.lkey = dst_mr->lkey;
+
+
+	if ((err = ibv_post_send(rmem->id->qp, &wr, &bad_wr)) != 0)
 		return err;
-	if (sem_wait(&rmem->ctx.rdma_sem))
+	if (sem_wait(&ctx->rdma_sem))
 		return errno;
-	memcpy(dst, rmem->ctx.buffer, size);
 	return 0;
 }
 
@@ -260,4 +243,10 @@ int rmem_free(struct rmem *rmem, uint64_t addr)
 		return -1;
 
 	return 0;
+}
+
+struct ibv_mr *rmem_create_mr(void *data, size_t size)
+{
+	return ibv_reg_mr(rc_get_pd(), data,
+			size, IBV_ACCESS_LOCAL_WRITE);
 }

@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "rmem.h"
 
@@ -12,7 +13,8 @@ int main(int argc, char **argv)
 	uint64_t size;
 	uint32_t tag;
 	uint64_t raddr;
-	char data[2048];
+	char *data;
+	struct ibv_mr *data_mr;
 	int i;
 
 	if (argc != 4) {
@@ -28,8 +30,12 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
+	posix_memalign((void **) &data, sysconf(_SC_PAGESIZE), 2 * size);
+
 	printf("Connecting to server...\n");
-	rmem_connect(&rmem, argv[1], DEFAULT_PORT, size + 1);
+	rmem_connect(&rmem, argv[1], DEFAULT_PORT);
+
+	data_mr = rmem_create_mr(data, 2 * size);
 
 	printf("Allocating memory...\n");
 	raddr = rmem_malloc(&rmem, size, tag);
@@ -39,15 +45,18 @@ int main(int argc, char **argv)
 	}
 	printf("Remote memory has addr %lx\n", raddr);
 
-	memset(data, 0, sizeof(data));
+	memset(data, 0, size);
 
-	for (i = 0; i < size; i++)
-		data[i] = random();
+	for (i = 0; i < size; i += sizeof(long)) {
+		long word = random();
+		int wsz = (size - i < sizeof(word)) ? size - i : sizeof(word);
+		memcpy(data + i, &word, wsz);
+	}
 
 	printf("Writing random data...\n");
-	rmem_put(&rmem, raddr, data, size);
+	rmem_put(&rmem, raddr, data, data_mr, size);
 	printf("Reading it back...\n");
-	rmem_get(&rmem, data + size, raddr, size);
+	rmem_get(&rmem, data + size, data_mr, raddr, size);
 
 	if (memcmp(data, data + size, size) == 0)
 		printf("Data matches\n");
@@ -56,6 +65,8 @@ int main(int argc, char **argv)
 	if (rmem_free(&rmem, raddr))
 		fprintf(stderr, "Failed to free remote memory\n");
 
+	free(data);
+	ibv_dereg_mr(data_mr);
 	rmem_disconnect(&rmem);
 
 	return 0;

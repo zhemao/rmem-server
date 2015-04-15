@@ -7,9 +7,6 @@
 #include <semaphore.h>
 
 struct client_context {
-	char *buffer;
-	struct ibv_mr *buffer_mr;
-
 	struct message *send_msg;
 	struct ibv_mr *send_msg_mr;
 
@@ -30,11 +27,12 @@ struct rmem {
 	struct client_context ctx;
 };
 
-void rmem_connect(struct rmem *rmem, const char *host, const char *port, size_t size);
+void rmem_connect(struct rmem *rmem, const char *host, const char *port);
 void rmem_disconnect(struct rmem *rmem);
 uint64_t rmem_malloc(struct rmem *rmem, size_t size, uint32_t tag);
-int rmem_put(struct rmem *rmem, uint64_t dst, void *src, size_t size);
-int rmem_get(struct rmem *rmem, void *dst, uint64_t src, size_t size);
+int rmem_put(struct rmem *rmem, uint64_t dst, void *src, struct ibv_mr *src_mr, size_t size);
+int rmem_get(struct rmem *rmem, void *dst, struct ibv_mr *dst_mr, uint64_t src, size_t size);
 int rmem_free(struct rmem *rmem, uint64_t addr);
+struct ibv_mr *rmem_create_mr(void *data, size_t size);
 
 #endif
