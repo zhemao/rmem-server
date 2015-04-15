@@ -168,6 +168,29 @@ uint64_t rmem_malloc(struct rmem *rmem, size_t size, uint32_t tag)
     return ctx->recv_msg->data.memresp.addr;
 }
 
+uint64_t rmem_lookup(struct rmem *rmem, uint32_t tag)
+{
+    struct client_context *ctx = &rmem->ctx;
+
+    ctx->send_msg->id = MSG_LOOKUP;
+    ctx->send_msg->data.lookup.tag = tag;
+
+    if (post_receive(rmem->id))
+	return 0;
+    if (send_message(rmem->id))
+	return 0;
+
+    if (sem_wait(&ctx->send_sem))
+        return 0;
+    if (sem_wait(&ctx->recv_sem))
+        return 0;
+
+    if (ctx->recv_msg->data.memresp.error)
+        return 0;
+
+    return ctx->recv_msg->data.memresp.addr;
+}
+
 int rmem_put(struct rmem *rmem, uint64_t dst,
         void *src, struct ibv_mr *src_mr, size_t size)
 {
