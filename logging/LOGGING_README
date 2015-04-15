@@ -1,0 +1,49 @@
+------------- Logging in Nephele ------------- 
+
+The logging service runs in the backup/remote nodes and ensures Atomicity/Durability of transactions and data.
+The log is redo-only and no locks are required (only one client accesses the data).
+
+The logging module provides the following properties:
+1) Atomicity: either all pages modified within a transaction are backed up to a single remote node or none are
+2) Durability: Data is stored in disk in case the machine dies
+
+
+A) Data structures:
+1) The remote node keeps a translation table of [local virtual address of backed page] -> [remote virtual address of backed page]
+This avoids having to copy a page twice to achieve atomicity (this may make recovery slower)
+2) Logging Record [3]. Contains the following fields:
+2.1) Txn Id
+2.2) Page content
+2.3) Local virtual address (where data lives in the main node)
+2.4) Remote virtual address (where data will live in the backup node)
+3) Commit record. Contains the following fields:
+3.1) Txn Id
+
+B) Normal case execution:
+1) client calls rvm_txn_commit()
+2) rvm_txn_commit() saves modified pages in some RDMA-connected/remote memory in well known addresses (note [1])
+3) rvm_txn_commit() sends a commit message (IB verb) to remote node saying to commit and informing which pages to commit [2]
+4) remote server writes a log with this transaction into a single file and syncs it
+5) once file is commited (synced to disk), remote server copies pages to final destination and updates translation table
+
+C) Recovery case (backup node dies):
+1) Backup node crashes and restarts
+2) Logging service reads logging directory where commited transactions live and loads transactions metadata
+3) Logging service replays transactions (by traversing transaction logs by transaction order)
+Note: The data saved on disk is sufficient to populate the pool of memory and translation table. 
+      The log contains the pages content, where they should be copied to and where they come from
+
+D) Recovery case (main node dies):
+1) Main node crashes and restarts
+2) Application sends to backup node a list of virtual addresses to recover with backed up data (addresses where the backed up data structure used to live)
+3) Backup node looks at the translation table and finds where those pages live and sends them to the main node
+Note: Communication during recovery should be two sided. The main node does not know where data is backed up (memory addresses)
+
+Possible optimizations:
+1) Recovery can be multi-threaded
+2) We can have a background thread to discard unnecessary disk data (data that is no longer required for recovery)
+
+
+[1] These pages can't be saved to the final destination to ensure atomicity
+[2] This can be a list of the main node's virtual addresses
+[3] To simplify we can have one disk file for each transaction. The name of the file can be a timestamp
