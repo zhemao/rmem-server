@@ -30,6 +30,7 @@ struct rmem {
 void rmem_connect(struct rmem *rmem, const char *host, const char *port);
 void rmem_disconnect(struct rmem *rmem);
 uint64_t rmem_malloc(struct rmem *rmem, size_t size, uint32_t tag);
+uint64_t rmem_lookup(struct rmem *rmem, uint32_t tag);
 int rmem_put(struct rmem *rmem, uint64_t dst, void *src, struct ibv_mr *src_mr, size_t size);
 int rmem_get(struct rmem *rmem, void *dst, struct ibv_mr *dst_mr, uint64_t src, size_t size);
 int rmem_free(struct rmem *rmem, uint64_t addr);
