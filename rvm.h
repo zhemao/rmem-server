@@ -1,39 +1,47 @@
 /* This file includes the user-facing interface for recoverable virtual memory
+ * NOTE: None of these functions are thread-safe
+ *
  * UC Berkeley CS267 Sprint '15
  * Howard Mao, Nathan Pemberton, Joao Carreira
  */
 #include <stdint.h>
 #include <stdbool.h>
 
-/* Transaction ID
- * Valid txid's have positive values. Negative valued txid's indicate errors*/
+/** Transaction ID
+ *  Valid txid's have positive values. Negative valued txid's indicate errors*/
 typedef int8_t rvm_txid_t;
 
+/** Options for an rvm configuration */
 typedef struct
 {
-    //Not sure what to put here yet
+    char *host; /**< Host to connect to. */
+    char *port; /**< Port to use for connection */
+    bool recovery; /**< Are we recovering from a fault? */
 } rvm_opt_t;
 
-/* RVM configuration information. Use this to identify an instance of rvm. */
+/** RVM configuration information.
+ *  Use this to identify an instance of rvm. */
 typedef struct rvm_cfg rvm_cfg_t;
 
 /** Configure rvm.
  *  Will initialize the rvm system and enable the allocation of
  *  recoverable memory and the use of transactions. Free the rvm configuration
- *  using rvm_cfg_destroy().
+ *  using rvm_cfg_destroy(). If the recovery flag is set in rvm_opt_t then
+ *  rvm_cfg_create will remap all previously allocated memory from the server.
+ *  The user can use rvm_rec() to recover the structure of this memory.
  *
  *  \param[in] opts Options used to configure rvm. See rvm_opt_t for a
  *  description of each option.
  *  \returns A newly allocated configuration or NULL on error. Sets errno.
  */
-rvm_cfg_t *rvm_cfg_create(rvm_opt_t opts);
+rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts);
 
 /** Free a previously created rvm configuration.
  *
  *  \param[in] cfg Configuration to destroy
  *  \returns true on success, false otherwise (sets errno)
  */
-bool rvm_cfg_destroy(rvm_cfg_t cfg);
+bool rvm_cfg_destroy(rvm_cfg_t *cfg);
 
 /** Begin a transaction.
  *  rvm_begin_txn starts a new recoverable memory transaction. Any modifications
@@ -82,3 +90,22 @@ void *rvm_alloc(rvm_cfg_t cfg, size_t size);
  * \returns true on success, false on error (sets errno)
  */
 bool rvm_free(rvm_cfg_t cfg, void *buf);
+
+/** Recover the structure of recoverable memory.
+ *  rvm_rec returns the address of the first recoverable allocation. Subsequent
+ *  calls to rvm_rec return the next memory region that was allocated. rvm_rec
+ *  returns NULL when there are no more allocations to recover.
+ *
+ *  It is important to note that all recoverable memory has already been mapped
+ *  back into process memory by rvm_cfg_create. It is not necessary to call
+ *  rvm_rec in order to read allocations. A typical usage would be to make the
+ *  first allocation a structure that describes your recoverable data
+ *  structures and then call rvm_rec only once to get this structure.
+ *
+ *  XXX Right now pointers do not work in rvm, as a result rvm_rec is the only
+ *  way access recoverable data structures. I.E. the "typical usage" described
+ *  above won't actually work.
+ *
+ *  \returns The first invocation of rvm_rec returns
+ */
+void *rvm_rec(rvm_cfg_t *cfg);

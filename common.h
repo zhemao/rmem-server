@@ -8,6 +8,9 @@
 #include <unistd.h>
 #include <rdma/rdma_cma.h>
 
+#define rvm_log(M, ... ) fprintf(stderr, "RVM_LOG %s:%d: " M, \
+    __FILE__, __LINE__, ##__VA_ARGS__)
+
 #define TEST_NZ(x) do { if ( (x)) rc_die("error: " #x " failed (returned non-zero)." ); } while (0)
 #define TEST_Z(x)  do { if (!(x)) rc_die("error: " #x " failed (returned zero/null)."); } while (0)
 
