@@ -1,9 +1,11 @@
 /* Implementation of user-facing functions for rvm */
 #include <unistd.h>
 #include <errno.h>
+#include <assert.h>
 #include "rvm.h"
 #include "rvm_int.h"
 #include "rmem.h"
+#include "common.h"
 
 /* Recover the block table and all pages
  * TODO Right now this just loads everything into new locations. Eventually this
@@ -22,7 +24,8 @@ static bool recover_blocks(rvm_cfg_t *cfg)
     }
 
     /* Recover every previously allocated block */
-    for(int bx = 0; bx < cfg->blk_tbl->end; bx++)
+    int bx;
+    for(bx = 0; bx < cfg->blk_tbl->end; bx++)
     {
         block_desc_t *blk = &(cfg->blk_tbl->tbl[bx]);
         if(blk->local_addr == NULL)
@@ -68,7 +71,7 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts)
     rmem_connect(&(cfg->rmem), opts->host, opts->port);
 
     /* Allocate and initialize the block table locally */
-    err = posix_memalign(&(cfg->blk_tbl), cfg->blk_sz, cfg->blk_sz);
+    err = posix_memalign((void**)&(cfg->blk_tbl), cfg->blk_sz, cfg->blk_sz);
     if(err != 0) {
         errno = err;
         return NULL;
@@ -110,20 +113,22 @@ bool rvm_cfg_destroy(rvm_cfg_t *cfg)
     }
 
     /* Free all remote blocks (leave local blocks)*/
-    for(int bx = 0; bx < cfg->blk_tbl->end; bx++)
+    int bx;
+    for(bx = 0; bx < cfg->blk_tbl->end; bx++)
     {
         block_desc_t *blk = &(cfg->blk_tbl->tbl[bx]);
         if(blk->local_addr == NULL)
             continue;
 
-        rmem_free(&rmem, blk->raddr);
+        // XXX fix this rmem_free(&rmem, blk->raddr);
         if(blk->mr)
             ibv_dereg_mr(blk->mr);
     }
 
     /* Clean up config info on server */
-    rmem_free(cfg->rmem, cfg->blk_tbl->raddr);
-    ibv_dereg_mr(cfg->blk_tbl->mr);
+    rmem_free(&cfg->rmem, cfg->blk_tbl->raddr);
+    ibv_dereg_mr(cfg->blk_tbl_mr); // XXX jcar
+    //ibv_dereg_mr(cfg->blk_tbl->mr);
     rmem_disconnect(&(cfg->rmem));
 
     /* Free local memory */
@@ -141,7 +146,7 @@ rvm_txid_t rvm_txn_begin(rvm_cfg_t cfg)
     return 1;
 }
 
-bool rvm_txn_commit(rvm_cfg_t cfg, rvm_txid_t txid)
+bool rvm_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
 {
     /* TODO This is a brain-dead initial implementation. We simply copy over
      * everything in the block table, even if it wasn't modified. The long-term
@@ -155,7 +160,8 @@ bool rvm_txn_commit(rvm_cfg_t cfg, rvm_txid_t txid)
 
     /* Copy the updated block table */
     err = rmem_put(&(cfg->rmem), cfg->blk_tbl->raddr, cfg->blk_tbl,
-            cfg->blk_tbl->mr, cfg->blk_sz);
+            cfg->blk_tbl_mr, cfg->blk_sz);
+            //cfg->blk_tbl->mr, cfg->blk_sz);
     if(err != 0) {
         rvm_log("Failed to write block table\n");
         errno = err;
@@ -163,7 +169,8 @@ bool rvm_txn_commit(rvm_cfg_t cfg, rvm_txid_t txid)
     }
 
     /* Walk the block table and commit everything */
-    for(int bx = 0; bx < cfg->blk_tbl->end; bx++)
+    int bx;
+    for(bx = 0; bx < cfg->blk_tbl->end; bx++)
     {
         block_desc_t *blk = &(cfg->blk_tbl->tbl[bx]);
         if(blk->local_addr == NULL)
@@ -185,7 +192,7 @@ bool rvm_txn_commit(rvm_cfg_t cfg, rvm_txid_t txid)
     return true;
 }
 
-void *rvm_alloc(rvm_cfg_t cfg, size_t size)
+void *rvm_alloc(rvm_cfg_t* cfg, size_t size)
 {
     int err;
 
@@ -238,7 +245,7 @@ void *rvm_alloc(rvm_cfg_t cfg, size_t size)
     return block->local_addr;
 }
 
-bool rvm_free(rvm_cfg_t cfg, void *buf)
+bool rvm_free(rvm_cfg_t* cfg, void *buf)
 {
     /* TODO Were just doing a linear search right now, I'm sure we could do
      * something better.
@@ -260,7 +267,7 @@ bool rvm_free(rvm_cfg_t cfg, void *buf)
 
 
     /* Cleanup remote info */
-    rmem_free(&rmem, blk->raddr);
+    // XXX fix this jcar. rmem_free(&rmem, blk->raddr);
     if(blk->mr)
         ibv_dereg_mr(blk->mr);
 
@@ -285,3 +292,5 @@ void *rvm_rec(rvm_cfg_t *cfg)
 
     return res;
 }
+
+
