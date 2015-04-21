@@ -20,6 +20,8 @@ struct conn_context
 
     struct message *send_msg;
     struct ibv_mr *send_msg_mr;
+
+    struct rmem_cp_info_list cp_info;
 };
 
 static void send_message(struct rdma_cm_id *id)
@@ -88,6 +90,8 @@ static void on_pre_conn(struct rdma_cm_id *id)
             rc_get_pd(), ctx->send_msg, sizeof(*ctx->send_msg),
             IBV_ACCESS_LOCAL_WRITE));
 
+    cp_info_list_init(&ctx->cp_info);
+
     post_msg_receive(id);
 }
 
@@ -121,7 +125,6 @@ static void on_completion(struct ibv_wc *wc)
             ctx->send_msg->data.memresp.addr = (uintptr_t) ptr;
             ctx->send_msg->data.memresp.error = (ptr == NULL);
             send_message(id);
-            post_msg_receive(id);
             break;
         case MSG_LOOKUP:
             ptr = rmem_lookup(&rmem, msg->data.lookup.tag);
@@ -129,23 +132,40 @@ static void on_completion(struct ibv_wc *wc)
             ctx->send_msg->data.memresp.addr = (uintptr_t) ptr;
             ctx->send_msg->data.memresp.error = (ptr == NULL);
             send_message(id);
-            post_msg_receive(id);
             break;
         case MSG_FREE:
             ptr = (void *) msg->data.free.addr;
             rmem_free(&rmem, ptr);
-            post_msg_receive(id);
             break;
+	case MSG_CP_REQ:
+	    cp_info_list_add(&ctx->cp_info,
+		    (void *) msg->data.cpreq.dst,
+		    (void *) msg->data.cpreq.src,
+		    (size_t) msg->data.cpreq.size);
+	    break;
+	case MSG_CP_GO:
+	    multi_cp(&ctx->cp_info);
+	    cp_info_list_clear(&ctx->cp_info);
+	    ctx->send_msg->id = MSG_CP_ACK;
+	    send_message(id);
+	    break;
+	case MSG_CP_ABORT:
+	    cp_info_list_clear(&ctx->cp_info);
+	    break;
         default:
             fprintf(stderr, "Invalid message type %d\n", msg->id);
             exit(EXIT_FAILURE);
         }
+
+	post_msg_receive(id);
     }
 }
 
 static void on_disconnect(struct rdma_cm_id *id)
 {
     struct conn_context *ctx = (struct conn_context *)id->context;
+
+    cp_info_list_clear(&ctx->cp_info);
 
     ibv_dereg_mr(ctx->rmem_mr);
     ibv_dereg_mr(ctx->recv_msg_mr);

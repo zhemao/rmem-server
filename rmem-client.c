@@ -12,7 +12,7 @@ int main(int argc, char **argv)
     struct rmem rmem;
     uint64_t size;
     uint32_t tag;
-    uint64_t raddr;
+    uint64_t raddr, raddr2;
     char *data;
     struct ibv_mr *data_mr;
     int i;
@@ -80,10 +80,37 @@ int main(int argc, char **argv)
 
     if (memcmp(data, data + size, size) == 0)
         printf("Data matches\n");
+    else
+	printf("Data does not match\n");
+
+    if (recover) {
+	printf("Recovering memory...\n");
+	raddr2 = rmem_lookup(&rmem, tag);
+    } else {
+	printf("Allocating memory...\n");
+	raddr2 = rmem_malloc(&rmem, size, tag);
+    }
+
+    if (raddr2 == 0) {
+        fprintf(stderr, "Failed to allocate/recover remote memory\n");
+        exit(EXIT_FAILURE);
+    }
+
+    rmem_multi_cp_add(&rmem, raddr2, raddr, size);
+    rmem_multi_cp_go(&rmem);
+
+    rmem_get(&rmem, data + size, data_mr, raddr2, size);
+
+    if (memcmp(data, data + size, size) == 0)
+        printf("Data matches\n");
+    else
+	printf("Data does not match\n");
 
     if (endfree) {
 	printf("Freeing remote memory...\n");
 	if (rmem_free(&rmem, raddr))
+	    fprintf(stderr, "Failed to free remote memory\n");
+	if (rmem_free(&rmem, raddr2))
 	    fprintf(stderr, "Failed to free remote memory\n");
     }
 

@@ -20,6 +20,13 @@ static inline struct alloc_entry *entry_of_free_list(struct list_head *list)
     return (struct alloc_entry *) (((void *) list) - offset);
 }
 
+static inline struct rmem_cp_info *cp_info_of_list(struct list_head *list)
+{
+    struct rmem_cp_info info;
+    int offset = ((void *) &info.list) - ((void *) &info);
+    return (struct rmem_cp_info *) (((void *) list) - offset);
+}
+
 static inline void list_init(struct list_head *node)
 {
     node->prev = node;
@@ -319,4 +326,50 @@ void dump_rmem_table(struct rmem_table *rmem)
         iter_node = iter_node->next;
     }
     //dump_free_list(rmem);
+}
+
+void cp_info_list_init(struct rmem_cp_info_list *list)
+{
+    list_init(&list->head);
+}
+
+void cp_info_list_clear(struct rmem_cp_info_list *list)
+{
+    struct rmem_cp_info *info;
+
+    while (!list_empty(&list->head)) {
+	info = cp_info_of_list(list->head.next);
+	list_delete(list->head.next);
+	free(info);
+    }
+}
+
+int cp_info_list_add(struct rmem_cp_info_list *list,
+	void *dst, void *src, size_t size)
+{
+    struct rmem_cp_info *info;
+
+    info = malloc(sizeof(struct rmem_cp_info));
+    if (info == NULL)
+	return -1;
+
+    info->src = src;
+    info->dst = dst;
+    info->size = size;
+
+    list_append(&list->head, &info->list);
+
+    return 0;
+}
+
+void multi_cp(struct rmem_cp_info_list *list)
+{
+    struct rmem_cp_info *info;
+    struct list_head *node = list->head.next;
+
+    while (node != &list->head) {
+	info = cp_info_of_list(node);
+	memcpy(info->dst, info->src, info->size);
+	node = node->next;
+    }
 }

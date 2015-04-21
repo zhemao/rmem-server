@@ -151,7 +151,6 @@ uint64_t rmem_malloc(struct rmem *rmem, size_t size, uint32_t tag)
     ctx->send_msg->data.alloc.size = size;
     ctx->send_msg->data.alloc.tag = tag;
 
-
     if (post_receive(rmem->id))
         return 0;
     if (send_message(rmem->id))
@@ -263,6 +262,44 @@ int rmem_free(struct rmem *rmem, uint64_t addr)
         return -1;
     if (sem_wait(&ctx->send_sem))
         return -1;
+
+    return 0;
+}
+
+int rmem_multi_cp_add(struct rmem *rmem, uint64_t dst, uint64_t src, uint64_t size)
+{
+    struct client_context *ctx = &rmem->ctx;
+
+    ctx->send_msg->id = MSG_CP_REQ;
+    ctx->send_msg->data.cpreq.dst = dst;
+    ctx->send_msg->data.cpreq.src = src;
+    ctx->send_msg->data.cpreq.size = size;
+
+    if (send_message(rmem->id))
+	return -1;
+    if (sem_wait(&ctx->send_sem))
+	return -1;
+
+    return 0;
+}
+
+int rmem_multi_cp_go(struct rmem *rmem)
+{
+    struct client_context *ctx = &rmem->ctx;
+
+    ctx->send_msg->id = MSG_CP_GO;
+
+    if (send_message(rmem->id))
+	return -1;
+    if (sem_wait(&ctx->send_sem))
+	return -1;
+
+    if (post_receive(rmem->id))
+	return -1;
+    if (sem_wait(&ctx->recv_sem))
+	return -1;
+    if (ctx->recv_msg->id != MSG_CP_ACK)
+	return -1;
 
     return 0;
 }

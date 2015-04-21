@@ -35,5 +35,7 @@ int rmem_put(struct rmem *rmem, uint64_t dst, void *src, struct ibv_mr *src_mr, 
 int rmem_get(struct rmem *rmem, void *dst, struct ibv_mr *dst_mr, uint64_t src, size_t size);
 int rmem_free(struct rmem *rmem, uint64_t addr);
 struct ibv_mr *rmem_create_mr(void *data, size_t size);
+int rmem_multi_cp_add(struct rmem *rmem, uint64_t dst, uint64_t src, uint64_t size);
+int rmem_multi_cp_go(struct rmem *rmem);
 
 #endif
