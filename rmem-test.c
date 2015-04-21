@@ -31,10 +31,10 @@ int main(void)
     data3 = rmem_alloc(&rmem, 120, 3);
     memset(data3, '3', 120);
 
-    assert(data1 == rmem_lookup(&rmem, 1));
-    assert(data2 == rmem_lookup(&rmem, 2));
-    assert(data3 == rmem_lookup(&rmem, 3));
-    assert(data4 == rmem_lookup(&rmem, 4));
+    assert(data1 == rmem_table_lookup(&rmem, 1));
+    assert(data2 == rmem_table_lookup(&rmem, 2));
+    assert(data3 == rmem_table_lookup(&rmem, 3));
+    assert(data4 == rmem_table_lookup(&rmem, 4));
 
     dump_rmem_table(&rmem);
     free_rmem_table(&rmem);

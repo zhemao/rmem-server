@@ -4,6 +4,7 @@
 #include "common.h"
 #include "messages.h"
 #include "rmem_table.h"
+#include "rmem.h"
 
 static const char *DEFAULT_PORT = "12345";
 static const size_t BUFFER_SIZE = 10 * 1024 * 1024;
