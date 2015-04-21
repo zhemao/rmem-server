@@ -1,12 +1,14 @@
 .PHONY: clean
 
-CFLAGS  := -Wall -g -fPIC -std=gnu11
+# POSIX_C_SOURCE required
+# -std-c11 -D_POSIX_C_SOURCE=1
+CFLAGS  := -Wall -g -fPIC 
 LD      := gcc
 LDFLAGS := ${LDFLAGS} -lrdmacm -libverbs -lpthread
 
-APPS    := rmem-server rmem-client dgemv_test
+APPS    := rmem-server rmem-client rmem-test dgemv_test
 
-all: ${APPS}
+all: ${APPS} rvm-test
 
 rmem-server: common.o rmem_table.o rmem-server.o
 	${LD} -o $@ $^ ${LDFLAGS}
@@ -19,6 +21,10 @@ rmem-test: common.o rmem_table.o rmem-test.o
 
 dgemv_test: dgemv_test.o
 	${LD} -o $@ $^ -lblas
+
+rvm-test: common.o rmem_table.o rmem-test.o rvm.o rmem.c
+	${LD} -o $@ $^ ${LDFLAGS}
+
 clean:
 	rm -f *.o ${APPS}
 

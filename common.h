@@ -7,6 +7,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <rdma/rdma_cma.h>
+#include <sys/types.h>
+#include <sys/socket.h>
 
 #define rvm_log(M, ... ) fprintf(stderr, "RVM_LOG %s:%d: " M, \
     __FILE__, __LINE__, ##__VA_ARGS__)

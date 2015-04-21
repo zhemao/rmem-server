@@ -326,7 +326,7 @@ static inline void dump_free_list(struct rmem_table *rmem)
     printf("-----------\n");
 }
 
-void rmem_free(struct rmem_table *rmem, void *ptr)
+void rmem_table_free(struct rmem_table *rmem, void *ptr)
 {
     void *start = ptr - DATA_OFFSET;
     struct alloc_entry *entry;
@@ -343,7 +343,7 @@ void rmem_free(struct rmem_table *rmem, void *ptr)
     //dump_free_list(rmem);
 }
 
-void *rmem_lookup(struct rmem_table *rmem, tag_t tag)
+void *rmem_table_lookup(struct rmem_table *rmem, tag_t tag)
 {
     struct alloc_entry *entry;
 
