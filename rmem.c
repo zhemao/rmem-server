@@ -203,8 +203,7 @@ int rmem_put(struct rmem *rmem, uint64_t dst,
     memset(&wr, 0, sizeof(wr));
 
     wr.wr_id = (uintptr_t) rmem->id;
-    wr.opcode = IBV_WR_RDMA_WRITE_WITH_IMM;
-    wr.imm_data = htonl(size);
+    wr.opcode = IBV_WR_RDMA_WRITE;
     wr.send_flags = IBV_SEND_SIGNALED;
     wr.wr.rdma.remote_addr = dst;
     wr.wr.rdma.rkey = ctx->peer_rkey;

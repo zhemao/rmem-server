@@ -64,19 +64,6 @@ static void post_msg_receive(struct rdma_cm_id *id)
     TEST_NZ(ibv_post_recv(id->qp, &wr, &bad_wr));
 }
 
-static void post_rmem_receive(struct rdma_cm_id *id)
-{
-    struct ibv_recv_wr wr, *bad_wr = NULL;
-
-    memset(&wr, 0, sizeof(wr));
-
-    wr.wr_id = (uintptr_t) id;
-    wr.sg_list = NULL;
-    wr.num_sge = 0;
-
-    TEST_NZ(ibv_post_recv(id->qp, &wr, &bad_wr));
-}
-
 static void on_pre_conn(struct rdma_cm_id *id)
 {
     struct conn_context *ctx = (struct conn_context *) malloc(
@@ -113,18 +100,12 @@ static void on_connection(struct rdma_cm_id *id)
     ctx->send_msg->data.mr.rkey = ctx->rmem_mr->rkey;
 
     send_message(id);
-    post_rmem_receive(id);
 }
 
 static void on_completion(struct ibv_wc *wc)
 {
     struct rdma_cm_id *id = (struct rdma_cm_id *)(uintptr_t)wc->wr_id;
     struct conn_context *ctx = (struct conn_context *)id->context;
-
-    if (wc->opcode == IBV_WC_RECV_RDMA_WITH_IMM) {
-        post_rmem_receive(id);
-        return;
-    }
 
     if (wc->opcode == IBV_WC_RECV) {
         struct message *msg = ctx->recv_msg;
