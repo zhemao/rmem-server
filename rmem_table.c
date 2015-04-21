@@ -20,6 +20,13 @@ static inline struct alloc_entry *entry_of_free_list(struct list_head *list)
     return (struct alloc_entry *) (((void *) list) - offset);
 }
 
+static inline struct alloc_entry *entry_of_htable(struct list_head *list)
+{
+    struct alloc_entry dummy;
+    int offset = ((void *) &dummy.htable) - ((void *) &dummy);
+    return (struct alloc_entry *) (((void *) list) - offset);
+}
+
 static inline struct rmem_cp_info *cp_info_of_list(struct list_head *list)
 {
     struct rmem_cp_info info;
@@ -62,6 +69,8 @@ static inline int list_empty(struct list_head *list)
 
 void init_rmem_table(struct rmem_table *rmem)
 {
+    int i;
+
     rmem->mem = mmap(NULL, RMEM_SIZE, PROT_READ | PROT_WRITE,
             MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (rmem->mem == MAP_FAILED) {
@@ -71,6 +80,15 @@ void init_rmem_table(struct rmem_table *rmem)
     list_init(&rmem->list);
     list_init(&rmem->free_list);
     rmem->alloc_size = 0;
+
+    rmem->htable = malloc(sizeof(struct list_head) * NUM_BUCKETS);
+    if (rmem->htable == NULL) {
+	fprintf(stderr, "Failed to allocate hash table\n");
+	exit(EXIT_FAILURE);
+    }
+
+    for (i = 0; i < NUM_BUCKETS; i++)
+	list_init(&rmem->htable[i]);
 }
 
 void free_rmem_table(struct rmem_table *rmem)
@@ -87,6 +105,8 @@ void free_rmem_table(struct rmem_table *rmem)
         free(entry);
         node = next;
     }
+
+    free(rmem->htable);
 }
 
 static inline struct list_head *free_list_to_list(struct rmem_table *rmem,
@@ -162,11 +182,37 @@ static inline void reserve_entry(struct rmem_table *rmem,
     set_free_ptrs(rmem, free_node);
 }
 
+static struct alloc_entry *find_entry(struct rmem_table *rmem, tag_t tag)
+{
+    int bucket;
+    struct list_head *list, *node;
+    struct alloc_entry *entry;
+
+    bucket = tag % NUM_BUCKETS;
+    list = &rmem->htable[bucket];
+    node = list->next;
+
+    while (node != list) {
+	entry = entry_of_htable(node);
+	if (entry->tag == tag)
+	    return entry;
+	node = node->next;
+    }
+
+    return NULL;
+}
+
 void *rmem_alloc(struct rmem_table *rmem, size_t size, tag_t tag)
 {
     size_t req_size = size + DATA_OFFSET;
     struct alloc_entry *entry = NULL;
     struct list_head *free_node;
+    int bucket;
+
+    // error out if the tag is not unique
+    entry = find_entry(rmem, tag);
+    if (entry != NULL)
+	return NULL;
 
     free_node = rmem->free_list.next;
 
@@ -198,6 +244,9 @@ void *rmem_alloc(struct rmem_table *rmem, size_t size, tag_t tag)
         reserve_entry(rmem, entry, req_size);
     }
 
+    bucket = tag % NUM_BUCKETS;
+    list_append(&rmem->htable[bucket], &entry->htable);
+
     memcpy(entry->start, &entry, sizeof(struct alloc_entry *));
 
     return entry->start + DATA_OFFSET;
@@ -211,6 +260,8 @@ static inline struct alloc_entry *merge_free_blocks(
 
     start = entry->start;
     end = entry->start + entry->size;
+
+    list_delete(&entry->htable);
 
     if (entry->list.prev != &rmem->list) {
         prev_entry = entry_of_list(entry->list.prev);
@@ -294,19 +345,14 @@ void rmem_free(struct rmem_table *rmem, void *ptr)
 
 void *rmem_lookup(struct rmem_table *rmem, tag_t tag)
 {
-    struct list_head *iter_node;
-    struct alloc_entry *iter_entry;
+    struct alloc_entry *entry;
 
-    iter_node = rmem->list.next;
+    entry = find_entry(rmem, tag);
 
-    while (iter_node != &rmem->list) {
-        iter_entry = entry_of_list(iter_node);
-        if (iter_entry->tag == tag)
-            return iter_entry->start + DATA_OFFSET;
-        iter_node = iter_node->next;
-    }
+    if (entry == NULL)
+	return NULL;
 
-    return NULL;
+    return entry->start + DATA_OFFSET;
 }
 
 void dump_rmem_table(struct rmem_table *rmem)

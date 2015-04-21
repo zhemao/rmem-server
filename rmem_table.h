@@ -6,6 +6,7 @@
 
 #define RMEM_SIZE (1 << 14)
 #define MIN_SIZE (2 * sizeof(void*))
+#define NUM_BUCKETS 1024
 
 typedef uint32_t tag_t;
 
@@ -17,6 +18,7 @@ struct list_head {
 struct alloc_entry {
     struct list_head list;
     struct list_head free_list;
+    struct list_head htable;
     void *start;
     size_t size;
     tag_t tag;
@@ -28,6 +30,7 @@ struct rmem_table {
     struct list_head list;
     struct list_head free_list;
     size_t alloc_size;
+    struct list_head *htable;
 };
 
 struct rmem_cp_info {
