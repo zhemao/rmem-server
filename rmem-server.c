@@ -127,7 +127,7 @@ static void on_completion(struct ibv_wc *wc)
             send_message(id);
             break;
         case MSG_LOOKUP:
-            ptr = rmem_lookup(&rmem, msg->data.lookup.tag);
+            ptr = rmem_table_lookup(&rmem, msg->data.lookup.tag);
             ctx->send_msg->id = MSG_MEMRESP;
             ctx->send_msg->data.memresp.addr = (uintptr_t) ptr;
             ctx->send_msg->data.memresp.error = (ptr == NULL);
