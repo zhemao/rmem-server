@@ -138,7 +138,7 @@ bool rvm_cfg_destroy(rvm_cfg_t *cfg)
     return true;
 }
 
-rvm_txid_t rvm_txn_begin(rvm_cfg_t cfg)
+rvm_txid_t rvm_txn_begin(rvm_cfg_t* cfg)
 {
     //Nothing to do yet
 

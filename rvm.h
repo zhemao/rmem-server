@@ -56,7 +56,7 @@ bool rvm_cfg_destroy(rvm_cfg_t *cfg);
  *  \param[in] cfg Configuration to use for rvm
  *  \returns A transaction ID on success. -1 on error (sets errno).
  */
-rvm_txid_t rvm_txn_begin(rvm_cfg_t cfg);
+rvm_txid_t rvm_txn_begin(rvm_cfg_t* cfg);
 
 /** Finalize a transaction.
  * After calling rvm_commit() any changes to a recoverable memory region since

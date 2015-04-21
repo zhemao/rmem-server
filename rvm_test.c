@@ -13,7 +13,8 @@
 
 static void fill_arr(int *a)
 {
-    for(int i = 0; i < ARR_SIZE; i++)
+    int i = 0;
+    for(;i < ARR_SIZE; i++)
     {
         a[i]++;
     }
@@ -23,7 +24,8 @@ static void fill_arr(int *a)
 
 static bool check_arr(int *a)
 {
-    for(int i = 0; i < ARR_SIZE; i++)
+    int i = 0;
+    for(;i < ARR_SIZE; i++)
     {
         if(a[i] != 1) {
             if(a[i] == 0)
@@ -47,7 +49,7 @@ int main(int argc, char **argv)
                 argv[0]);
         return EXIT_FAILURE;
     }
-    bool restart = (argv[3] == 'y' || argv[3] == 'Y') ? true : false;
+    bool restart = (strcmp(argv[3],"y") == 0 || strcmp(argv[3],"Y") == 0) ? true : false;
 
     rvm_opt_t opt;
     opt.host = argv[1];
@@ -56,7 +58,8 @@ int main(int argc, char **argv)
     if(restart) {
         /* Try to recover from server */
         opt.recovery = true;
-        rvm_cfg_t *cfg = rvm_configure(opt);
+        //rvm_cfg_t *cfg = rvm_configure(opt);
+        rvm_cfg_t *cfg = rvm_cfg_create(&opt);
 
         /* Get the new addresses for arr0 and arr1 */
         int *safe_arr0 = rvm_rec(cfg);
@@ -77,13 +80,15 @@ int main(int argc, char **argv)
         /* Non-recovery case */
         opt.recovery = false;
 
-        rvm_cfg_t *cfg = rvm_configure(opt);
+        printf("rvm_cfg_create\n");
+        rvm_cfg_t *cfg = rvm_cfg_create(&opt);
         if(cfg == NULL) {
             printf("FAILURE: Failed to initialize rvm configuration - %s\n",
                     strerror(errno));
             return EXIT_FAILURE;
         }
 
+        printf("rvm_alloc\n");
         //You can allocate outside a txn so long as you don't modify
         int *safe_arr0 = rvm_alloc(cfg, ARR_SIZE*sizeof(int));
         if(safe_arr0 == NULL) {
@@ -92,6 +97,7 @@ int main(int argc, char **argv)
             return EXIT_FAILURE;
         }
 
+        printf("rvm_txn_begin\n");
         rvm_txid_t txid = rvm_txn_begin(cfg);
         if(txid < 0) {
             printf("FAILURE: Could not start transaction - %s\n",
@@ -99,6 +105,7 @@ int main(int argc, char **argv)
             return EXIT_FAILURE;
         }
 
+        printf("rvm_alloc\n");
         /* You can also allocate within a transaction */
         int *safe_arr1 = rvm_alloc(cfg, ARR_SIZE*sizeof(int));
         if(safe_arr1 == NULL) {
@@ -106,6 +113,7 @@ int main(int argc, char **argv)
                     strerror(errno));
             return EXIT_FAILURE;
         }
+        printf("rvm_alloc done\n");
 
         //Initialize arrays
         memset(safe_arr0, 0, ARR_SIZE*sizeof(int));
@@ -115,12 +123,14 @@ int main(int argc, char **argv)
         fill_arr(safe_arr0);
         fill_arr(safe_arr1);
 
+        printf("rvm_txn_commit\n");
         if(!rvm_txn_commit(cfg, txid)) {
             printf("FAILURE: Failed to commit transaction - %s",
                     strerror(errno));
             return EXIT_FAILURE;
         }
 
+        printf("rvm_txn_begin\n");
         /* Start a new transaction */
         txid = rvm_txn_begin(cfg);
         fill_arr(safe_arr0);
@@ -131,4 +141,5 @@ int main(int argc, char **argv)
                 "Test now exiting mid-transaction to simulate a failure\n");
         return EXIT_SUCCESS;
     }
+    return 0;
 }
