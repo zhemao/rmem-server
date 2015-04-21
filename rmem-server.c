@@ -4,6 +4,7 @@
 #include "common.h"
 #include "messages.h"
 #include "rmem_table.h"
+#include "rmem.h"
 
 static const char *DEFAULT_PORT = "12345";
 static const size_t BUFFER_SIZE = 10 * 1024 * 1024;
@@ -135,7 +136,7 @@ static void on_completion(struct ibv_wc *wc)
             break;
         case MSG_FREE:
             ptr = (void *) msg->data.free.addr;
-            rmem_free(&rmem, ptr);
+            rmem_table_free(&rmem, ptr);
             break;
 	case MSG_CP_REQ:
 	    cp_info_list_add(&ctx->cp_info,
