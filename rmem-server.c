@@ -143,7 +143,7 @@ static void on_completion(struct ibv_wc *wc)
             post_msg_receive(id);
             break;
         case MSG_LOOKUP:
-            ptr = rmem_lookup(&rmem, msg->data.lookup.tag);
+            ptr = rmem_table_lookup(&rmem, msg->data.lookup.tag);
             ctx->send_msg->id = MSG_MEMRESP;
             ctx->send_msg->data.memresp.addr = (uintptr_t) ptr;
             ctx->send_msg->data.memresp.error = (ptr == NULL);
@@ -152,7 +152,7 @@ static void on_completion(struct ibv_wc *wc)
             break;
         case MSG_FREE:
             ptr = (void *) msg->data.free.addr;
-            rmem_free(&rmem, ptr);
+            rmem_table_free(&rmem, ptr);
             post_msg_receive(id);
             break;
         default:

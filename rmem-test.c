@@ -19,14 +19,14 @@ int main(void)
     memset(data2, '2', 50);
     memset(data3, '3', 120);
 
-    rmem_free(&rmem, data2);
+    rmem_table_free(&rmem, data2);
     data2 = rmem_alloc(&rmem, 70, 2);
     memset(data2, '2', 70);
 
     data4 = rmem_alloc(&rmem, 25, 4);
     memset(data4, '4', 25);
 
-    rmem_free(&rmem, data3);
+    rmem_table_free(&rmem, data3);
     data3 = rmem_alloc(&rmem, 120, 3);
     memset(data3, '3', 120);
 
