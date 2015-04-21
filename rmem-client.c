@@ -85,10 +85,10 @@ int main(int argc, char **argv)
 
     if (recover) {
 	printf("Recovering memory...\n");
-	raddr2 = rmem_lookup(&rmem, tag);
+	raddr2 = rmem_lookup(&rmem, tag + 1);
     } else {
 	printf("Allocating memory...\n");
-	raddr2 = rmem_malloc(&rmem, size, tag);
+	raddr2 = rmem_malloc(&rmem, size, tag + 1);
     }
 
     if (raddr2 == 0) {
