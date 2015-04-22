@@ -72,6 +72,17 @@ rvm_txid_t rvm_txn_begin(rvm_cfg_t* cfg);
  */
 bool rvm_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid);
 
+/** Check transaction success (for debugging)
+ * Check that all data now lives in the right places in the buddy node
+ *
+ * \pre Exactly one transaction must have been started (rvm_txn_begin) and not
+ *  already committed.
+ * \param[in] cfg Configuration to use for rvm
+ * \param[in] txid The transaction id of the currently running transaction
+ * \returns true for success. false otherwise, sets errno for specific error.
+ */
+bool check_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid);
+
 /** Allocate a region of recoverable memory of at least size "size" bytes.
  *
  * Any changes to memory returned by rvm_alloc() will be included in the
