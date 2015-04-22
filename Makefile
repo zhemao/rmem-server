@@ -1,27 +1,37 @@
 .PHONY: clean
 
-# POSIX_C_SOURCE required
-# -std-c11 -D_POSIX_C_SOURCE=1
 CFLAGS  := -Wall -g -fPIC 
 LD      := gcc
 LDFLAGS := ${LDFLAGS} -lrdmacm -libverbs -lpthread
+INCLUDE :=-I.
 
-APPS    := rmem-server rmem-client rmem-test rvm_test
+FILES   := log.h common.o rmem_table.o rmem-server.o rvm.o rmem.o
+APPS    := rmem-server rmem-client rmem-test
+TESTS   := tests/rvm_test tests/rvm_test_txn_commit tests/rvm_test_recovery tests/rvm_test_free
 
-all: ${APPS}
+all: ${APPS} ${TESTS}
 
-rmem-server: common.o rmem_table.o rmem-server.o
-	${LD} -o $@ $^ ${CFLAGS} ${LDFLAGS}
+rmem-server: ${FILES}
+	${LD} -o $@ $^ ${CFLAGS} ${LDFLAGS} ${INCLUDE}
 
-rmem-client: common.o rmem.o rmem-client.o
-	${LD} -o $@ $^ ${CFLAGS} ${LDFLAGS}
+rmem-client: ${FILES}
+	${LD} -o $@ $^ ${CFLAGS} ${LDFLAGS} ${INCLUDE}
 
-rmem-test: common.o rmem_table.o rmem-test.o
-	${LD} -o $@ $^ ${CFLAGS} ${LDFLAGS}
+rmem-test: ${FILES}
+	${LD} -o $@ $^ ${CFLAGS} ${LDFLAGS} ${INCLUDE}
 
-rvm_test: common.o rmem_table.o rvm_test.o rvm.o rmem.c
-	${LD} -o $@ $^ ${CFLAGS} ${LDFLAGS}
+tests/rvm_test: tests/rvm_test.c rmem.o rvm.o rmem_table.o common.o
+	${LD} -o $@ $^ ${CFLAGS} ${LDFLAGS} ${INCLUDE}
+
+tests/rvm_test_txn_commit: tests/rvm_test_txn_commit.c rmem.o rvm.o rmem_table.o common.o
+	${LD} -o $@ $^ ${CFLAGS} ${LDFLAGS} ${INCLUDE}
+
+tests/rvm_test_recovery: tests/rvm_test_recovery.c rmem.o rvm.o rmem_table.o common.o
+	${LD} -o $@ $^ ${CFLAGS} ${LDFLAGS} ${INCLUDE}
+
+tests/rvm_test_free: tests/rvm_test_free.c rmem.o rvm.o rmem_table.o common.o
+	${LD} -o $@ $^ ${CFLAGS} ${LDFLAGS} ${INCLUDE}
 
 clean:
-	rm -f *.o ${APPS}
+	rm -f *.o ${APPS} ${TESTS}
 
