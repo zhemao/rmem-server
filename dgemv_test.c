@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
-
-#include "cblas.h"
+#include <stdint.h>
+#include <cblas.h>
 
 /* Defaults for n, m and niter respectively */
 #ifndef N_DEF
@@ -97,7 +97,8 @@ void init_mat(double *A, int m, int n)
     {
         for(int col = 0; col < n; col++)
         {
-            A[col*n + row] = (double)rand() / (double)rand();
+            //A[col*n + row] = (double)rand() / (double)rand();
+            A[col*n + row] = 2 * drand48() - 1;
         }
     }
 
@@ -112,7 +113,8 @@ void init_vec(double *v, int m)
 
     for(int i = 0; i < m; i++)
     {
-        v[i] = (double)rand() / (double)rand();
+        //v[i] = (double)rand() / (double)rand();
+        v[i] = 2 * drand48() - 1;
     }
 
     return;
