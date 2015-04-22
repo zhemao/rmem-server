@@ -6,6 +6,8 @@
 #include "rvm_int.h"
 #include "rmem.h"
 #include "common.h"
+#include "log.h"
+#include "error.h"
 
 /* Recover the block table and all pages
  * TODO Right now this just loads everything into new locations. Eventually this
@@ -92,6 +94,9 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts)
         /* Allocate and register the block table remotely */
         cfg->blk_tbl->raddr = rmem_malloc(&(cfg->rmem), cfg->blk_sz,
                 BLOCK_TBL_ID);
+
+        LOG(5, ("Allocated remote table in raddr: %ld\n", cfg->blk_tbl->raddr));
+
         if(cfg->blk_tbl->raddr == 0) {
             rvm_log("Failed to allocate remote memory for block table\n");
             errno = 0;
@@ -145,6 +150,57 @@ rvm_txid_t rvm_txn_begin(rvm_cfg_t* cfg)
     //Always return the same txid because we don't support nesting or rollback
     return 1;
 }
+
+bool check_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
+{
+    LOG(8, ("Checking txn commit\n"));
+
+    // check block table
+    char* block = (char*)malloc(sizeof(char) * cfg->blk_sz);
+    RETURN_ERROR(block == 0, false,
+            ("Failure: Error allocating table\n"));
+
+    struct ibv_mr* block_mr = rmem_create_mr(block, sizeof(char) * cfg->blk_sz);
+
+    LOG(8, ("Getting block table\n"));
+    int err;
+    err = rmem_get(&cfg->rmem, block,
+                block_mr, cfg->blk_tbl->raddr, cfg->blk_sz);
+    LOG(8, ("Block table fetched\n"));
+
+    RETURN_ERROR(err != 0, false,
+            ("Failure: Error doing RDMA read of block table\n"));
+
+    err = memcmp(block, cfg->blk_tbl, sizeof(char) * cfg->blk_sz);
+
+    RETURN_ERROR(err != 0, false,
+            ("Block table does not match replica\n"));
+
+    //check data blocks
+    int bx;
+    for(bx = 0; bx < cfg->blk_tbl->end; bx++) {
+        block_desc_t *blk = &(cfg->blk_tbl->tbl[bx]);
+        if(blk->local_addr == NULL) // ?
+            continue;
+
+        /* TODO Eventually we may have to unpin blocks, this will catch that.
+         * Right now this should never trigger. */
+        assert(blk->mr != NULL);
+
+        LOG(8, ("Getting block %d\n", bx));
+        int err = rmem_get(&(cfg->rmem), block, block_mr,
+                blk->raddr, cfg->blk_sz);
+        RETURN_ERROR(err != 0, false,
+                ("Block %d does not match replica\n", bx));
+    }
+
+    ibv_dereg_mr(block_mr);
+
+    return true;
+}
+
+//int rmem_get(struct rmem *rmem, void *dst, struct ibv_mr *dst_mr,
+//        uint64_t src, size_t size)
 
 bool rvm_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
 {
@@ -216,7 +272,7 @@ void *rvm_alloc(rvm_cfg_t* cfg, size_t size)
     }
 
     block_desc_t *block = &(cfg->blk_tbl->tbl[cfg->blk_tbl->end]);
-    block->bid = BLOCK_TBL_ID + cfg->blk_tbl->end;
+    block->bid = BLOCK_TBL_ID + cfg->blk_tbl->end + 1;
     cfg->blk_tbl->end++;
     err = posix_memalign(&(block->local_addr), cfg->blk_sz, cfg->blk_sz);
     if(err != 0) {
@@ -235,6 +291,7 @@ void *rvm_alloc(rvm_cfg_t* cfg, size_t size)
         return NULL;
     }
 
+    LOG(5, ("rmem_malloc tag: %d\n", block->bid));
     block->raddr = rmem_malloc(&(cfg->rmem), cfg->blk_sz, block->bid);
     if(block->raddr == 0) {
         rvm_log("Failed to allocate remote memory for block\n");
@@ -267,7 +324,7 @@ bool rvm_free(rvm_cfg_t* cfg, void *buf)
 
 
     /* Cleanup remote info */
-    // XXX fix this jcar. rmem_free(&rmem, blk->raddr);
+    rmem_free(&cfg->rmem, blk->raddr);
     if(blk->mr)
         ibv_dereg_mr(blk->mr);
 
