@@ -4,7 +4,7 @@ CFLAGS  := -Wall -g -fPIC
 LD      := gcc
 LDFLAGS := ${LDFLAGS} -lrdmacm -libverbs -lpthread
 
-APPS    := rmem-server rmem-client
+APPS    := rmem-server rmem-client dgemv_test
 
 all: ${APPS}
 
@@ -17,6 +17,8 @@ rmem-client: common.o rmem.o rmem-client.o
 rmem-test: common.o rmem_table.o rmem-test.o
 	${LD} -o $@ $^ ${LDFLAGS}
 
+dgemv_test: dgemv_test.o
+	${LD} -o $@ $^ -lblas
 clean:
 	rm -f *.o ${APPS}
 
