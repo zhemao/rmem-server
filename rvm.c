@@ -26,7 +26,7 @@ static bool recover_blocks(rvm_cfg_t *cfg)
 
     /* Recover every previously allocated block */
     int bx;
-    for(bx = 0; bx < cfg->blk_tbl->end; bx+=2)
+    for(bx = 0; bx < BLOCK_TBL_SIZE; bx += 2)
     {
         block_desc_t *blk = &(cfg->blk_tbl->tbl[bx]);
         if(blk->local_addr == NULL)
@@ -102,7 +102,7 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts)
             return NULL;
         }
 
-        cfg->blk_tbl->end = 0;
+        cfg->blk_tbl->n_blocks = 0;
     }
 
     return cfg;
@@ -118,7 +118,7 @@ bool rvm_cfg_destroy(rvm_cfg_t *cfg)
 
     /* Free all remote blocks (leave local blocks)*/
     int bx;
-    for(bx = 0; bx < cfg->blk_tbl->end; bx+=2) 
+    for(bx = 0; bx < BLOCK_TBL_SIZE; bx+=2) 
     {
         block_desc_t *blk = &(cfg->blk_tbl->tbl[bx]);
         if(blk->local_addr == NULL)
@@ -177,7 +177,7 @@ bool check_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
 
     //check data blocks
     int bx;
-    for(bx = 0; bx < cfg->blk_tbl->end; bx+=2) {
+    for(bx = 0; bx < BLOCK_TBL_SIZE; bx+=2) {
         block_desc_t *blk = &(cfg->blk_tbl->tbl[bx]);
         if(blk->local_addr == NULL) // ?
             continue;
@@ -200,6 +200,7 @@ bool check_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
 
     }
 
+    free(block);
     ibv_dereg_mr(block_mr);
 
     return true;
@@ -228,7 +229,7 @@ bool rvm_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
 
     /* Walk the block table and commit everything */
     int bx;
-    for(bx = 0; bx < cfg->blk_tbl->end; bx++)
+    for(bx = 0; bx < BLOCK_TBL_SIZE; bx++)
     {
         block_desc_t *blk = &(cfg->blk_tbl->tbl[bx]);
         if(blk->local_addr == NULL)
@@ -279,14 +280,25 @@ void *rvm_alloc(rvm_cfg_t* cfg, size_t size)
     }
 
     /* Allocate and initialize the block locally */
-    if(cfg->blk_tbl->end == BLOCK_TBL_SIZE) {
+    if(cfg->blk_tbl->n_blocks == BLOCK_TBL_SIZE) {
         //Out of room in the block table
         rvm_log("Block table out of space\n");
         errno = ENOMEM;
         return NULL;
     }
 
-    block_desc_t *block = &(cfg->blk_tbl->tbl[cfg->blk_tbl->end]);
+    // search for a free block
+    int bx;
+    for(bx = 0; bx < BLOCK_TBL_SIZE; bx += 2) 
+    {
+        block_desc_t *blk = &(cfg->blk_tbl->tbl[bx]);
+        if(blk->local_addr == NULL)
+            break;
+    }
+    CHECK_ERROR(bx >= BLOCK_TBL_SIZE,
+            ("Failure: Block table is full and we should have caught this earlier\n"));
+
+    block_desc_t *block = &(cfg->blk_tbl->tbl[bx]);
 
     // set block size
     block->size = size;
@@ -294,8 +306,8 @@ void *rvm_alloc(rvm_cfg_t* cfg, size_t size)
     // ----- SHADOW PAGES ------ //
     // final destination of a block has block_id = X (odd numbers, starts at 1)
     // corresponding shadow block has block_id = X + 1
-    block->bid = BLOCK_TBL_ID + cfg->blk_tbl->end + 1;
-    cfg->blk_tbl->end += 2;
+    block->bid = BLOCK_TBL_ID + cfg->blk_tbl->n_blocks + 1;
+    cfg->blk_tbl->n_blocks += 2;
     err = posix_memalign(&(block->local_addr), cfg->blk_sz, size);
     if(err != 0) {
         errno = err;
@@ -333,14 +345,14 @@ bool rvm_free(rvm_cfg_t* cfg, void *buf)
      */
     block_desc_t *blk;
     int bx;
-    for(bx = 0; bx < cfg->blk_tbl->end; bx+=2)
+    for(bx = 0; bx < BLOCK_TBL_SIZE; bx+=2)
     {
         blk = &(cfg->blk_tbl->tbl[bx]);
         if(blk->local_addr == buf)
             break;
     }
 
-    if(bx == cfg->blk_tbl->end) {
+    if(bx == BLOCK_TBL_SIZE) {
         rvm_log("Couldn't find buf in rvm block table\n");
         errno = EINVAL;
         return false;
@@ -362,17 +374,27 @@ bool rvm_free(rvm_cfg_t* cfg, void *buf)
     free(blk->local_addr);
     blk->local_addr = NULL;
 
+    cfg->blk_tbl->n_blocks -= 2;
+    assert(cfg->blk_tbl->n_blocks >= 0);
+
     return true;
 }
 
 void *rvm_rec(rvm_cfg_t *cfg)
 {
     static int64_t bx = 0;
+
+    for(; bx < BLOCK_TBL_SIZE; bx+=2) {
+        block_desc_t* blk = &(cfg->blk_tbl->tbl[bx]);
+        if(blk->local_addr != NULL)
+            break;
+    }
+    
     if(bx == BLOCK_TBL_SIZE)
         return NULL;
 
     void *res = cfg->blk_tbl->tbl[bx].local_addr;
-    bx+=2;
+    bx += 2;
 
     return res;
 }
