@@ -323,6 +323,13 @@ int rmem_free(struct rmem *rmem, uint32_t tag)
     struct client_context *ctx = &rmem->ctx;
 
     ctx->send_msg->id = MSG_FREE;
+
+    uintptr_t addr = lookup_remote_addr(rmem->tag_to_addr, tag);
+    CHECK_ERROR(addr == 0,
+            ("Failure: tag not found in tag_to_addr\n"));
+
+    delete_hash_item(rmem->tag_to_addr, tag);
+
     ctx->send_msg->data.free.addr = addr;
 
     if (send_message(rmem->id))

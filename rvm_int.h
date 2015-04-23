@@ -15,10 +15,12 @@
  * For now blocks are fixed-sized (page size) */
 typedef struct
 {
-    uint32_t bid;        /**< Block identifier on the server */
+    uint32_t bid;        /**< Block identifier (tag) on the server */
     void *local_addr;    /**< Address of block on client */
     uint64_t raddr;      /**< Address of block on server */
     struct ibv_mr *mr;   /**< IB registration info (invalid during rec) */
+
+    int size;            /**< size of this block (no longer stuck with page size) */
 } block_desc_t;
 
 /** The block table is a page-sized list of every block tracked by rvm */
