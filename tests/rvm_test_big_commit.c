@@ -1,4 +1,5 @@
 /* 
+ * ----- TEST ------
  * Test case where the replicated data is big (1000 blocks)
  * Stress test the data structures of the system
  */
@@ -80,6 +81,7 @@ int main(int argc, char **argv)
     CHECK_ERROR(check_txn_commit(cfg, txid) == false,
             ("FAILURE: commit did not get through - %s", strerror(errno)));
 
+    printf("SUCCESS\n");
     return EXIT_SUCCESS;
 }
 
