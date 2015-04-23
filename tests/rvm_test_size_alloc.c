@@ -72,7 +72,6 @@ int main(int argc, char **argv)
     memset(safe_arr3, 0, 1*sizeof(int));
     memset(safe_arr4, 0, 2*ARR_SIZE*sizeof(int));
 
-    //fill_arr doesn't need to know about rvm
     fill_arr(safe_arr1, ARR_SIZE);
     fill_arr(safe_arr3, 1);
     fill_arr(safe_arr1, 2*ARR_SIZE);
