@@ -6,6 +6,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+#include <assert.h>
 
 #include <rvm.h>
 #include <log.h>
@@ -52,6 +53,9 @@ int main(int argc, char **argv)
     /* Get the new addresses for arr0 and arr1 */
     int *safe_arr0 = rvm_rec(cfg);
     int *safe_arr1 = rvm_rec(cfg);
+
+    assert(safe_arr0);
+    assert(safe_arr1);
 
     /* Check their values */
     if(!check_arr(safe_arr0)) {
