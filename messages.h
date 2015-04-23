@@ -3,6 +3,10 @@
 
 #include <stdint.h>
 
+#define TAG_ADDR_PAIR_SIZEOF sizeof(tag_addr_entry)
+#define TAG_ADDR_MAP_SIZE_MSG 20
+
+
 enum message_id {
     MSG_INVALID = 0,
     MSG_MR,
@@ -13,8 +17,14 @@ enum message_id {
     MSG_CP_REQ,
     MSG_CP_GO,
     MSG_CP_ABORT,
-    MSG_CP_ACK
+    MSG_CP_ACK,
+    MSG_TAG_ADDR_MAP,
 };
+
+typedef struct tag_addr_entry {
+    uint32_t tag;
+    uintptr_t addr;
+} tag_addr_entry_t;
 
 struct message {
     enum message_id id;
@@ -43,6 +53,10 @@ struct message {
 	    uint64_t src;
 	    uint64_t size;
 	} cpreq;
+	struct {
+            int size;
+	    tag_addr_entry_t data[TAG_ADDR_MAP_SIZE_MSG];
+	} tag_addr_map;
     } data;
 };
 

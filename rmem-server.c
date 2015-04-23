@@ -1,10 +1,15 @@
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <assert.h>
 
 #include "common.h"
 #include "messages.h"
 #include "rmem_table.h"
 #include "rmem.h"
+#include "log.h"
+#include "error.h"
+
+#define MIN(a,b) ((a)<(b)?(a):(b))
 
 static const char *DEFAULT_PORT = "12345";
 static const size_t BUFFER_SIZE = 10 * 1024 * 1024;
@@ -24,6 +29,14 @@ struct conn_context
 
     struct rmem_cp_info_list cp_info;
 };
+
+void insert_tag_to_addr(struct rmem_table* rmem, uint32_t tag, uintptr_t addr) {
+    uintptr_t* value = (uintptr_t*)malloc(sizeof(uintptr_t));
+    CHECK_ERROR(value == 0,
+            ("Failure: error allocating value"));
+    *value = addr;
+    insert_hash_item(rmem->tag_to_addr, tag, value);
+}
 
 static void send_message(struct rdma_cm_id *id)
 {
@@ -96,6 +109,38 @@ static void on_pre_conn(struct rdma_cm_id *id)
     post_msg_receive(id);
 }
 
+static void send_tag_to_addr_info(struct rdma_cm_id *id) 
+{
+    struct conn_context *ctx = (struct conn_context *)id->context;
+
+    int hash_n = hash_elements(rmem.tag_to_addr);
+    int map_size_left = hash_n;
+
+    hash_iterator_t it = begin_hash(rmem.tag_to_addr);
+
+    assert( (map_size_left == 0) == (is_iterator_null(it)) );
+
+    ctx->send_msg->id = MSG_TAG_ADDR_MAP;
+
+    int to_send = MIN(map_size_left, TAG_ADDR_MAP_SIZE_MSG);
+    ctx->send_msg->data.tag_addr_map.size = to_send;
+
+    int i = 0;
+    for (; i < to_send; ++i) {
+        assert(!is_iterator_null(it));
+
+        ctx->send_msg->data.tag_addr_map.data[i].tag = 
+            (uint32_t)hash_iterator_key(it);
+
+        uintptr_t addr = *(uintptr_t*)hash_iterator_value(it);
+        ctx->send_msg->data.tag_addr_map.data[i].addr = addr;
+
+        next_hash_iterator(it);
+    }
+
+    send_message(id);
+}
+
 static void on_connection(struct rdma_cm_id *id)
 {
     struct conn_context *ctx = (struct conn_context *)id->context;
@@ -105,6 +150,11 @@ static void on_connection(struct rdma_cm_id *id)
     ctx->send_msg->data.mr.rkey = ctx->rmem_mr->rkey;
 
     send_message(id);
+
+    sleep(1);
+
+    send_tag_to_addr_info(id);
+
 }
 
 static void on_completion(struct ibv_wc *wc)
