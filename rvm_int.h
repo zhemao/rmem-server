@@ -1,6 +1,7 @@
 /* Private (internal) interfaces, types and constants for RVM */
 #include "rvm.h"
 #include "rmem.h"
+#include <stdbool.h>
 
 /* Block table always has this tag */
 #define BLOCK_TBL_ID 0
@@ -16,7 +17,7 @@
 typedef struct
 {
     uint32_t bid;        /**< Block identifier (tag) on the server */
-    void *local_addr;    /**< Address of block on client */
+    void *local_addr;    /**< Address of block on client (also flag for whether block is being used)*/
     uint64_t raddr;      /**< Address of block on server */
     struct ibv_mr *mr;   /**< IB registration info (invalid during rec) */
 
@@ -27,7 +28,8 @@ typedef struct
 typedef struct
 {
     uint64_t raddr; /**< Remote address of block table */
-    uint64_t end; /**< Next available slot in the block table */
+    
+    uint64_t n_blocks; /**< Counter of how many blocks are currently being used (also shadow blocks) */
 
     /** Table of block descriptors. It has BLOCK_TBL_SIZE entries. */
     block_desc_t tbl[];

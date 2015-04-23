@@ -9,6 +9,7 @@
  */
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 
 /** Transaction ID
  *  Valid txid's have positive values. Negative valued txid's indicate errors*/
