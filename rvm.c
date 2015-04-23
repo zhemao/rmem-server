@@ -1,9 +1,22 @@
 /* Implementation of user-facing functions for rvm */
 #include <unistd.h>
 #include <errno.h>
+#include <sys/mman.h>
+#include <signal.h>
 #include "rvm.h"
 #include "rvm_int.h"
 #include "rmem.h"
+
+/* Global bit-mask of every changed block */
+bitmap_t blk_chlist[BITNSLOTS(BLOCK_TBL_SIZE)];
+
+/* Flag to indicate whether we are currently handling a fault */
+volatile bool in_sighdl;
+
+rvm_cfg_t *cfg_glob;
+
+/* Signal handler for when blocks are written by the user (handles SIGSEGV) */
+void block_write_sighdl(int signum, siginfo_t *siginfo, void *uctx);
 
 /* Recover the block table and all pages
  * TODO Right now this just loads everything into new locations. Eventually this
@@ -74,6 +87,9 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts)
         return NULL;
     }
 
+    /* Clear the block change list */
+    memset(blk_chlist, 0, BLK_CHLIST_SZ*sizeof(int32_t));
+
     /* Register the local block table with IB */
     cfg->blk_tbl_mr = rmem_create_mr(cfg->blk_tbl, cfg->blk_sz);
     if(cfg->blk_tbl_mr == NULL) {
@@ -98,6 +114,21 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts)
         cfg->blk_tbl->end = 0;
     }
 
+    /* Install our special signal handler to track changed blocks */
+    in_sighdl = false;
+    struct sigaction sigact;
+    sigact.__sigaction_u.__sa_sigaction = block_write_sighdl;
+    sigact.sa_flags = SA_SIGINFO | SA_NODEFER;
+    sigact.sa_mask = 0;
+    sigaction(SIGSEGV, &sigact, NULL);
+
+    /* Protect the block table (treat it just like any other block) */
+    mprotect(cfg->blk_tbl, cfg->blk_sz, PROT_READ);
+
+    /* A global config is used because signal handlers need access to it. */
+    /* TODO: We probably don't need the cfg argument anymore since there can
+     * only be one now. */
+    cfg_glob = cfg;
     return cfg;
 }
 
@@ -165,8 +196,9 @@ bool rvm_txn_commit(rvm_cfg_t cfg, rvm_txid_t txid)
     /* Walk the block table and commit everything */
     for(int bx = 0; bx < cfg->blk_tbl->end; bx++)
     {
+        /* If the block has been freed or if it hasn't changed, skip it */
         block_desc_t *blk = &(cfg->blk_tbl->tbl[bx]);
-        if(blk->local_addr == NULL)
+        if(blk->local_addr == NULL || !TESTBIT(blk_chlist, bx))
             continue;
 
         /* TODO Eventually we may have to unpin blocks, this will catch that.
@@ -217,6 +249,9 @@ void *rvm_alloc(rvm_cfg_t cfg, size_t size)
         return NULL;
     }
 
+    /* Protect the local block so that we can keep track of changes */
+    mprotect(block->local_addr, cfg->blk_sz, PROT_READ);
+
     /* Allocate and register the block table remotely */
     /* TODO Right now we pin everything, all the time. Eventually we may want
      * to have some caching thing where we only pin hot pages or something.
@@ -258,7 +293,6 @@ bool rvm_free(rvm_cfg_t cfg, void *buf)
         return false;
     }
 
-
     /* Cleanup remote info */
     rmem_free(&rmem, blk->raddr);
     if(blk->mr)
@@ -268,6 +302,7 @@ bool rvm_free(rvm_cfg_t cfg, void *buf)
     /* TODO We don't really free the entry in the block table. I just don't
      * want to deal with fragmentation yet.
      */
+    mprotect(blk->local_addr, cfg->blk_sz, PROT_READ | PROT_WRITE | PROT_EXEC);
     free(blk->local_addr);
     blk->local_addr = NULL;
 
@@ -284,4 +319,45 @@ void *rvm_rec(rvm_cfg_t *cfg)
     bx++;
 
     return res;
+}
+
+void block_write_sighdl(int signum, siginfo_t *siginfo, void *uctx)
+{
+    if(in_sighdl == true) {
+        /* Recursive segfault probably means this is a real fault. Restore the
+         * default handler and proceed. Note, this may mess with debuggers. */
+        signal(SIGSEGV, SIG_DFL);
+        return;
+    }
+    in_sighdl = true;
+
+    /* Get the address of the beginning of the faulting page */
+    void page_addr = (siginfo->si_addr / _SC_PAGESIZE) * _SC_PAGESIZE;
+
+    /* Check if the attempted read was for a recoverable page */
+    /* TODO Were just doing a linear search right now, I'm sure we could do
+     * something better.
+     */
+    block_desc_t *blk;
+    int bx;
+    for(bx = 0; bx < cfg_glob->blk_tbl->end; bx++)
+    {
+        blk = &(cfg_glob->blk_tbl->tbl[bx]);
+        if(blk->local_addr == page_addr)
+            break;
+    }
+    if(bx == cfg_glob->blk_tbl->end) {
+        /* Address not in block table, this must be a real segfault */
+        signal(SIGSEGV, SIG_DFL);
+        return;
+    }
+
+    /* Found a valid block, mark it in the change list and unprotect.
+     * Strictly speaking, this isn't legal because mprotect may not be reentrant
+     * but in practice it should be fine. */
+    BITSET(blk_chlist, bx);
+    mprotect(page_addr, _SC_PAGESIZE, PROT_READ | PROT_WRITE | PROT_EXEC);
+
+    in_sighdl = false;
+    return;
 }

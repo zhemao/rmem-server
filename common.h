@@ -14,6 +14,24 @@
 #define TEST_NZ(x) do { if ( (x)) rc_die("error: " #x " failed (returned non-zero)." ); } while (0)
 #define TEST_Z(x)  do { if (!(x)) rc_die("error: " #x " failed (returned zero/null)."); } while (0)
 
+/* Generic bit-array data stucture. Taken from:
+ * http://c-faq.com/misc/bitsets.html"
+ */
+typedef int32_t bitmap_t;
+/* Internal (don't use) */
+#define _BITMASK(b) (1 << ((b) % 32))
+/* Internal (don't use) */
+#define _BITSLOT(b) ((b) / 32)
+/* Set a bit in the map */
+#define BITSET(a, b) ((a)[_BITSLOT(b)] |= _BITMASK(b))
+/* Clear a bit in the map */
+#define BITCLEAR(a, b) ((a)[_BITSLOT(b)] &= ~_BITMASK(b))
+/* Test if a bit is set */
+#define BITTEST(a, b) ((a)[_BITSLOT(b)] & _BITMASK(b))
+/* How man slots of type bitmap_t you must alloc
+ * (bitmap_t map[BITNSLOTS(number_of_bits)]) */
+#define BITNSLOTS(nb) ((nb + 32 - 1) / 32)
+
 typedef void (*pre_conn_cb_fn)(struct rdma_cm_id *id);
 typedef void (*connect_cb_fn)(struct rdma_cm_id *id);
 typedef void (*completion_cb_fn)(struct ibv_wc *wc);
