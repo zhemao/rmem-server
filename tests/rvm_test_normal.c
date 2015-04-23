@@ -1,5 +1,5 @@
 /* This is a test implementation of the RVM implementation. It doesn't do
- * anything interesting but it uses all the features */
+ * anything interesting but it uses most of the features */
 
 #include <stdlib.h>
 #include <stdio.h>
