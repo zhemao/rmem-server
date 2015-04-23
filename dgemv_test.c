@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <cblas.h>
+#include <errno.h>
+#include "rvm.h"
 
 /* Defaults for n, m and niter respectively */
 #ifndef N_DEF
@@ -17,6 +19,21 @@
     #define NITER_DEF 5
 #endif
 
+#define USAGE \
+    "Compute x*A niter times where A is an mxn random matrix and "  \
+    "x is a random vector of length n. The result will be "         \
+    "printed to stdout.\n"                                          \
+    "Usage: ./test [-mni]"                                          \
+    "\t-m NUMBER The m dimension of the matrix\n"                   \
+    "\t-n NUMBER The n dimension of the matrix\n"                   \
+    "\t-niter NUMBER The number of iterations\n"
+
+typedef struct
+{
+    int iter;       /* Which iteration we're on */
+    double vec[];   /* The latest vector */
+} state_t;
+
 /* Initialize the matrix A of dimension mxn with random numbers */
 void init_mat(double *A, int m, int n);
 
@@ -28,12 +45,19 @@ void print_vec(FILE* out, double *v, int m);
 
 int main(int argc, char *argv[])
 {
+    bool res;
+    rvm_txid_t txid;
+
     /* Parse Inputs */
     int n = N_DEF, m = M_DEF;  /* Matrix is mxn */
     int64_t niter = NITER_DEF; /* Number of iterations */
+    char *host = NULL;
+    char *port = NULL;
+    char *out_filename = NULL;
+    bool recover = false;
 
     int c;
-    while((c = getopt(argc, argv, "n:m:i:")) != -1)
+    while((c = getopt(argc, argv, "n:m:i:h:p:f:r")) != -1)
     {
         switch(c) {
         case 'm':
@@ -45,19 +69,54 @@ int main(int argc, char *argv[])
         case 'i':
             niter = strtoll(optarg, NULL, 0);
             break;
+        case 'h':
+            host = optarg;
+            break;
+        case 'p':
+            port = optarg;
+            break;
+        case 'f':
+            out_filename = optarg;
+            break;
+        case 'r':
+            recover = true;
+            break;
 
         case '?':
         case 'h':
         default:
-            printf("Compute x*A niter times where A is an mxn random matrix and"
-                    "x is a random vector of length n. The result will be"
-                    "printed to stdout.\n");
-            printf("Usage: ./%s [-mni]", argv[0]);
-            printf("\t-m NUMBER The m dimension of the matrix\n");
-            printf("\t-n NUMBER The n dimension of the matrix\n");
-            printf("\t-niter NUMBER The number of iterations\n");
+            printf(USAGE);
+            return EXIT_FAILURE;
             break;
         }
+    }
+
+    if(host == NULL || port == NULL) {
+        printf("Please provide a host and port number for the backup server\n");
+        printf(USAGE);
+        return EXIT_FAILURE;
+    }
+
+    FILE *out;
+    if(out_filename == NULL) {
+        out = stdout;
+    } else {
+        FILE *out = fopen(out_filename, "w");
+        if(out == NULL) {
+            printf("Failed to open output file: %s\n", out_filename);
+            return EXIT_FAILURE;
+        }
+    }
+
+    /* Initialize the rvm configuration */
+    rvm_opt_t opt;
+    opt.host = argv[1];
+    opt.port = argv[2];
+    opt.recovery = recover;
+    rvm_cfg_t *cfg = rvm_configure(opt);
+    if(cfg == NULL) {
+        printf("Failed to initialize rvm: %s\n", strerror(errno));
+        return EXIT_FAILURE;
     }
 
     /* The input matrix */
@@ -68,22 +127,56 @@ int main(int argc, char *argv[])
     }
     init_mat(A, m, n);
 
-    /* The working vector */
-    double *x = malloc(n*sizeof(double));
-    if(x == NULL) {
-        printf("Could not allocate vector x of dimension %d\n", n);
-        return EXIT_FAILURE;
-    }
-    init_vec(x, m);
+    /* We first try to recover state, if this is the first run or if the
+     * previous run failed before initializing rvm_rec will return NULL. */
+    state_t *state = rvm_rec(cfg);
+    if(!state) {
+        /* Starting from scratch */
+        rvm_txid_t txid = rvm_txn_begin(cfg);
+        if(txid == -1) {
+            printf("Failed to start initial transaction\n");
+            return EXIT_FAILURE;
+        }
 
-    for(int iter = 0; iter < niter; iter++)
+        /* The algorithm state. Will be preserved. */
+        state = rvm_alloc(cfg, sizeof(state_t) + n*sizeof(double));
+        if(state == NULL) {
+            printf("Could not allocate vector x of dimension %d\n", n);
+            return EXIT_FAILURE;
+        }
+        state->iter = 0;
+        init_vec(state->vec, m);
+
+        res = rvm_txn_commit(cfg, txid);
+        if(!res) {
+            printf("Failed to commit initial transaction\n");
+            return EXIT_FAILURE;
+        }
+    }
+
+    while(state->iter < niter)
     {
+        txid = rvm_txn_begin(cfg);
+        if(txid == -1) {
+            printf("Failed to begin transaction for iteration %d\n",
+                    state->iter + 1);
+            return EXIT_FAILURE;
+        }
+
         cblas_dgemv(CblasColMajor, CblasNoTrans,
-                m, n, 1.0, A, m, x, 1, 0, x, 1);
+                m, n, 1.0, A, m, state->vec, 1, 0, state->vec, 1);
+        state->iter++;
+
+        res = rvm_txn_end(cfg);
+        if(!res) {
+            printf("Failed to commit transaction for iteration %d\n",
+                    state->iter);
+            return EXIT_FAILURE;
+        }
     }
 
     printf("Result:\n");
-    print_vec(stdout, x, n);
+    print_vec(stdout, state->vec, n);
 
     return EXIT_SUCCESS;
 }

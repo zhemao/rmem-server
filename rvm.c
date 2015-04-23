@@ -133,7 +133,7 @@ bool rvm_cfg_destroy(rvm_cfg_t *cfg)
     return true;
 }
 
-rvm_txid_t rvm_txn_begin(rvm_cfg_t cfg)
+rvm_txid_t rvm_txn_begin(rvm_cfg_t *cfg)
 {
     //Nothing to do yet
 
@@ -141,7 +141,7 @@ rvm_txid_t rvm_txn_begin(rvm_cfg_t cfg)
     return 1;
 }
 
-bool rvm_txn_commit(rvm_cfg_t cfg, rvm_txid_t txid)
+bool rvm_txn_commit(rvm_cfg_t *cfg, rvm_txid_t txid)
 {
     /* TODO This is a brain-dead initial implementation. We simply copy over
      * everything in the block table, even if it wasn't modified. The long-term
@@ -185,7 +185,7 @@ bool rvm_txn_commit(rvm_cfg_t cfg, rvm_txid_t txid)
     return true;
 }
 
-void *rvm_alloc(rvm_cfg_t cfg, size_t size)
+void *rvm_alloc(rvm_cfg_t *cfg, size_t size)
 {
     int err;
 
@@ -238,7 +238,7 @@ void *rvm_alloc(rvm_cfg_t cfg, size_t size)
     return block->local_addr;
 }
 
-bool rvm_free(rvm_cfg_t cfg, void *buf)
+bool rvm_free(rvm_cfg_t *cfg, void *buf)
 {
     /* TODO Were just doing a linear search right now, I'm sure we could do
      * something better.
@@ -277,11 +277,18 @@ bool rvm_free(rvm_cfg_t cfg, void *buf)
 void *rvm_rec(rvm_cfg_t *cfg)
 {
     static int64_t bx = 0;
-    if(bx == BLOCK_TBL_SIZE)
-        return NULL;
 
-    void *res = cfg->blk_tbl->tbl[bx].local_addr;
-    bx++;
+    void *res;
+    while(bx < cfg->blk_tbl->end)
+    {
+        res = cfg->blk_tbl->tbl[bx].local_addr;
+        if(res == NULL) {
+            bx++;
+            continue;
+        } else {
+            return res;
+        }
+    }
 
-    return res;
+    return NULL;
 }
