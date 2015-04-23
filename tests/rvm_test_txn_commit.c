@@ -77,6 +77,9 @@ int main(int argc, char **argv)
     //fill_arr doesn't need to know about rvm
     fill_arr(safe_arr0);
     fill_arr(safe_arr1);
+    
+    CHECK_ERROR(check_txn_commit(cfg, txid) == true,
+            ("FAILURE: data got through before commit - %s", strerror(errno)));
 
     printf("rvm_txn_commit\n");
     CHECK_ERROR(!rvm_txn_commit(cfg, txid),
