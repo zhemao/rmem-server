@@ -17,8 +17,7 @@ static bool recover_blocks(rvm_cfg_t *cfg)
     int err;
 
     /* Recover the block table */
-    uint64_t raddr = rmem_lookup(&(cfg->rmem), BLOCK_TBL_ID);
-    err = rmem_get(&(cfg->rmem), cfg->blk_tbl, cfg->blk_tbl_mr, raddr, cfg->blk_sz);
+    err = rmem_get(&(cfg->rmem), cfg->blk_tbl, cfg->blk_tbl_mr, BLOCK_TBL_ID, cfg->blk_sz);
     if(err != 0) {
         rvm_log("Failed to recover block table\n");
         errno = 0;
@@ -50,7 +49,7 @@ static bool recover_blocks(rvm_cfg_t *cfg)
 
         /* Actual fetch from server */
         err = rmem_get(&(cfg->rmem), blk->local_addr, blk->mr,
-                blk->raddr, cfg->blk_sz);
+                bx + 1, cfg->blk_sz);
         if(err != 0) {
             rvm_log("Failed to recover block %d\n", bx);
             errno = 0;
@@ -125,15 +124,15 @@ bool rvm_cfg_destroy(rvm_cfg_t *cfg)
         if(blk->local_addr == NULL)
             continue;
 
-        // XXX fix this rmem_free(&rmem, blk->raddr);
+        rmem_free(&cfg->rmem, bx + 1); // free 'real' block
+        rmem_free(&cfg->rmem, bx + 2 ); // free 'shadow' block
         if(blk->mr)
             ibv_dereg_mr(blk->mr);
     }
 
     /* Clean up config info on server */
-    rmem_free(&cfg->rmem, cfg->blk_tbl->raddr);
-    ibv_dereg_mr(cfg->blk_tbl_mr); // XXX jcar
-    //ibv_dereg_mr(cfg->blk_tbl->mr);
+    rmem_free(&cfg->rmem, BLOCK_TBL_ID);
+    ibv_dereg_mr(cfg->blk_tbl_mr);
     rmem_disconnect(&(cfg->rmem));
 
     /* Free local memory */
@@ -165,7 +164,7 @@ bool check_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
     LOG(8, ("Getting block table\n"));
     int err;
     err = rmem_get(&cfg->rmem, block,
-                block_mr, cfg->blk_tbl->raddr, cfg->blk_sz);
+                block_mr, BLOCK_TBL_ID, cfg->blk_sz);
     LOG(8, ("Block table fetched\n"));
 
     RETURN_ERROR(err != 0, false,
@@ -189,7 +188,7 @@ bool check_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
 
         LOG(8, ("Getting block %d\n", bx));
         int err = rmem_get(&(cfg->rmem), block, block_mr,
-                blk->raddr, cfg->blk_sz);
+                bx + 1, cfg->blk_sz);
         RETURN_ERROR(err != 0, false,
                 ("Block %d does not match replica\n", bx));
     }
@@ -215,9 +214,8 @@ bool rvm_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
     int err;
 
     /* Copy the updated block table */
-    err = rmem_put(&(cfg->rmem), cfg->blk_tbl->raddr, cfg->blk_tbl,
+    err = rmem_put(&(cfg->rmem), BLOCK_TBL_ID, cfg->blk_tbl,
             cfg->blk_tbl_mr, cfg->blk_sz);
-            //cfg->blk_tbl->mr, cfg->blk_sz);
     if(err != 0) {
         rvm_log("Failed to write block table\n");
         errno = err;
@@ -236,14 +234,22 @@ bool rvm_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
          * Right now this should never trigger. */
         assert(blk->mr != NULL);
 
-        err = rmem_put(&(cfg->rmem), blk->raddr, blk->local_addr, blk->mr,
+        err = rmem_put(&(cfg->rmem), bx + 2, blk->local_addr, blk->mr,
                 cfg->blk_sz);
         if(err != 0) {
             rvm_log("Failed to write block %d\n", bx);
             errno = err;
             return false;
         }
+
+        int ret = rmem_multi_cp_add(&cfg->rmem, bx + 1, bx + 2, cfg->blk_sz);
+        CHECK_ERROR(ret != 0,
+                ("Failure: rmem_multi_cp_add\n"));
     }
+
+    int ret = rmem_multi_cp_go(&cfg->rmem);
+        CHECK_ERROR(ret != 0,
+                ("Failure: rmem_multi_cp_go\n"));
 
     return true;
 }
@@ -272,8 +278,12 @@ void *rvm_alloc(rvm_cfg_t* cfg, size_t size)
     }
 
     block_desc_t *block = &(cfg->blk_tbl->tbl[cfg->blk_tbl->end]);
+
+    // ----- SHADOW PAGES ------ //
+    // final destination of a block has block_id = X (odd numbers, starts at 1)
+    // corresponding shadow block has block_id = X + 1
     block->bid = BLOCK_TBL_ID + cfg->blk_tbl->end + 1;
-    cfg->blk_tbl->end++;
+    cfg->blk_tbl->end += 2;
     err = posix_memalign(&(block->local_addr), cfg->blk_sz, cfg->blk_sz);
     if(err != 0) {
         errno = err;
@@ -292,7 +302,10 @@ void *rvm_alloc(rvm_cfg_t* cfg, size_t size)
     }
 
     LOG(5, ("rmem_malloc tag: %d\n", block->bid));
+    // allocate final block
     block->raddr = rmem_malloc(&(cfg->rmem), cfg->blk_sz, block->bid);
+    // allocate shadow block
+    (void)rmem_malloc(&(cfg->rmem), cfg->blk_sz, block->bid + 1);
     if(block->raddr == 0) {
         rvm_log("Failed to allocate remote memory for block\n");
         errno = 0;
@@ -324,7 +337,10 @@ bool rvm_free(rvm_cfg_t* cfg, void *buf)
 
 
     /* Cleanup remote info */
-    rmem_free(&cfg->rmem, blk->raddr);
+    rmem_free(&cfg->rmem, bx + 1); 
+    
+    LOG(5, ("rmem_free id: %d\n", bx + 2));
+    rmem_free(&cfg->rmem, bx + 2); // free shadow block as well
     if(blk->mr)
         ibv_dereg_mr(blk->mr);
 
@@ -345,7 +361,7 @@ void *rvm_rec(rvm_cfg_t *cfg)
         return NULL;
 
     void *res = cfg->blk_tbl->tbl[bx].local_addr;
-    bx++;
+    bx+=2;
 
     return res;
 }
