@@ -1,3 +1,6 @@
+#ifndef _RVM_H_
+#define _RVM_H_
+
 /* This file includes the user-facing interface for recoverable virtual memory
  * NOTE: None of these functions are thread-safe
  *
@@ -6,6 +9,7 @@
  */
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 
 /** Transaction ID
  *  Valid txid's have positive values. Negative valued txid's indicate errors*/
@@ -53,7 +57,7 @@ bool rvm_cfg_destroy(rvm_cfg_t *cfg);
  *  \param[in] cfg Configuration to use for rvm
  *  \returns A transaction ID on success. -1 on error (sets errno).
  */
-rvm_txid_t rvm_txn_begin(rvm_cfg_t *cfg);
+rvm_txid_t rvm_txn_begin(rvm_cfg_t* cfg);
 
 /** Finalize a transaction.
  * After calling rvm_commit() any changes to a recoverable memory region since
@@ -67,7 +71,18 @@ rvm_txid_t rvm_txn_begin(rvm_cfg_t *cfg);
  * \param[in] txid The transaction id of the currently running transaction
  * \returns true for success. false otherwise, sets errno for specific error.
  */
-bool rvm_txn_commit(rvm_cfg_t *cfg, rvm_txid_t txid);
+bool rvm_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid);
+
+/** Check transaction success (for debugging)
+ * Check that all data now lives in the right places in the buddy node
+ *
+ * \pre Exactly one transaction must have been started (rvm_txn_begin) and not
+ *  already committed.
+ * \param[in] cfg Configuration to use for rvm
+ * \param[in] txid The transaction id of the currently running transaction
+ * \returns true for success. false otherwise, sets errno for specific error.
+ */
+bool check_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid);
 
 /** Allocate a region of recoverable memory of at least size "size" bytes.
  *
@@ -81,7 +96,7 @@ bool rvm_txn_commit(rvm_cfg_t *cfg, rvm_txid_t txid);
  * \param[in] size The size (in bytes) of the memory to allocate.
  * \returns A pointer to the beginning of recoverable memory
  */
-void *rvm_alloc(rvm_cfg_t *cfg, size_t size);
+void *rvm_alloc(rvm_cfg_t* cfg, size_t size);
 
 /** Free memory allocated by rvm_alloc().
  *
@@ -89,7 +104,7 @@ void *rvm_alloc(rvm_cfg_t *cfg, size_t size);
  * \param[in] buf Buffer to free
  * \returns true on success, false on error (sets errno)
  */
-bool rvm_free(rvm_cfg_t *cfg, void *buf);
+bool rvm_free(rvm_cfg_t* cfg, void *buf);
 
 /** Recover the structure of recoverable memory.
  *  rvm_rec returns the address of the first recoverable allocation. Subsequent
@@ -109,3 +124,5 @@ bool rvm_free(rvm_cfg_t *cfg, void *buf);
  *  \returns The first invocation of rvm_rec returns
  */
 void *rvm_rec(rvm_cfg_t *cfg);
+
+#endif // _RVM_H_

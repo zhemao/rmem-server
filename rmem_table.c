@@ -3,7 +3,9 @@
 
 #include <stdio.h>
 #include <sys/mman.h>
+#include "log.h"
 
+#define HASH_SIZE 10000
 #define DATA_OFFSET (sizeof(struct alloc_entry *))
 
 static inline struct alloc_entry *entry_of_list(struct list_head *list)
@@ -89,6 +91,8 @@ void init_rmem_table(struct rmem_table *rmem)
 
     for (i = 0; i < NUM_BUCKETS; i++)
 	list_init(&rmem->htable[i]);
+
+    rmem->tag_to_addr = create_hash(HASH_SIZE);
 }
 
 void free_rmem_table(struct rmem_table *rmem)
@@ -326,7 +330,7 @@ static inline void dump_free_list(struct rmem_table *rmem)
     printf("-----------\n");
 }
 
-void rmem_free(struct rmem_table *rmem, void *ptr)
+void rmem_table_free(struct rmem_table *rmem, void *ptr)
 {
     void *start = ptr - DATA_OFFSET;
     struct alloc_entry *entry;
@@ -343,7 +347,7 @@ void rmem_free(struct rmem_table *rmem, void *ptr)
     //dump_free_list(rmem);
 }
 
-void *rmem_lookup(struct rmem_table *rmem, tag_t tag)
+void *rmem_table_lookup(struct rmem_table *rmem, tag_t tag)
 {
     struct alloc_entry *entry;
 

@@ -1,9 +1,15 @@
 #include <fcntl.h>
 #include <sys/stat.h>
+#include <assert.h>
 
 #include "common.h"
 #include "messages.h"
 #include "rmem_table.h"
+#include "rmem.h"
+#include "log.h"
+#include "error.h"
+
+#define MIN(a,b) ((a)<(b)?(a):(b))
 
 static const char *DEFAULT_PORT = "12345";
 static const size_t BUFFER_SIZE = 10 * 1024 * 1024;
@@ -24,6 +30,15 @@ struct conn_context
     struct rmem_cp_info_list cp_info;
 };
 
+static
+void insert_tag_to_addr(struct rmem_table* rmem, uint32_t tag, uintptr_t addr) {
+    uintptr_t* value = (uintptr_t*)malloc(sizeof(uintptr_t));
+    CHECK_ERROR(value == 0,
+            ("Failure: error allocating value"));
+    *value = addr;
+    insert_hash_item(rmem->tag_to_addr, tag, value);
+}
+
 static void send_message(struct rdma_cm_id *id)
 {
     struct conn_context *ctx = (struct conn_context *)id->context;
@@ -42,6 +57,8 @@ static void send_message(struct rdma_cm_id *id)
     sge.addr = (uintptr_t)ctx->send_msg;
     sge.length = sizeof(*ctx->send_msg);
     sge.lkey = ctx->send_msg_mr->lkey;
+
+    LOG(1, ("posting sending WR\n"));
 
     TEST_NZ(ibv_post_send(id->qp, &wr, &bad_wr));
 }
@@ -63,36 +80,72 @@ static void post_msg_receive(struct rdma_cm_id *id)
     sge.length = sizeof(*ctx->recv_msg);
     sge.lkey = ctx->recv_msg_mr->lkey;
 
+    LOG(1, ("posting receive WR\n"));
+
     TEST_NZ(ibv_post_recv(id->qp, &wr, &bad_wr));
 }
 
 static void on_pre_conn(struct rdma_cm_id *id)
 {
     struct conn_context *ctx = (struct conn_context *) malloc(
-		    sizeof(struct conn_context));
+            sizeof(struct conn_context));
 
     id->context = ctx;
 
+    LOG(5, ("Creating rmem mr. addr: %ld size: %d\n", 
+                (uintptr_t)rmem.mem, RMEM_SIZE));
     TEST_Z(ctx->rmem_mr = ibv_reg_mr(
-            rc_get_pd(), rmem.mem, RMEM_SIZE,
-            IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE |
-            IBV_ACCESS_REMOTE_READ));
+                rc_get_pd(), rmem.mem, RMEM_SIZE,
+                IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE |
+                IBV_ACCESS_REMOTE_READ));
 
     posix_memalign((void **)&ctx->recv_msg, sysconf(_SC_PAGESIZE),
-		    sizeof(*ctx->recv_msg));
+            sizeof(*ctx->recv_msg));
     TEST_Z(ctx->recv_msg_mr = ibv_reg_mr(
-            rc_get_pd(), ctx->recv_msg, sizeof(*ctx->recv_msg),
-            IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE));
+                rc_get_pd(), ctx->recv_msg, sizeof(*ctx->recv_msg),
+                IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE));
 
     posix_memalign((void **)&ctx->send_msg, sysconf(_SC_PAGESIZE),
-		    sizeof(*ctx->send_msg));
+            sizeof(*ctx->send_msg));
     TEST_Z(ctx->send_msg_mr = ibv_reg_mr(
-            rc_get_pd(), ctx->send_msg, sizeof(*ctx->send_msg),
-            IBV_ACCESS_LOCAL_WRITE));
+                rc_get_pd(), ctx->send_msg, sizeof(*ctx->send_msg),
+                IBV_ACCESS_LOCAL_WRITE));
 
     cp_info_list_init(&ctx->cp_info);
 
     post_msg_receive(id);
+}
+
+static void send_tag_to_addr_info(struct rdma_cm_id *id) 
+{
+    struct conn_context *ctx = (struct conn_context *)id->context;
+
+    int hash_n = hash_elements(rmem.tag_to_addr);
+    int map_size_left = hash_n;
+
+    hash_iterator_t it = begin_hash(rmem.tag_to_addr);
+
+    assert( (map_size_left == 0) == (is_iterator_null(it)) );
+
+    ctx->send_msg->id = MSG_TAG_ADDR_MAP;
+
+    int to_send = MIN(map_size_left, TAG_ADDR_MAP_SIZE_MSG);
+    ctx->send_msg->data.tag_addr_map.size = to_send;
+
+    int i = 0;
+    for (; i < to_send; ++i) {
+        assert(!is_iterator_null(it));
+
+        ctx->send_msg->data.tag_addr_map.data[i].tag = 
+            (uint32_t)hash_iterator_key(it);
+
+        uintptr_t addr = *(uintptr_t*)hash_iterator_value(it);
+        ctx->send_msg->data.tag_addr_map.data[i].addr = addr;
+
+        next_hash_iterator(it);
+    }
+
+    send_message(id);
 }
 
 static void on_connection(struct rdma_cm_id *id)
@@ -103,7 +156,15 @@ static void on_connection(struct rdma_cm_id *id)
     ctx->send_msg->data.mr.addr = (uintptr_t)ctx->rmem_mr->addr;
     ctx->send_msg->data.mr.rkey = ctx->rmem_mr->rkey;
 
+    LOG(5, ("On connection. mr.addrd: %ld rmem.mem: %ld\n", (uintptr_t)ctx->send_msg->data.mr.addr,
+                (uintptr_t)rmem.mem));
+
     send_message(id);
+
+    sleep(1);
+
+    send_tag_to_addr_info(id);
+
 }
 
 static void on_completion(struct ibv_wc *wc)
@@ -114,56 +175,78 @@ static void on_completion(struct ibv_wc *wc)
     if (wc->opcode == IBV_WC_RECV) {
         struct message *msg = ctx->recv_msg;
         void *ptr;
+        LOG(1, ("on_completion: IBV_WC_RECV\n"));
 
         switch (msg->id) {
-        case MSG_ALLOC:
-            TEST_NZ(pthread_mutex_lock(&alloc_mutex));
-            ptr = rmem_alloc(&rmem, msg->data.alloc.size,
-                    msg->data.alloc.tag);
-            TEST_NZ(pthread_mutex_unlock(&alloc_mutex));
-            ctx->send_msg->id = MSG_MEMRESP;
-            ctx->send_msg->data.memresp.addr = (uintptr_t) ptr;
-            ctx->send_msg->data.memresp.error = (ptr == NULL);
-            send_message(id);
-            break;
-        case MSG_LOOKUP:
-            ptr = rmem_lookup(&rmem, msg->data.lookup.tag);
-            ctx->send_msg->id = MSG_MEMRESP;
-            ctx->send_msg->data.memresp.addr = (uintptr_t) ptr;
-            ctx->send_msg->data.memresp.error = (ptr == NULL);
-            send_message(id);
-            break;
-        case MSG_FREE:
-            ptr = (void *) msg->data.free.addr;
-            rmem_free(&rmem, ptr);
-            break;
-	case MSG_CP_REQ:
-	    cp_info_list_add(&ctx->cp_info,
-		    (void *) msg->data.cpreq.dst,
-		    (void *) msg->data.cpreq.src,
-		    (size_t) msg->data.cpreq.size);
-	    break;
-	case MSG_CP_GO:
-	    multi_cp(&ctx->cp_info);
-	    cp_info_list_clear(&ctx->cp_info);
-	    ctx->send_msg->id = MSG_CP_ACK;
-	    send_message(id);
-	    break;
-	case MSG_CP_ABORT:
-	    cp_info_list_clear(&ctx->cp_info);
-	    break;
-        default:
-            fprintf(stderr, "Invalid message type %d\n", msg->id);
-            exit(EXIT_FAILURE);
+            case MSG_ALLOC:
+                TEST_NZ(pthread_mutex_lock(&alloc_mutex));
+                ptr = rmem_alloc(&rmem, msg->data.alloc.size,
+                        msg->data.alloc.tag);
+                TEST_NZ(pthread_mutex_unlock(&alloc_mutex));
+                ctx->send_msg->id = MSG_MEMRESP;
+                ctx->send_msg->data.memresp.addr = (uintptr_t) ptr;
+                ctx->send_msg->data.memresp.error = (ptr == NULL);
+
+                insert_tag_to_addr(&rmem, msg->data.alloc.tag, (uintptr_t)ptr);
+                
+                LOG(1, ("MSG_ALLOC size: %ld ptr: %ld\n", 
+                            msg->data.alloc.size, (uintptr_t)ptr));
+
+#ifdef DEBUG
+                if (ptr == NULL) {
+                    printf("Error allocating\n");
+                }
+#endif
+
+                send_message(id);
+                break;
+            case MSG_LOOKUP:
+                LOG(1, ("MSG_LOOKUP\n"));
+                ptr = rmem_table_lookup(&rmem, msg->data.lookup.tag);
+                ctx->send_msg->id = MSG_MEMRESP;
+                ctx->send_msg->data.memresp.addr = (uintptr_t) ptr;
+                ctx->send_msg->data.memresp.error = (ptr == NULL);
+                send_message(id);
+                break;
+            case MSG_FREE:
+                LOG(1, ("MSG_FREE\n"));
+                ptr = (void *) msg->data.free.addr;
+                rmem_table_free(&rmem, ptr);
+                break;
+            case MSG_CP_REQ:
+                LOG(1, ("MSG_CP_REQ\n"));
+                cp_info_list_add(&ctx->cp_info,
+                        (void *) msg->data.cpreq.dst,
+                        (void *) msg->data.cpreq.src,
+                        (size_t) msg->data.cpreq.size);
+                break;
+            case MSG_CP_GO:
+                LOG(1, ("MSG_CP_GO\n"));
+                multi_cp(&ctx->cp_info);
+                cp_info_list_clear(&ctx->cp_info);
+                ctx->send_msg->id = MSG_CP_ACK;
+                send_message(id);
+                break;
+            case MSG_CP_ABORT:
+                LOG(1, ("MSG_CP_ABORT\n"));
+                cp_info_list_clear(&ctx->cp_info);
+                break;
+            default:
+                fprintf(stderr, "Invalid message type %d\n", msg->id);
+                exit(EXIT_FAILURE);
         }
 
-	post_msg_receive(id);
+        post_msg_receive(id);
+    } else {
+        LOG(1, ("on_completion: else\n"));
     }
 }
 
 static void on_disconnect(struct rdma_cm_id *id)
 {
     struct conn_context *ctx = (struct conn_context *)id->context;
+
+    LOG(1, ("on_disconnect\n"));
 
     cp_info_list_clear(&ctx->cp_info);
 
@@ -179,14 +262,15 @@ static void on_disconnect(struct rdma_cm_id *id)
 
 int main(int argc, char **argv)
 {
+    LOG(1, ("starting rmem-server\n"));
     init_rmem_table(&rmem);
     pthread_mutex_init(&alloc_mutex, NULL);
 
     rc_init(
-        on_pre_conn,
-        on_connection,
-        on_completion,
-        on_disconnect);
+            on_pre_conn,
+            on_connection,
+            on_completion,
+            on_disconnect);
 
     printf("waiting for connections. interrupt (^C) to exit.\n");
 
@@ -197,3 +281,4 @@ int main(int argc, char **argv)
 
     return 0;
 }
+

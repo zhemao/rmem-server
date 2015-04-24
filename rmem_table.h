@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include "data/hash.h"
 
 #define RMEM_SIZE (1 << 14)
 #define MIN_SIZE (2 * sizeof(void*))
@@ -31,6 +32,7 @@ struct rmem_table {
     struct list_head free_list;
     size_t alloc_size;
     struct list_head *htable;
+    hash_t tag_to_addr;
 };
 
 struct rmem_cp_info {
@@ -46,8 +48,8 @@ struct rmem_cp_info_list {
 
 void init_rmem_table(struct rmem_table *rmem);
 void *rmem_alloc(struct rmem_table *rmem, size_t size, tag_t tag);
-void rmem_free(struct rmem_table *rmem, void *ptr);
-void *rmem_lookup(struct rmem_table *rmem, tag_t tag);
+void rmem_table_free(struct rmem_table *rmem, void *ptr);
+void *rmem_table_lookup(struct rmem_table *rmem, tag_t tag);
 void free_rmem_table(struct rmem_table *rmem);
 void dump_rmem_table(struct rmem_table *rmem);
 
