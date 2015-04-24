@@ -1,5 +1,10 @@
 #include "common.h"
 
+#include <netdb.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include "log.h"
+
 const int TIMEOUT_IN_MS = 500;
 
 struct context {
@@ -168,7 +173,8 @@ void rc_client_loop(const char *host, const char *port, void *context)
 
     TEST_Z(ec = rdma_create_event_channel());
     TEST_NZ(rdma_create_id(ec, &conn, NULL, RDMA_PS_TCP));
-    TEST_NZ(rdma_resolve_addr(conn, NULL, addr->ai_addr, TIMEOUT_IN_MS));
+    //TEST_NZ(rdma_resolve_addr(conn, NULL, addr->ai_addr, TIMEOUT_IN_MS));
+    rdma_resolve_addr(conn, NULL, addr->ai_addr, TIMEOUT_IN_MS);
 
     freeaddrinfo(addr);
 
