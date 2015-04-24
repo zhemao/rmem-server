@@ -446,6 +446,7 @@ void *rvm_rec(rvm_cfg_t *cfg)
 
     return res;
 }
+<<<<<<< HEAD
 
 void block_write_sighdl(int signum, siginfo_t *siginfo, void *uctx)
 {
@@ -493,5 +494,3 @@ void block_write_sighdl(int signum, siginfo_t *siginfo, void *uctx)
     in_sighdl = false;
     return;
 }
-
-

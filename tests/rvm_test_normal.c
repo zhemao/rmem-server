@@ -93,6 +93,7 @@ int main(int argc, char **argv)
             return EXIT_FAILURE;
         }
 
+        printf("SUCCESS: Memory recovered after \"failure\"\n");
     } else {
 
         rvm_cfg_t* cfg = initialize_rvm(argv[1], argv[2]);

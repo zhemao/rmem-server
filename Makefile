@@ -7,7 +7,7 @@ INCLUDE :=-I. -Idata
 
 FILES   := log.h common.o rmem_table.o rmem-server.o rvm.o rmem.o data/hash.o data/list.o
 APPS    := rmem-server rmem-client rmem-test
-TESTS   := tests/rvm_test_normal tests/rvm_test_txn_commit tests/rvm_test_recovery tests/rvm_test_free tests/rvm_test_big_commit tests/rvm_test_size_alloc dgemv_test
+TESTS   := tests/rvm_test_normal tests/rvm_test_txn_commit tests/rvm_test_recovery tests/rvm_test_free tests/rvm_test_big_commit tests/rvm_test_size_alloc tests/dgemv_test
 #HEADERS := $(wildcard *.h)
 SRCS    := $(wildcard *.c)
 
@@ -24,8 +24,8 @@ rmem-client: ${FILES}
 rmem-test: ${FILES}
 	${LD} -o $@ $^ ${CFLAGS} ${LDFLAGS} ${INCLUDE}
 
-dgemv_test: dgemv_test.c
-	${LD} -o $@ $^ -lblas -std=gnu11
+tests/dgemv_test: tests/dgemv_test.c rmem.o rvm.o rmem_table.o common.o data/hash.o data/list.o
+	${LD} -o $@ $^ -lblas ${LDFLAGS} ${INCLUDE} -std=gnu11
 
 tests/rvm_test_normal: tests/rvm_test_normal.c rmem.o rvm.o rmem_table.o common.o data/hash.o data/list.o
 	${LD} -o $@ $^ ${CFLAGS} ${LDFLAGS} ${INCLUDE}
