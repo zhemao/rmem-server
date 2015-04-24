@@ -398,5 +398,3 @@ void *rvm_rec(rvm_cfg_t *cfg)
 
     return res;
 }
-
-
