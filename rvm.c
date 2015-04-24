@@ -68,6 +68,9 @@ static bool recover_blocks(rvm_cfg_t *cfg)
             errno = 0;
             return false;
         }
+
+        /* Protect the block to detect changes */
+        mprotect(blk->local_addr, blk->size, PROT_READ);
     }
 
     return true;
@@ -81,6 +84,7 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts)
     if(cfg == NULL)
         return NULL;
     cfg->blk_sz = sysconf(_SC_PAGESIZE);
+    cfg->in_txn = false;
 
     rmem_connect(&(cfg->rmem), opts->host, opts->port);
 
@@ -159,6 +163,10 @@ bool rvm_cfg_destroy(rvm_cfg_t *cfg)
         rmem_free(&cfg->rmem, bx + 2 ); // free 'shadow' block
         if(blk->mr)
             ibv_dereg_mr(blk->mr);
+
+        /* Unprotect block */
+        mprotect(blk->local_addr, blk->size,
+                PROT_READ | PROT_WRITE | PROT_EXEC);
     }
 
     /* Clean up config info on server */
@@ -175,7 +183,7 @@ bool rvm_cfg_destroy(rvm_cfg_t *cfg)
 
 rvm_txid_t rvm_txn_begin(rvm_cfg_t* cfg)
 {
-    //Nothing to do yet
+    cfg->in_txn = true;
 
     //Always return the same txid because we don't support nesting or rollback
     return 1;
@@ -234,6 +242,8 @@ bool check_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
     free(block);
     ibv_dereg_mr(block_mr);
 
+    cfg->in_txn = false;
+
     return true;
 }
 
@@ -282,6 +292,9 @@ bool rvm_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
         int ret = rmem_multi_cp_add(&cfg->rmem, bx + 1, bx + 2, blk->size);
         CHECK_ERROR(ret != 0,
                 ("Failure: rmem_multi_cp_add\n"));
+
+        /* Re-protect the block for the next txn */
+        mprotect(blk->local_addr, blk->size, PROT_READ);
     }
 
     int ret = rmem_multi_cp_go(&cfg->rmem);
@@ -443,6 +456,11 @@ void block_write_sighdl(int signum, siginfo_t *siginfo, void *uctx)
         return;
     }
     in_sighdl = true;
+
+    if(!cfg_glob->in_txn) {
+        /* Not allowed to change pages outside of a txn. Issue a warning. */
+        LOG(1, ("Recoverable page modified outside a txn\n"));
+    }
 
     /* Get the address of the beginning of the faulting page */
     void page_addr = (siginfo->si_addr / _SC_PAGESIZE) * _SC_PAGESIZE;

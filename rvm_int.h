@@ -42,4 +42,5 @@ struct rvm_cfg
     size_t blk_sz;               /**< Size of minimum rvm allocation */
     blk_tbl_t *blk_tbl;          /**< Info about all blocks tracked by rvm */
     struct ibv_mr *blk_tbl_mr;   /**< IB registration info for block table */
+    bool in_txn;                 /**< Are we currently in a transaction? */
 };
