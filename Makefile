@@ -24,8 +24,8 @@ rmem-client: ${FILES}
 rmem-test: ${FILES}
 	${LD} -o $@ $^ ${CFLAGS} ${LDFLAGS} ${INCLUDE}
 
-dgemv_test: dgemv_test.o
-	${LD} -o $@ $^ -lblas
+dgemv_test: dgemv_test.c
+	${LD} -o $@ $^ -lblas -std=gnu11
 
 tests/rvm_test_normal: tests/rvm_test_normal.c rmem.o rvm.o rmem_table.o common.o data/hash.o data/list.o
 	${LD} -o $@ $^ ${CFLAGS} ${LDFLAGS} ${INCLUDE}
