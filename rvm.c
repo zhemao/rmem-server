@@ -282,8 +282,8 @@ void *rvm_rec(rvm_cfg_t *cfg)
     while(bx < cfg->blk_tbl->end)
     {
         res = cfg->blk_tbl->tbl[bx].local_addr;
+        bx++;
         if(res == NULL) {
-            bx++;
             continue;
         } else {
             return res;

@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <cblas.h>
 #include <errno.h>
+#include <string.h>
 #include "rvm.h"
 
 /* Defaults for n, m and niter respectively */
@@ -83,7 +84,6 @@ int main(int argc, char *argv[])
             break;
 
         case '?':
-        case 'h':
         default:
             printf(USAGE);
             return EXIT_FAILURE;
@@ -113,7 +113,7 @@ int main(int argc, char *argv[])
     opt.host = argv[1];
     opt.port = argv[2];
     opt.recovery = recover;
-    rvm_cfg_t *cfg = rvm_configure(opt);
+    rvm_cfg_t *cfg = rvm_cfg_create(&opt);
     if(cfg == NULL) {
         printf("Failed to initialize rvm: %s\n", strerror(errno));
         return EXIT_FAILURE;
@@ -167,7 +167,7 @@ int main(int argc, char *argv[])
                 m, n, 1.0, A, m, state->vec, 1, 0, state->vec, 1);
         state->iter++;
 
-        res = rvm_txn_end(cfg);
+        res = rvm_txn_commit(cfg, txid);
         if(!res) {
             printf("Failed to commit transaction for iteration %d\n",
                     state->iter);
@@ -176,7 +176,7 @@ int main(int argc, char *argv[])
     }
 
     printf("Result:\n");
-    print_vec(stdout, state->vec, n);
+    print_vec(out, state->vec, n);
 
     return EXIT_SUCCESS;
 }
