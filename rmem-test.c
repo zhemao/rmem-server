@@ -20,21 +20,21 @@ int main(void)
     memset(data2, '2', 50);
     memset(data3, '3', 120);
 
-    rmem_free(&rmem, data2);
+    rmem_table_free(&rmem, data2);
     data2 = rmem_alloc(&rmem, 70, 2);
     memset(data2, '2', 70);
 
     data4 = rmem_alloc(&rmem, 25, 4);
     memset(data4, '4', 25);
 
-    rmem_free(&rmem, data3);
+    rmem_table_free(&rmem, data3);
     data3 = rmem_alloc(&rmem, 120, 3);
     memset(data3, '3', 120);
 
-    assert(data1 == rmem_lookup(&rmem, 1));
-    assert(data2 == rmem_lookup(&rmem, 2));
-    assert(data3 == rmem_lookup(&rmem, 3));
-    assert(data4 == rmem_lookup(&rmem, 4));
+    assert(data1 == rmem_table_lookup(&rmem, 1));
+    assert(data2 == rmem_table_lookup(&rmem, 2));
+    assert(data3 == rmem_table_lookup(&rmem, 3));
+    assert(data4 == rmem_table_lookup(&rmem, 4));
 
     dump_rmem_table(&rmem);
     free_rmem_table(&rmem);

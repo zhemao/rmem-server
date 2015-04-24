@@ -1,7 +1,20 @@
 #include "common.h"
 #include "rmem.h"
+#include "log.h"
+#include "error.h"
 
+static const int HASH_SIZE = 10000;
 static const int TIMEOUT_IN_MS = 500;
+
+static 
+uintptr_t lookup_remote_addr(hash_t tag_to_addr, uint32_t tag) {
+    void *addr = get_item(tag_to_addr, tag);
+    
+    if (!addr)
+        return 0;
+
+   return *(uintptr_t*)addr; 
+}
 
 static int send_message(struct rdma_cm_id *id)
 {
@@ -80,6 +93,38 @@ static void on_completion(struct ibv_wc *wc)
     }
 }
 
+static
+void insert_tag_to_addr(struct rmem* rmem, uint32_t tag, uintptr_t addr) {
+    uintptr_t* addr_ptr = (uintptr_t*)malloc(sizeof(uintptr_t));
+    CHECK_ERROR(addr == 0,
+            ("Failure: error allocating memory for tag_to_addr entry\n"));
+    *addr_ptr = addr;
+
+    insert_hash_item(rmem->tag_to_addr, tag, (void*)addr_ptr);
+}
+
+static
+void receive_tag_to_addr_info(struct rmem* rmem) 
+{
+    while (1) {
+        TEST_NZ(post_receive(rmem->id));
+        sem_wait(&rmem->ctx.recv_sem);
+
+        int size = rmem->ctx.recv_msg->data.tag_addr_map.size;
+
+        tag_addr_entry_t* entries = 
+            (tag_addr_entry_t*)rmem->ctx.recv_msg->data.tag_addr_map.data;
+
+        int i = 0;
+        for (; i < size; ++i) {
+            insert_tag_to_addr(rmem, entries[i].tag, entries[i].addr);
+        }
+
+        if (size < TAG_ADDR_MAP_SIZE_MSG)
+            break;
+    }
+}
+
 void rmem_connect(struct rmem *rmem, const char *host, const char *port)
 {
     struct addrinfo *addr;
@@ -100,6 +145,9 @@ void rmem_connect(struct rmem *rmem, const char *host, const char *port)
     TEST_NZ(sem_init(&rmem->ctx.rdma_sem, 0, 0));
     TEST_NZ(sem_init(&rmem->ctx.send_sem, 0, 0));
     TEST_NZ(sem_init(&rmem->ctx.recv_sem, 0, 0));
+
+    // build tag_to_addr map
+    rmem->tag_to_addr = create_hash(HASH_SIZE);
 
     while (rdma_get_cm_event(rmem->ec, &event) == 0) {
         struct rdma_cm_event event_copy;
@@ -123,6 +171,8 @@ void rmem_connect(struct rmem *rmem, const char *host, const char *port)
     sem_wait(&rmem->ctx.recv_sem);
     rmem->ctx.peer_addr = rmem->ctx.recv_msg->data.mr.addr;
     rmem->ctx.peer_rkey = rmem->ctx.recv_msg->data.mr.rkey;
+
+    receive_tag_to_addr_info(rmem);
 }
 
 void rmem_disconnect(struct rmem *rmem)
@@ -164,7 +214,10 @@ uint64_t rmem_malloc(struct rmem *rmem, size_t size, uint32_t tag)
     if (ctx->recv_msg->data.memresp.error)
         return 0;
 
-    return ctx->recv_msg->data.memresp.addr;
+    uintptr_t addr = ctx->recv_msg->data.memresp.addr;
+    insert_tag_to_addr(rmem, tag, addr);
+
+    return addr;
 }
 
 uint64_t rmem_lookup(struct rmem *rmem, uint32_t tag)
@@ -190,7 +243,7 @@ uint64_t rmem_lookup(struct rmem *rmem, uint32_t tag)
     return ctx->recv_msg->data.memresp.addr;
 }
 
-int rmem_put(struct rmem *rmem, uint64_t dst,
+int rmem_put(struct rmem *rmem, uint32_t tag,
         void *src, struct ibv_mr *src_mr, size_t size)
 {
     int err;
@@ -204,6 +257,13 @@ int rmem_put(struct rmem *rmem, uint64_t dst,
     wr.wr_id = (uintptr_t) rmem->id;
     wr.opcode = IBV_WR_RDMA_WRITE;
     wr.send_flags = IBV_SEND_SIGNALED;
+
+    uintptr_t dst = lookup_remote_addr(rmem->tag_to_addr, tag);
+    CHECK_ERROR(dst == 0,
+            ("Failure: tag not found in tag_to_addr\n"));
+    
+    LOG(8, ("rmem_put size: %ld tag: %d dst:%ld\n", size, tag, dst));
+
     wr.wr.rdma.remote_addr = dst;
     wr.wr.rdma.rkey = ctx->peer_rkey;
     wr.sg_list = &sge;
@@ -221,7 +281,7 @@ int rmem_put(struct rmem *rmem, uint64_t dst,
 }
 
 int rmem_get(struct rmem *rmem, void *dst, struct ibv_mr *dst_mr,
-        uint64_t src, size_t size)
+        uint32_t tag, size_t size)
 {
     struct client_context *ctx = &rmem->ctx;
     int err;
@@ -234,6 +294,13 @@ int rmem_get(struct rmem *rmem, void *dst, struct ibv_mr *dst_mr,
     wr.wr_id = (uintptr_t) rmem->id;
     wr.opcode = IBV_WR_RDMA_READ;
     wr.send_flags = IBV_SEND_SIGNALED;
+
+    uintptr_t src = lookup_remote_addr(rmem->tag_to_addr, tag);
+    CHECK_ERROR(src == 0,
+            ("Failure: tag not found in tag_to_addr\n"));
+
+    LOG(8, ("rmem_get size: %ld tag: %d src: %ld\n", size, tag, src));
+
     wr.wr.rdma.remote_addr = src;
     wr.wr.rdma.rkey = ctx->peer_rkey;
     wr.sg_list = &sge;
@@ -251,11 +318,18 @@ int rmem_get(struct rmem *rmem, void *dst, struct ibv_mr *dst_mr,
     return 0;
 }
 
-int rmem_free(struct rmem *rmem, uint64_t addr)
+int rmem_free(struct rmem *rmem, uint32_t tag)
 {
     struct client_context *ctx = &rmem->ctx;
 
     ctx->send_msg->id = MSG_FREE;
+
+    uintptr_t addr = lookup_remote_addr(rmem->tag_to_addr, tag);
+    CHECK_ERROR(addr == 0,
+            ("Failure: tag not found in tag_to_addr\n"));
+
+    delete_hash_item(rmem->tag_to_addr, tag);
+
     ctx->send_msg->data.free.addr = addr;
 
     if (send_message(rmem->id))
@@ -266,9 +340,12 @@ int rmem_free(struct rmem *rmem, uint64_t addr)
     return 0;
 }
 
-int rmem_multi_cp_add(struct rmem *rmem, uint64_t dst, uint64_t src, uint64_t size)
+int rmem_multi_cp_add(struct rmem *rmem, uint32_t tag_dst, uint32_t tag_src, uint64_t size)
 {
     struct client_context *ctx = &rmem->ctx;
+
+    uint64_t dst = lookup_remote_addr(rmem->tag_to_addr, tag_dst);
+    uint64_t src = lookup_remote_addr(rmem->tag_to_addr, tag_src);
 
     ctx->send_msg->id = MSG_CP_REQ;
     ctx->send_msg->data.cpreq.dst = dst;
