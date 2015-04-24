@@ -396,7 +396,5 @@ void *rvm_rec(rvm_cfg_t *cfg)
     void *res = cfg->blk_tbl->tbl[bx].local_addr;
     bx += 2;
 
-    return NULL;
+    return res;
 }
-
-
