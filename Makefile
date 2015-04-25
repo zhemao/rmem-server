@@ -1,8 +1,8 @@
 .PHONY: clean
 
-CFLAGS  := -Wall -g -fPIC 
+CFLAGS  := -Wall -g -fPIC -std=gnu11
 LD      := gcc
-LDFLAGS := ${LDFLAGS} -lrdmacm -libverbs -lpthread
+LDFLAGS := ${LDFLAGS} -lrdmacm -libverbs -lpthread -std=gnu11
 INCLUDE :=-I. -Idata
 
 FILES   := log.h common.o rmem_table.o rmem-server.o rvm.o rmem.o data/hash.o data/list.o
@@ -25,7 +25,7 @@ rmem-test: ${FILES}
 	${LD} -o $@ $^ ${CFLAGS} ${LDFLAGS} ${INCLUDE}
 
 tests/dgemv_test: tests/dgemv_test.c rmem.o rvm.o rmem_table.o common.o data/hash.o data/list.o
-	${LD} -o $@ $^ -lblas ${LDFLAGS} ${INCLUDE} -std=gnu11
+	${LD} -o $@ $^ -lblas ${LDFLAGS} ${INCLUDE} 
 
 tests/rvm_test_normal: tests/rvm_test_normal.c rmem.o rvm.o rmem_table.o common.o data/hash.o data/list.o
 	${LD} -o $@ $^ ${CFLAGS} ${LDFLAGS} ${INCLUDE}

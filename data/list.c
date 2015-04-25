@@ -65,7 +65,7 @@ void push_back_list(list_t list, void* data) {
     list->size++;
 }
 
-inline 
+inline static
 void free_node(list_t list, list_node_t node) {
     free(node);
 }
