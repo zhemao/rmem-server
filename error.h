@@ -1,6 +1,11 @@
 #ifndef _DEBUG_H_
 #define _DEBUG_H_
 
+/* errno doesn't define EUNKNOWN, so we do it here.
+   This is a dubious hack because errno may not be an int or even an enum.
+   In practice it seems to work. */
+#define EUNKNOWN -1
+
 #define CHECK_ERROR(cond, STR) do {\
     if (cond) {\
         printf("%-20s | %3d |  ",__FUNCTION__,__LINE__); \

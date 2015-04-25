@@ -40,10 +40,11 @@ static bool recover_blocks(rvm_cfg_t *cfg)
     int err;
 
     /* Recover the block table */
-    err = rmem_get(&(cfg->rmem), cfg->blk_tbl, cfg->blk_tbl_mr, BLOCK_TBL_ID, cfg->blk_sz);
+    err = rmem_get(&(cfg->rmem), cfg->blk_tbl, cfg->blk_tbl_mr,
+            BLOCK_TBL_ID, cfg->blk_sz);
     if(err != 0) {
         rvm_log("Failed to recover block table\n");
-        errno = 0;
+        errno = EUNKNOWN;
         return false;
     }
 
@@ -66,7 +67,7 @@ static bool recover_blocks(rvm_cfg_t *cfg)
         blk->mr = rmem_create_mr(blk->local_addr, blk->size);
         if(blk->mr == NULL) {
             rvm_log("Failed to register memory for block\n");
-            errno = 0;
+            errno = EUNKNOWN;
             return NULL;
         }
 
@@ -75,7 +76,7 @@ static bool recover_blocks(rvm_cfg_t *cfg)
                 bx + 1, blk->size);
         if(err != 0) {
             rvm_log("Failed to recover block %d\n", bx);
-            errno = 0;
+            errno = EUNKNOWN;
             return false;
         }
 
@@ -113,7 +114,7 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts)
     cfg->blk_tbl_mr = rmem_create_mr(cfg->blk_tbl, cfg->blk_sz);
     if(cfg->blk_tbl_mr == NULL) {
         rvm_log("Failed to register memory for block table\n");
-        errno = 0;
+        errno = EUNKNOWN;
         return NULL;
     }
 
@@ -129,7 +130,7 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts)
 
         if(cfg->blk_tbl->raddr == 0) {
             rvm_log("Failed to allocate remote memory for block table\n");
-            errno = 0;
+            errno = EUNKNOWN;
             return NULL;
         }
 
@@ -376,7 +377,7 @@ void *rvm_alloc(rvm_cfg_t* cfg, size_t size)
     block->mr = rmem_create_mr(block->local_addr, size);
     if(block->mr == NULL) {
         rvm_log("Failed to register memory for block\n");
-        errno = 0;
+        errno = EUNKNOWN;
         return NULL;
     }
 
@@ -386,7 +387,7 @@ void *rvm_alloc(rvm_cfg_t* cfg, size_t size)
     uintptr_t shadow_ptr = rmem_malloc(&(cfg->rmem), size, block->bid + 1);
     if(block->raddr == 0 || shadow_ptr == 0) {
         rvm_log("Failed to allocate remote memory for block\n");
-        errno = 0;
+        errno = EUNKNOWN;
         return NULL;
     }
 
