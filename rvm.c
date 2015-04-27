@@ -50,7 +50,7 @@ static bool recover_blocks(rvm_cfg_t *cfg)
 
     /* Recover every previously allocated block */
     int bx;
-    for(bx = 0; bx < BLOCK_TBL_SIZE; bx += 2)
+    for(bx = 0; bx < BLOCK_TBL_SIZE; bx++)
     {
         block_desc_t *blk = &(cfg->blk_tbl->tbl[bx]);
         if(blk->local_addr == NULL)
@@ -70,7 +70,7 @@ static bool recover_blocks(rvm_cfg_t *cfg)
         }
 
         /* Register new memory with IB */
-        blk->mr = rmem_create_mr(blk->local_addr, blk->size);
+        blk->mr = rmem_create_mr(blk->local_addr, cfg->blk_sz);
         if(blk->mr == NULL) {
             rvm_log("Failed to register memory for block\n");
             errno = EUNKNOWN;
@@ -79,7 +79,7 @@ static bool recover_blocks(rvm_cfg_t *cfg)
 
         /* Actual fetch from server */
         err = rmem_get(&(cfg->rmem), blk->local_addr, blk->mr,
-                bx + 1, blk->size);
+                BLK_REAL_TAG(bx), cfg->blk_sz);
         if(err != 0) {
             rvm_log("Failed to recover block %d\n", bx);
             errno = EUNKNOWN;
@@ -87,7 +87,7 @@ static bool recover_blocks(rvm_cfg_t *cfg)
         }
 
         /* Protect the block to detect changes */
-        rvm_protect(blk->local_addr, blk->size);
+        rvm_protect(blk->local_addr, cfg->blk_sz);
     }
 
     return true;
@@ -180,7 +180,7 @@ bool rvm_cfg_destroy(rvm_cfg_t *cfg)
             ibv_dereg_mr(blk->mr);
 
         /* Unprotect block */
-        rvm_unprotect(blk->local_addr, blk->size);
+        rvm_unprotect(blk->local_addr, cfg->blk_sz);
     }
 
     /* Clean up config info on server */
@@ -231,7 +231,7 @@ bool check_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
 
     //check data blocks
     int bx;
-    for(bx = 0; bx < BLOCK_TBL_SIZE; bx+=2) {
+    for(bx = 0; bx < BLOCK_TBL_SIZE; bx++) {
         block_desc_t *blk = &(cfg->blk_tbl->tbl[bx]);
         if(blk->local_addr == NULL) // ?
             continue;
@@ -240,16 +240,17 @@ bool check_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
          * Right now this should never trigger. */
         assert(blk->mr != NULL);
 
-        char* block = (char*)malloc(sizeof(char) * blk->size);
-        struct ibv_mr* block_mr = rmem_create_mr(block, sizeof(char) * blk->size);
+        char* block = (char*)malloc(sizeof(char) * cfg->blk_sz);
+        struct ibv_mr* block_mr = rmem_create_mr(block,
+                sizeof(char) * cfg->blk_sz);
 
         int err = rmem_get(&(cfg->rmem), block, block_mr,
-                bx + 1, blk->size);
+                BLK_REAL_TAG(bx), cfg->blk_sz);
         RETURN_ERROR(err != 0, false,
             ("Failure: Error doing RDMA read of block\n"));
         
 
-        err = memcmp(block, blk->local_addr, sizeof(char) * blk->size);
+        err = memcmp(block, blk->local_addr, sizeof(char) * cfg->blk_sz);
         RETURN_ERROR(err != 0, false,
                 ("Block %d does not match replica\n", bx));
 
@@ -296,20 +297,22 @@ bool rvm_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
          * Right now this should never trigger. */
         assert(blk->mr != NULL);
 
-        err = rmem_put(&(cfg->rmem), bx + 2, blk->local_addr, blk->mr,
-                blk->size);
+        /* Copy local block to it's shadow page */
+        err = rmem_put(&(cfg->rmem), BLK_SHDW_TAG(bx), blk->local_addr, blk->mr,
+                cfg->blk_sz);
         if(err != 0) {
             rvm_log("Failed to write block %d\n", bx);
             errno = err;
             return false;
         }
 
-        int ret = rmem_multi_cp_add(&cfg->rmem, bx + 1, bx + 2, blk->size);
+        int ret = rmem_multi_cp_add(&cfg->rmem, BLK_REAL_TAG(bx),
+                BLK_SHDW_TAG(bx), cfg->blk_sz);
         CHECK_ERROR(ret != 0,
                 ("Failure: rmem_multi_cp_add\n"));
 
         /* Re-protect the block for the next txn */
-        rvm_protect(blk->local_addr, blk->size);
+        rvm_protect(blk->local_addr, cfg->blk_sz);
     }
 
     int ret = rmem_multi_cp_go(&cfg->rmem);
@@ -344,25 +347,30 @@ void *rvm_alloc(rvm_cfg_t* cfg, size_t size)
 
     /* Number of blocks is the ceiling of size / block_size */
     size_t nblocks = INT_DIV_CEIL(size, cfg->blk_sz);
+    //XXX
+    printf("nblocks: %ld\n", nblocks);
 
     // search for a run of free blocks big enough for this size
     int bx;
     size_t cur_run = 0; //Number of contiguous free blocks seen
     size_t b_start = 0; //Starting block of the current run
-    for(bx = 0; bx < BLOCK_TBL_SIZE; bx += 2) 
+    for(bx = 0; bx < BLOCK_TBL_SIZE; bx++) 
     {
         block_desc_t *blk = &(cfg->blk_tbl->tbl[bx]);
         if(blk->local_addr == NULL) {
-            if(++cur_run == nblocks) {
+            cur_run++;
+            if(cur_run == nblocks)
                 break;
-            } else {
-                cur_run = 0;
-                b_start = bx + 2;
-            }
+        } else {
+            cur_run = 0;
+            b_start = bx + 1;
         }
     }
+    //XXX
+    printf("Found slot: %ld\n", b_start);
     CHECK_ERROR(bx >= BLOCK_TBL_SIZE,
             ("Failure: Block table is full and we should have caught this earlier\n"));
+
 
     /* Allocate local memory for this region.
      * Note: It's important to allocate an integer number of blocks instead of
@@ -371,33 +379,33 @@ void *rvm_alloc(rvm_cfg_t* cfg, size_t size)
     err = posix_memalign(&start_addr, cfg->blk_sz, nblocks*cfg->blk_sz);
     if(err != 0) {
         errno = err;
+        LOG(8, ("Failed to allocate local memory for block\n"));
         return NULL;
     }
 
-    /* Protect the local block so that we can keep track of changes */
-    rvm_protect(start_addr, nblocks*cfg->blk_sz);
+    //XXX
+    printf("Base addr: %p\n", start_addr);
 
-    for(bx = b_start; bx < b_start + nblocks; bx += 2)
+    for(bx = b_start; bx < b_start + nblocks; bx++)
     {
         block_desc_t *block = &(cfg->blk_tbl->tbl[bx]);
-
-        // set block size
-        block->size = size;
 
         // ----- SHADOW PAGES ------ //
         // final destination of a block has block_id = X (odd numbers, starts at 1)
         // corresponding shadow block has block_id = X + 1
-        block->bid = BLOCK_TBL_ID + cfg->blk_tbl->n_blocks + 1;
-        cfg->blk_tbl->n_blocks += 2;
+        block->bid = BLK_REAL_TAG(bx);
+        cfg->blk_tbl->n_blocks++;
 
         /* Calculate the start address of each block in the region */
-        block->local_addr = start_addr + (bx/2)*cfg->blk_sz;
+        block->local_addr = start_addr + (bx - b_start)*cfg->blk_sz;
+        //XXX
+        printf("Local addr: %p\n", block->local_addr);
 
         /* Allocate and register the block table remotely */
         /* TODO Right now we pin everything, all the time. Eventually we may want
          * to have some caching thing where we only pin hot pages or something.
          */
-        block->mr = rmem_create_mr(block->local_addr, size);
+        block->mr = rmem_create_mr(block->local_addr, cfg->blk_sz);
         if(block->mr == NULL) {
             rvm_log("Failed to register memory for block\n");
             errno = EUNKNOWN;
@@ -405,9 +413,13 @@ void *rvm_alloc(rvm_cfg_t* cfg, size_t size)
         }
 
         // allocate final block
-        block->raddr = rmem_malloc(&(cfg->rmem), size, block->bid);
+        //XXX
+        printf("rmem_malloc: bid %d\n", block->bid);
+        printf("rmem_malloc: bid %d\n", BLK_SHDW_TAG(bx));
+        block->raddr = rmem_malloc(&(cfg->rmem), cfg->blk_sz, block->bid);
         // allocate shadow block
-        uintptr_t shadow_ptr = rmem_malloc(&(cfg->rmem), size, block->bid + 1);
+        uintptr_t shadow_ptr = rmem_malloc(&(cfg->rmem), cfg->blk_sz,
+                BLK_SHDW_TAG(bx));
         if(block->raddr == 0 || shadow_ptr == 0) {
             rvm_log("Failed to allocate remote memory for block\n");
             errno = EUNKNOWN;
@@ -415,7 +427,10 @@ void *rvm_alloc(rvm_cfg_t* cfg, size_t size)
         }
     }
 
-    return cfg->blk_tbl->tbl[b_start].local_addr;
+    /* Protect the local blocks so that we can keep track of changes */
+    rvm_protect(start_addr, nblocks*cfg->blk_sz);
+
+    return start_addr;
 }
 
 bool rvm_free(rvm_cfg_t* cfg, void *buf)
@@ -425,7 +440,7 @@ bool rvm_free(rvm_cfg_t* cfg, void *buf)
      */
     block_desc_t *blk;
     int bx;
-    for(bx = 0; bx < BLOCK_TBL_SIZE; bx+=2)
+    for(bx = 0; bx < BLOCK_TBL_SIZE; bx++)
     {
         blk = &(cfg->blk_tbl->tbl[bx]);
         if(blk->local_addr == buf)
@@ -439,10 +454,10 @@ bool rvm_free(rvm_cfg_t* cfg, void *buf)
     }
 
     /* Cleanup remote info */
-    rmem_free(&cfg->rmem, bx + 1); 
+    rmem_free(&cfg->rmem, BLK_REAL_TAG(bx)); 
     
-    LOG(5, ("rmem_free id: %d\n", bx + 2));
-    rmem_free(&cfg->rmem, bx + 2); // free shadow block as well
+    LOG(5, ("rmem_free id: %d\n", BLK_SHDW_TAG(bx)));
+    rmem_free(&cfg->rmem, BLK_SHDW_TAG(bx)); // free shadow block as well
     if(blk->mr)
         ibv_dereg_mr(blk->mr);
 
@@ -450,11 +465,11 @@ bool rvm_free(rvm_cfg_t* cfg, void *buf)
     /* TODO We don't really free the entry in the block table. I just don't
      * want to deal with fragmentation yet.
      */
-    rvm_unprotect(blk->local_addr, blk->size);
+    rvm_unprotect(blk->local_addr, cfg->blk_sz);
     free(blk->local_addr);
     blk->local_addr = NULL;
 
-    cfg->blk_tbl->n_blocks -= 2;
+    cfg->blk_tbl->n_blocks--;
     assert(cfg->blk_tbl->n_blocks >= 0);
 
     return true;
@@ -484,6 +499,7 @@ void block_write_sighdl(int signum, siginfo_t *siginfo, void *uctx)
     if(in_sighdl == true) {
         /* Recursive segfault probably means this is a real fault. Restore the
          * default handler and proceed. Note, this may mess with debuggers. */
+        LOG(1, ("Recursive segfault, restoring default handler\n"));
         signal(SIGSEGV, SIG_DFL);
         return;
     }
@@ -494,6 +510,9 @@ void block_write_sighdl(int signum, siginfo_t *siginfo, void *uctx)
         LOG(1, ("Recoverable page modified outside a txn\n"));
     }
 
+    void *page_addr = (void*)(((uint64_t)siginfo->si_addr / cfg_glob->blk_sz) *
+        cfg_glob->blk_sz);
+
     /* Check if the attempted read was for a recoverable page */
     /* TODO Were just doing a linear search right now, I'm sure we could do
      * something better.
@@ -503,23 +522,22 @@ void block_write_sighdl(int signum, siginfo_t *siginfo, void *uctx)
     for(bx = 0; bx < BLOCK_TBL_SIZE; bx++)
     {
         blk = &(cfg_glob->blk_tbl->tbl[bx]);
-        if(blk->local_addr <= siginfo->si_addr 
-           && blk->local_addr + blk->size > siginfo->si_addr)
+        if(blk->local_addr == page_addr)    
             break;
     }
 
     if(bx == BLOCK_TBL_SIZE) {
         /* Address not in block table, this must be a real segfault */
-        fprintf(stderr, "can't find block: %lx\n", (uint64_t)siginfo->si_addr);
+        fprintf(stderr, "can't find block: %p\n", page_addr);
             signal(SIGSEGV, SIG_DFL);
         return;
     }
 
-    /* Found a valid block, mark it in the change list and unprotect.
-     * Strictly speaking, this isn't legal because mprotect may not be reentrant
+    /* Found a valid block, mark it in the change list and unprotect. */
+    /* Strictly speaking, this isn't legal because mprotect may not be reentrant
      * but in practice it should be fine. */
     BITSET(blk_chlist, bx);
-    rvm_unprotect(siginfo->si_addr, _SC_PAGESIZE);
+    rvm_unprotect(page_addr, cfg_glob->blk_sz);
 
     in_sighdl = false;
     return;

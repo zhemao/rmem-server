@@ -10,7 +10,13 @@
 #define BLOCK_TBL_SIZE \
     ((sysconf(_SC_PAGESIZE) - sizeof(blk_tbl_t)) / sizeof(block_desc_t))
 
+/* Get the tag for a real block 
+ int BX - index of the block in the block table */
+#define BLK_REAL_TAG(BX) (BLOCK_TBL_ID + BX*2 + 1)
 
+/* Get the tag for a shadow-block
+   int BX - the index of the block in the block table */
+#define BLK_SHDW_TAG(BX) (BLOCK_TBL_ID + BX*2 + 2)
 
 /** Describes a block (these are the entries in the block table)
  * For now blocks are fixed-sized (page size) */
@@ -21,7 +27,7 @@ typedef struct
     uint64_t raddr;      /**< Address of block on server */
     struct ibv_mr *mr;   /**< IB registration info (invalid during rec) */
 
-    int size;            /**< size of this block (no longer stuck with page size) */
+//    int size;            /**< size of this block (no longer stuck with page size) */
 } block_desc_t;
 
 /** The block table is a page-sized list of every block tracked by rvm */

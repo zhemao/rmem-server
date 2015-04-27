@@ -11,7 +11,7 @@
 #include <log.h>
 #include <error.h>
 
-#define ARR_SIZE 10
+#define ARR_SIZE 2048
 
 static void fill_arr(int *a)
 {

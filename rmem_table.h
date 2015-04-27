@@ -5,7 +5,8 @@
 #include <stdint.h>
 #include "data/hash.h"
 
-#define RMEM_SIZE (1 << 14)
+//#define RMEM_SIZE (1 << 14)
+#define RMEM_SIZE (1 << 16)
 #define MIN_SIZE (2 * sizeof(void*))
 #define NUM_BUCKETS 1024
 

@@ -215,8 +215,10 @@ void *rmem_alloc(struct rmem_table *rmem, size_t size, tag_t tag)
 
     // error out if the tag is not unique
     entry = find_entry(rmem, tag);
-    if (entry != NULL)
-	return NULL;
+    if (entry != NULL) {
+        LOG(5, ("Requested tag is not unique\n"));
+    	return NULL;
+    }
 
     free_node = rmem->free_list.next;
 
@@ -232,8 +234,11 @@ void *rmem_alloc(struct rmem_table *rmem, size_t size, tag_t tag)
 
     if (free_node == &rmem->free_list) {
         // make sure we haven't run out of memory
-        if (rmem->alloc_size + req_size > RMEM_SIZE)
+        if (rmem->alloc_size + req_size > RMEM_SIZE) {
+            LOG(5, ("Out of memory\n"));
             return NULL;
+        }
+
         TEST_Z(entry = malloc(sizeof(struct alloc_entry)));
         list_append(&rmem->list, &entry->list);
         entry->free_list.next = &rmem->free_list;
