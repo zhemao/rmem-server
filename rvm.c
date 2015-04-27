@@ -466,8 +466,6 @@ void *rvm_rec(rvm_cfg_t *cfg)
 
 void block_write_sighdl(int signum, siginfo_t *siginfo, void *uctx)
 {
-    //XXX
-    fprintf(stderr, "IN HANDLER: %lx\n", (uint64_t)siginfo->si_addr);
     if(in_sighdl == true) {
         /* Recursive segfault probably means this is a real fault. Restore the
          * default handler and proceed. Note, this may mess with debuggers. */

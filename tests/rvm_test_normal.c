@@ -24,15 +24,16 @@ static void fill_arr(int *a)
     return;
 }
 
-static bool check_arr(int *a)
+/* Check if the array is filled with the expeceted value. */
+static bool check_arr(int *a, int expect)
 {
     int i = 0;
     for(;i < ARR_SIZE; i++)
     {
-        if(a[i] != 1) {
-            if(a[i] == 0)
+        if(a[i] != expect) {
+            if(a[i] == expect - 1)
                 printf("FAILURE: Array didn't receive any commits\n");
-            else if(a[i] == 2)
+            else if(a[i] == expect + 1)
                 printf("FAILURE: Array has uncommitted changes\n");
             else
                 printf("FAILURE: Array has unexpected value: %d\n", a[i]);
@@ -79,17 +80,29 @@ int main(int argc, char **argv)
         rvm_cfg_t *cfg = rvm_cfg_create(&opt);
 
         /* Get the new addresses for arr0 and arr1 */
-        int *safe_arr0 = rvm_rec(cfg);
-        int *safe_arr1 = rvm_rec(cfg);
+        int **arr_ptr = rvm_rec(cfg);
+        int *arr0 = rvm_rec(cfg);
+        int *arr1 = rvm_rec(cfg);
 
         /* Check their values */
-        if(!check_arr(safe_arr0)) {
-            printf("FAILURE: Array 0 doesn't look right\n");
+        if(!check_arr(arr_ptr[0], 1)) {
+            if(!check_arr(arr0, 1)) {
+                printf("FAILURE: Arr0 doesn't look right\n");
+            } else {
+                printf("FAILURE: Couldn't access array 0 through pointer\n");
+            }
+
             return EXIT_FAILURE;
         }
 
-        if(!check_arr(safe_arr1)) {
-            printf("FAILURE: Array 1 doesn't look right\n");
+        /* Check their values */
+        if(!check_arr(arr_ptr[1], 2)) {
+            if(!check_arr(arr1, 2)) {
+                printf("FAILURE: Arr1 doesn't look right\n");
+            } else {
+                printf("FAILURE: Couldn't access array 1 through pointer\n");
+            }
+
             return EXIT_FAILURE;
         }
 
@@ -104,25 +117,35 @@ int main(int argc, char **argv)
         CHECK_ERROR(txid < 0,
                 ("FAILURE: Could not start transaction - %s\n", strerror(errno)));
        
+        /* Allocate a "state" structure to test pointers */
+        LOG(8, ("Allocating state structure\n"));
+        int **arr_ptr = rvm_alloc(cfg, 2*sizeof(int*));
+        CHECK_ERROR(arr_ptr == NULL,
+                ("FAILURE: Failed to allocate tracking structure -%s\n",
+                 strerror(errno)));
+
+        /* Arr0 gets incremented once */
         LOG(8,("rvm_alloc\n"));
-        int *safe_arr0 = rvm_alloc(cfg, ARR_SIZE*sizeof(int));
-        CHECK_ERROR(safe_arr0 == NULL, 
+        arr_ptr[0] = rvm_alloc(cfg, ARR_SIZE*sizeof(int));
+        CHECK_ERROR(arr_ptr[0] == NULL, 
                 ("FAILURE: Failed to allocate array0 - %s\n", strerror(errno)));
 
+        /* Arr1 gets incremented twice */
         LOG(8, ("rvm_alloc\n"));
-        int *safe_arr1 = rvm_alloc(cfg, ARR_SIZE*sizeof(int));
-        CHECK_ERROR(safe_arr1 == NULL,
+        arr_ptr[1] = rvm_alloc(cfg, ARR_SIZE*sizeof(int));
+        CHECK_ERROR(arr_ptr[1] == NULL,
                 ("Failed to allocate array1 - %s", strerror(errno)));
 
         LOG(8, ("rvm_alloc done\n"));
 
         //Initialize arrays
-        memset(safe_arr0, 0, ARR_SIZE*sizeof(int));
-        memset(safe_arr1, 0, ARR_SIZE*sizeof(int));
+        memset(arr_ptr[0], 0, ARR_SIZE*sizeof(int));
+        memset(arr_ptr[1], 0, ARR_SIZE*sizeof(int));
 
         //fill_arr doesn't need to know about rvm
-        fill_arr(safe_arr0);
-        fill_arr(safe_arr1);
+        fill_arr(arr_ptr[0]);
+        fill_arr(arr_ptr[1]);
+        fill_arr(arr_ptr[1]);
 
         printf("rvm_txn_commit\n");
         CHECK_ERROR(!rvm_txn_commit(cfg, txid),
@@ -131,8 +154,8 @@ int main(int argc, char **argv)
         printf("rvm_txn_begin\n");
         /* Start a new transaction */
         txid = rvm_txn_begin(cfg);
-        fill_arr(safe_arr0);
-        fill_arr(safe_arr1);
+        fill_arr(arr_ptr[0]);
+        fill_arr(arr_ptr[1]);
 
         //Ohs Noes! Our program has mysteriously crashed without committing!
         printf("SUCCESS: Normal execution proceded without error. "
