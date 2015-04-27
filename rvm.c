@@ -239,11 +239,14 @@ bool check_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
 
         int err = rmem_get(&(cfg->rmem), block, block_mr,
                 bx + 1, blk->size);
+        RETURN_ERROR(err != 0, false,
+            ("Failure: Error doing RDMA read of block\n"));
         
+
+        err = memcmp(block, blk->local_addr, sizeof(char) * blk->size);
         RETURN_ERROR(err != 0, false,
                 ("Block %d does not match replica\n", bx));
 
-        err = memcmp(block, blk->local_addr, sizeof(char) * blk->size);
         free(block);
 
     }
@@ -255,9 +258,6 @@ bool check_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
 
     return true;
 }
-
-//int rmem_get(struct rmem *rmem, void *dst, struct ibv_mr *dst_mr,
-//        uint64_t src, size_t size)
 
 bool rvm_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
 {
