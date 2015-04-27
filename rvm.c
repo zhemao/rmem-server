@@ -57,9 +57,15 @@ static bool recover_blocks(rvm_cfg_t *cfg)
             continue; //Freed memory
 
         /* Allocate local storage for recovered block */
-        err = posix_memalign(&(blk->local_addr), cfg->blk_sz, cfg->blk_sz);
-        if(err != 0) {
-            errno = err;
+        void *new_addr = mmap(blk->local_addr, cfg->blk_sz,
+                PROT_READ | PROT_WRITE | PROT_EXEC,
+                MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED,
+                -1, 0);
+        if(new_addr != blk->local_addr) {
+            int er_tmp = errno;
+            LOG(1, ("Failed to allocate space for recovered block: %s\n",
+                    strerror(errno)));
+            errno = er_tmp;
             return false;
         }
 
