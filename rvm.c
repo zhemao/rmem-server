@@ -319,23 +319,18 @@ bool rvm_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
     return true;
 }
 
+/* Can now allocate more than one page. It still allocates in multiples of the
+ * page size. If you want better functionality, you can implement a library on
+ * top, for instance buddy_alloc.h. Internally it still thinks in terms of
+ * pages, so if you allocate 4 pages, then there will be 4 entries in the block
+ * table.
+ * TODO: Still uses a fixed-size block-table so there is a cap on the number
+ * of allocations. */
 void *rvm_alloc(rvm_cfg_t* cfg, size_t size)
 {
     int err;
 
-    /* TODO This is a brain-dead initial implementation, we allocate an entire
-     * page for each allocation. Obviously this is wasteful, plus it caps the
-     * max allocation at one page. This is just to get a basic working
-     * implementation and will be improved later.
-     */
-
     if (size == 0) {
-        return NULL;
-    }
-
-    if(size > cfg->blk_sz) {
-        rvm_log("rvm_alloc currently does not support allocations larger than"
-                "the page size\n");
         return NULL;
     }
 
@@ -347,60 +342,80 @@ void *rvm_alloc(rvm_cfg_t* cfg, size_t size)
         return NULL;
     }
 
-    // search for a free block
+    /* Number of blocks is the ceiling of size / block_size */
+    size_t nblocks = INT_DIV_CEIL(size, cfg->blk_sz);
+
+    // search for a run of free blocks big enough for this size
     int bx;
+    size_t cur_run = 0; //Number of contiguous free blocks seen
+    size_t b_start = 0; //Starting block of the current run
     for(bx = 0; bx < BLOCK_TBL_SIZE; bx += 2) 
     {
         block_desc_t *blk = &(cfg->blk_tbl->tbl[bx]);
-        if(blk->local_addr == NULL)
-            break;
+        if(blk->local_addr == NULL) {
+            if(++cur_run == nblocks) {
+                break;
+            } else {
+                cur_run = 0;
+                b_start = bx + 2;
+            }
+        }
     }
     CHECK_ERROR(bx >= BLOCK_TBL_SIZE,
             ("Failure: Block table is full and we should have caught this earlier\n"));
 
-    block_desc_t *block = &(cfg->blk_tbl->tbl[bx]);
-
-    // set block size
-    block->size = size;
-
-    // ----- SHADOW PAGES ------ //
-    // final destination of a block has block_id = X (odd numbers, starts at 1)
-    // corresponding shadow block has block_id = X + 1
-    block->bid = BLOCK_TBL_ID + cfg->blk_tbl->n_blocks + 1;
-    cfg->blk_tbl->n_blocks += 2;
-    /* Allocate entire blocks at a time because the automatic detection works
-       at a page granularity */
-    err = posix_memalign(&(block->local_addr), cfg->blk_sz, cfg->blk_sz);
+    /* Allocate local memory for this region.
+     * Note: It's important to allocate an integer number of blocks instead of
+     * just using size. This is because we protect whole pages. */
+    void *start_addr;
+    err = posix_memalign(&start_addr, cfg->blk_sz, nblocks*cfg->blk_sz);
     if(err != 0) {
         errno = err;
         return NULL;
     }
 
-    /* Allocate and register the block table remotely */
-    /* TODO Right now we pin everything, all the time. Eventually we may want
-     * to have some caching thing where we only pin hot pages or something.
-     */
-    block->mr = rmem_create_mr(block->local_addr, size);
-    if(block->mr == NULL) {
-        rvm_log("Failed to register memory for block\n");
-        errno = EUNKNOWN;
-        return NULL;
-    }
-
-    // allocate final block
-    block->raddr = rmem_malloc(&(cfg->rmem), size, block->bid);
-    // allocate shadow block
-    uintptr_t shadow_ptr = rmem_malloc(&(cfg->rmem), size, block->bid + 1);
-    if(block->raddr == 0 || shadow_ptr == 0) {
-        rvm_log("Failed to allocate remote memory for block\n");
-        errno = EUNKNOWN;
-        return NULL;
-    }
-
     /* Protect the local block so that we can keep track of changes */
-    rvm_protect(block->local_addr, block->size);
+    rvm_protect(start_addr, nblocks*cfg->blk_sz);
 
-    return block->local_addr;
+    for(bx = b_start; bx < b_start + nblocks; bx += 2)
+    {
+        block_desc_t *block = &(cfg->blk_tbl->tbl[bx]);
+
+        // set block size
+        block->size = size;
+
+        // ----- SHADOW PAGES ------ //
+        // final destination of a block has block_id = X (odd numbers, starts at 1)
+        // corresponding shadow block has block_id = X + 1
+        block->bid = BLOCK_TBL_ID + cfg->blk_tbl->n_blocks + 1;
+        cfg->blk_tbl->n_blocks += 2;
+
+        /* Calculate the start address of each block in the region */
+        block->local_addr = start_addr + (bx/2)*cfg->blk_sz;
+
+        /* Allocate and register the block table remotely */
+        /* TODO Right now we pin everything, all the time. Eventually we may want
+         * to have some caching thing where we only pin hot pages or something.
+         */
+        block->mr = rmem_create_mr(block->local_addr, size);
+        if(block->mr == NULL) {
+            rvm_log("Failed to register memory for block\n");
+            errno = EUNKNOWN;
+            return NULL;
+        }
+
+        // allocate final block
+        block->raddr = rmem_malloc(&(cfg->rmem), size, block->bid);
+        // allocate shadow block
+        uintptr_t shadow_ptr = rmem_malloc(&(cfg->rmem), size, block->bid + 1);
+        if(block->raddr == 0 || shadow_ptr == 0) {
+            rvm_log("Failed to allocate remote memory for block\n");
+            errno = EUNKNOWN;
+            return NULL;
+        }
+    }
+
+    return cfg->blk_tbl->tbl[b_start].local_addr;
 }
 
 bool rvm_free(rvm_cfg_t* cfg, void *buf)

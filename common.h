@@ -16,6 +16,9 @@
 #define TEST_NZ(x) do { if ( (x)) rc_die("error: " #x " failed (returned non-zero)." ); } while (0)
 #define TEST_Z(x)  do { if (!(x)) rc_die("error: " #x " failed (returned zero/null)."); } while (0)
 
+/* Integer ceiling division */
+#define INT_DIV_CEIL(X, Y) ((X % Y) ? X / Y + 1 : X / Y)
+
 /* Generic bit-array data stucture. Taken from:
  * http://c-faq.com/misc/bitsets.html"
  */
