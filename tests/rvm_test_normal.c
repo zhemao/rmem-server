@@ -123,7 +123,7 @@ int main(int argc, char **argv)
                  strerror(errno)));
 
         /* Register the state structure as our usr_data with rvm */
-        rvm_set_usr_data(arr_ptr);
+        rvm_set_usr_data(cfg, arr_ptr);
 
         /* Arr0 gets incremented once */
         LOG(8,("rvm_alloc\n"));
