@@ -102,6 +102,9 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts)
         return NULL;
     cfg->blk_sz = sysconf(_SC_PAGESIZE);
     cfg->in_txn = false;
+    cfg->alloc_fp = opts->alloc_fp;
+    cfg->free_fp = opts->free_fp;
+    cfg->alloc_data = NULL;
 
     rmem_connect(&(cfg->rmem), opts->host, opts->port);
 
@@ -322,6 +325,11 @@ bool rvm_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
     return true;
 }
 
+void *rvm_alloc(rvm_cfg_t *cfg, size_t size)
+{
+    return cfg->alloc_fp(cfg, size);
+}
+
 /* Can now allocate more than one page. It still allocates in multiples of the
  * page size. If you want better functionality, you can implement a library on
  * top, for instance buddy_alloc.h. Internally it still thinks in terms of
@@ -329,7 +337,7 @@ bool rvm_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
  * table.
  * TODO: Still uses a fixed-size block-table so there is a cap on the number
  * of allocations. */
-void *rvm_alloc(rvm_cfg_t* cfg, size_t size)
+void *rvm_blk_alloc(rvm_cfg_t* cfg, size_t size)
 {
     int err;
 
@@ -433,7 +441,12 @@ void *rvm_alloc(rvm_cfg_t* cfg, size_t size)
     return start_addr;
 }
 
-bool rvm_free(rvm_cfg_t* cfg, void *buf)
+bool rvm_free(rvm_cfg_t *cfg, void *buf)
+{
+    return cfg->free_fp(cfg, buf);
+}
+
+bool rvm_blk_free(rvm_cfg_t* cfg, void *buf)
 {
     /* TODO Were just doing a linear search right now, I'm sure we could do
      * something better.
@@ -479,6 +492,9 @@ void *rvm_rec(rvm_cfg_t *cfg)
 {
     static int64_t bx = 0;
 
+    LOG(8,
+        ("WARNING: Use of rvm_rec is now deprecated, use at your own risk!\n"));
+
     for(; bx < BLOCK_TBL_SIZE; bx+=2) {
         block_desc_t* blk = &(cfg->blk_tbl->tbl[bx]);
         if(blk->local_addr != NULL)
@@ -492,6 +508,21 @@ void *rvm_rec(rvm_cfg_t *cfg)
     bx += 2;
 
     return res;
+}
+
+/** Set the user's private data. Pointer "data" will be available after
+ *  recovery.
+ *
+ */
+bool rvm_set_usr_data(rvm_cfg_t *cfg, void *data)
+{
+    cfg->blk_tbl->usr_data = data;
+    return true;
+}
+
+void *rvm_get_usr_data(rvm_cfg_t *cfg)
+{
+    return cfg->blk_tbl->usr_data;
 }
 
 void block_write_sighdl(int signum, siginfo_t *siginfo, void *uctx)

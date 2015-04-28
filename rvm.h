@@ -15,17 +15,29 @@
  *  Valid txid's have positive values. Negative valued txid's indicate errors*/
 typedef int8_t rvm_txid_t;
 
+/** RVM configuration information.
+ *  Use this to identify an instance of rvm. */
+typedef struct rvm_cfg rvm_cfg_t;
+
+/** The standard malloc function type. A function of this type can be passed
+ * to rvm_cfg_create to provide a custom allocator. See rvm_alloc() for a
+ * description of this function's intended behavior. */
+typedef void *(*rvm_alloc_t)(rvm_cfg_t*, size_t);
+
+/** The standard free function type. A function of this type can be passed
+ * to rvm_cfg_create to provide a custom allocator. See rvm_free() for a
+ * description of this function's intended behavior. */
+typedef bool (*rvm_free_t)(rvm_cfg_t*, void*);
+
 /** Options for an rvm configuration */
 typedef struct
 {
     char *host; /**< Host to connect to. */
     char *port; /**< Port to use for connection */
     bool recovery; /**< Are we recovering from a fault? */
+    rvm_alloc_t alloc_fp; /**< Custom allocation function */
+    rvm_free_t free_fp;   /**< Custom free for alloc_fp */
 } rvm_opt_t;
-
-/** RVM configuration information.
- *  Use this to identify an instance of rvm. */
-typedef struct rvm_cfg rvm_cfg_t;
 
 /** Configure rvm.
  *  Will initialize the rvm system and enable the allocation of
@@ -84,19 +96,33 @@ bool rvm_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid);
  */
 bool check_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid);
 
-/** Allocate a region of recoverable memory of at least size "size" bytes.
+/** Allocate a region of recoverable memory of at least size bytes.
  *
  * Any changes to memory returned by rvm_alloc() will be included in the
  * current transaction. Modification of this memory when not within an rvm
  * transaction results in undefined behavior. Memory must be freed using
- * rvm_free();
+ * rvm_free();.
  *
  * \pre rvm must be configured (by calling rvm_configure())
  * \param[in] cfg Configuration to use for rvm.
  * \param[in] size The size (in bytes) of the memory to allocate.
  * \returns A pointer to the beginning of recoverable memory
  */
-void *rvm_alloc(rvm_cfg_t* cfg, size_t size);
+void *rvm_alloc(rvm_cfg_t *cfg, size_t size);
+
+/** Allocate a number of recoverable blocks of at least size "size" bytes.
+ *
+ * Any changes to memory returned by rvm_alloc() will be included in the
+ * current transaction. Modification of this memory when not within an rvm
+ * transaction results in undefined behavior. Memory must be freed using
+ * rvm_free();. This function allocates an integer number of blocks.
+ *
+ * \pre rvm must be configured (by calling rvm_configure())
+ * \param[in] cfg Configuration to use for rvm.
+ * \param[in] size The size (in bytes) of the memory to allocate.
+ * \returns A pointer to the beginning of recoverable memory
+ */
+void *rvm_blk_alloc(rvm_cfg_t* cfg, size_t size);
 
 /** Free memory allocated by rvm_alloc().
  *
@@ -105,6 +131,14 @@ void *rvm_alloc(rvm_cfg_t* cfg, size_t size);
  * \returns true on success, false on error (sets errno)
  */
 bool rvm_free(rvm_cfg_t* cfg, void *buf);
+
+/** Free memory allocated by rvm_blk_alloc().
+ *
+ * \param[in] cfg Configuration used to allocate buf
+ * \param[in] buf Buffer to free
+ * \returns true on success, false on error (sets errno)
+ */
+bool rvm_blk_free(rvm_cfg_t* cfg, void *buf);
 
 /** Recover the structure of recoverable memory.
  *  rvm_rec returns the address of the first recoverable allocation. Subsequent
@@ -121,8 +155,34 @@ bool rvm_free(rvm_cfg_t* cfg, void *buf);
  *  way access recoverable data structures. I.E. the "typical usage" described
  *  above won't actually work.
  *
+ *  XXX rvm_rec is quickly being deprecated. It's behavior could get a little
+ *  skrewy (although if you don't free anything and use the malloc_simple
+ *  allocator it should still work). No promises going forward.
+ *
  *  \returns The first invocation of rvm_rec returns
  */
 void *rvm_rec(rvm_cfg_t *cfg);
+
+/** Set the user's private data. Pointer "data" will be available after
+ *  recovery.
+ *
+ *  \pre Must be called within an active transaction.
+ *
+ *  \param[in] cfg RVM config
+ *  \param[in] data Pointer to recoverable memory to persist
+ *  \returns True on success, false otherwise (sets errno)
+ */
+bool rvm_set_usr_data(rvm_cfg_t *cfg, void *data);
+
+/** Retrieve the user's private data.
+ * Returns a pointer to recoverable memory that was set using rvm_set_usr_data()
+ * before or after recovery. This is the primary method to reconstruct state
+ * after a failure. Note that rvm_get_usr_data doesn't fetch remote data, it
+ * simply allows the user to get a known location.
+ *
+ * \param[in] cfg RVM configuration info
+ * \returns Whatever pointer (if any) was set using rvm_set_usr_data()
+ */
+void *rvm_get_usr_data(rvm_cfg_t *cfg);
 
 #endif // _RVM_H_
