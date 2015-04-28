@@ -36,6 +36,7 @@ typedef struct
     uint64_t n_blocks; /**< Counter of how many blocks are currently being used (also shadow blocks) */
 
     void *usr_data; /**< A user-defined pointer to recoverable data */
+    void *alloc_data; /**< Pointer to custom allocator data */
 
     /** Table of block descriptors. It has BLOCK_TBL_SIZE entries. */
     block_desc_t tbl[];

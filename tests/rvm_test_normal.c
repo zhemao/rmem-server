@@ -11,7 +11,8 @@
 #include <log.h>
 #include <error.h>
 
-#include "malloc_simple.h"
+//#include "malloc_simple.h"
+#include "buddy_malloc.h"
 
 #define ARR_SIZE 2048
 
@@ -27,7 +28,7 @@ static void fill_arr(int *a)
 }
 
 /* Check if the array is filled with the expeceted value. */
-static bool check_arr(int *a, int expect)
+static bool check_arr(int *a, int expect, int size)
 {
     int i = 0;
     for(;i < ARR_SIZE; i++)
@@ -51,8 +52,10 @@ rvm_cfg_t* initialize_rvm(char* host, char* port) {
     rvm_opt_t opt;
     opt.host = host;
     opt.port = port;
-    opt.alloc_fp = simple_malloc;
-    opt.free_fp = simple_free;
+//    opt.alloc_fp = simple_malloc;
+//    opt.free_fp = simple_free;
+    opt.alloc_fp = buddy_malloc;
+    opt.free_fp = buddy_free;
         
     /* Non-recovery case */
     opt.recovery = false;
@@ -84,21 +87,17 @@ int main(int argc, char **argv)
         rvm_cfg_t *cfg = rvm_cfg_create(&opt);
 
         /* Get the new addresses for arr0 and arr1 */
-/*        int **arr_ptr = rvm_rec(cfg);
-        int *arr0 = rvm_rec(cfg);
-        int *arr1 = rvm_rec(cfg);
-*/
         int **arr_ptr = rvm_get_usr_data(cfg);
 
         /* Check their values */
-        if(!check_arr(arr_ptr[0], 1)) {
+        if(!check_arr(arr_ptr[0], 1, ARR_SIZE)) {
             printf("FAILURE: Arr0 Doesn't look right\n");
 
             return EXIT_FAILURE;
         }
 
         /* Check their values */
-        if(!check_arr(arr_ptr[1], 2)) {
+        if(!check_arr(arr_ptr[1], 2, ARR_SIZE)) {
             printf("FAILURE: Arr1 doesn't look right\n");
 
             return EXIT_FAILURE;
@@ -106,9 +105,7 @@ int main(int argc, char **argv)
 
         printf("SUCCESS: Memory recovered after \"failure\"\n");
     } else {
-
         rvm_cfg_t* cfg = initialize_rvm(argv[1], argv[2]);
-    
 
         LOG(8,("rvm_txn_begin\n"));
         rvm_txid_t txid = rvm_txn_begin(cfg);

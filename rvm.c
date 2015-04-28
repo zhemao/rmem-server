@@ -199,6 +199,11 @@ bool rvm_cfg_destroy(rvm_cfg_t *cfg)
     return true;
 }
 
+size_t rvm_get_blk_sz(rvm_cfg_t *cfg)
+{
+    return cfg->blk_sz;
+}
+
 rvm_txid_t rvm_txn_begin(rvm_cfg_t* cfg)
 {
     cfg->in_txn = true;
@@ -323,6 +328,17 @@ bool rvm_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
                 ("Failure: rmem_multi_cp_go\n"));
 
     return true;
+}
+
+bool rvm_set_alloc_data(rvm_cfg_t *cfg, void *alloc_data)
+{
+    cfg->blk_tbl->alloc_data = alloc_data;
+    return true;
+}
+
+void *rvm_get_alloc_data(rvm_cfg_t *cfg)
+{
+    return cfg->blk_tbl->alloc_data;
 }
 
 void *rvm_alloc(rvm_cfg_t *cfg, size_t size)

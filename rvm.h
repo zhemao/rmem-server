@@ -59,6 +59,11 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts);
  */
 bool rvm_cfg_destroy(rvm_cfg_t *cfg);
 
+/** Returns the block size used by rvm.
+ * The block size is the size used by rvm_blk_alloc().
+ */
+size_t rvm_get_blk_sz(rvm_cfg_t *cfg);
+
 /** Begin a transaction.
  *  rvm_begin_txn starts a new recoverable memory transaction. Any modifications
  *  to any recoverable memory region will be made atomically with respect to
@@ -95,6 +100,12 @@ bool rvm_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid);
  * \returns true for success. false otherwise, sets errno for specific error.
  */
 bool check_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid);
+
+/** Set allocator private information, will be preserved between failures */
+bool rvm_set_alloc_data(rvm_cfg_t *cfg, void *alloc_data);
+
+/** Retrieve allocator private information */
+void *rvm_get_alloc_data(rvm_cfg_t *cfg);
 
 /** Allocate a region of recoverable memory of at least size bytes.
  *

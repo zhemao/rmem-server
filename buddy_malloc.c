@@ -13,6 +13,13 @@
 
 //#define BUDDY_DEBUG 1
 
+//Determine if something is a power of 2
+//#define POW_2P(X) (((X) != 0) && (((X) & ((X) - 1)) == 0))
+#define POW_2P(X) (__builtin_popcount(X) == 1)
+
+//Integer log base 2, takes type uint64_t
+#define LOG2(x) (sizeof(uint64_t)*8 - __builtin_clzll(x) - 1)
+
 /** Size of the pool of recoverable pages used for buddy allocation. Must be
  * a multiple of the page size and a power of 2 */
 #define POOL_SZ (1 << 14)
@@ -64,7 +71,7 @@ bool map_check(int lvl, int lvl_idx, map_t *map);
 void map_set(int lvl, int lvl_idx, map_t *map, bool val);
 int map_next(int lvl, map_t *map);
 int map_split(int lvl, map_t *map);
-int map_merge(int lvl, int idx, map_t *map);
+bool map_merge(int lvl, int idx, map_t *map);
 void print_map(rvm_cfg_t *cfg);
 
 /* Initialize the buddy allocator. Returns a pointer to the buddy allocator
@@ -73,15 +80,18 @@ void print_map(rvm_cfg_t *cfg);
 void *buddy_meminit(rvm_cfg_t *cfg)
 {
   size_t map_sz; //Size of map in groups of 64-bits (8 bytes)
-  size_t new_reg_sz;
   map_t *map;
 
   //Allocate enough space for bitmaps in groups of 64-bits
   //Round up just in case
   map_sz = ((POOL_SZ / MIN_PG_SZ)*2 / 64);
 
-  new_reg_sz = POOL_SZ + sizeof(map_t) + map_sz*sizeof(uint64_t);
-  void *pool = rvm_blk_alloc(cfg, POOL_SZ);
+  /* Figure out how much space is needed for metadata */
+  size_t meta_sz = sizeof(map_t) + map_sz*sizeof(uint64_t);
+
+  /* Allocate the pool plus room for metadata. rvm_blk_alloc will round
+  up to the nearest integer number of blocks. */
+  void *pool = rvm_blk_alloc(cfg, POOL_SZ + meta_sz);
   if(pool == NULL) {
       return NULL; //Use errno from rvm_blk_alloc
   }
@@ -92,17 +102,15 @@ void *buddy_meminit(rvm_cfg_t *cfg)
   map->max_lvl = LOG2((uint64_t)(POOL_SZ / MIN_PG_SZ));
   memset(map->map, 0, map_sz*sizeof(uint64_t)); //mark all regions free
 
-#define BUDDY_DEBUG 1
 #ifdef BUDDY_DEBUG
   printf("init: min_pg_sz %d\n", MIN_PG_SZ);
   printf("init: num_pg %d\n", map->num_pg);
   printf("init: map sz (num 64-bit ints) %d\n", map->sz);
   printf("init: max_lvl %d\n", map->max_lvl);
-  printf("init: reg_sz %zd\n", POOL_SZ);
+  printf("init: reg_sz %ld\n", POOL_SZ);
 #endif
-#undef BUDDY_DEBUG
 
-  return 1;
+  return pool;
 }
 
 void *buddy_malloc(rvm_cfg_t *cfg, size_t n_bytes)
@@ -110,10 +118,16 @@ void *buddy_malloc(rvm_cfg_t *cfg, size_t n_bytes)
   int idx;
   int lvl;  //The originally requested level
 
-  if(cfg->alloc_data == NULL) {
-      cfg->alloc_data = buddy_meminit();
+  map_t *map = (map_t *)rvm_get_alloc_data(cfg);
+  if(map == NULL) {
+      map = buddy_meminit(cfg);
+      rvm_set_alloc_data(cfg, map);
   }
-  map_t *map = (map_t *)cfg->alloc_data;
+
+  if(n_bytes >= rvm_get_blk_sz(cfg)) {
+      //Large allocations simply use rvm's block allocator
+      return rvm_blk_alloc(cfg, n_bytes);
+  }
 
   if(n_bytes > (MIN_PG_SZ * map->num_pg))
   {
@@ -159,14 +173,20 @@ void *buddy_malloc(rvm_cfg_t *cfg, size_t n_bytes)
   return MEM_REG(map) + LVL_PG_SZ(lvl, MIN_PG_SZ)*idx;
 }
 
-int buddy_memfree(rvm_cfg_t *cfg, void *buf)
+bool buddy_free(rvm_cfg_t *cfg, void *buf)
 {
   if(buf == NULL) {
     fprintf(stderr, "buddy_memfree: Tried to free NULL!\n");
-    return -1;
+    return false;
   }
 
-  map_t *map = (map_t *)cfg->alloc_data;
+  /* Check if buf is managed by the buddy allocator */
+  map_t *map = (map_t *)rvm_get_alloc_data(cfg);
+  if(buf < (void*)map || buf >= (void*)map + rvm_get_blk_sz(cfg)) {
+      //Assume memory was allocated by the block allocator
+      return rvm_blk_free(cfg, buf);
+  }
+
   uint64_t idx;
 
 #ifdef BUDDY_DEBUG
@@ -183,18 +203,18 @@ int buddy_memfree(rvm_cfg_t *cfg, void *buf)
   printf("free: idx %zd\n", idx);
   printf("free: map after: \n");
   print_map(reg);
-  return err;
+  return false;
 #else
   return map_merge(0, idx, map);
 #endif
 }
 
-int map_merge(int lvl, int idx, map_t *map)
+bool map_merge(int lvl, int idx, map_t *map)
 {
   if(lvl == map->max_lvl)
   {
     //Top level doesn't have a buddy to merge with so just end
-    return 1;
+    return true;
   }
 
   if(!map_check(lvl, idx, map) && !map_check(lvl, BUDDY(idx), map))
@@ -207,7 +227,7 @@ int map_merge(int lvl, int idx, map_t *map)
     printf("merge: recursion stoped at lvl %d\n", lvl);
 #endif
     //One of the buddies is still in use, stop merging
-    return 1;
+    return true;
   }
 }
 
@@ -303,7 +323,7 @@ int map_split(int lvl, map_t *map)
 
 void print_map(rvm_cfg_t *cfg)
 {
-  map_t *map = (map_t *)cfg->alloc_data;
+  map_t *map = (map_t *)rvm_get_alloc_data(cfg);
 
   for(int i = 0; i < map->sz; i++)
   {
@@ -314,13 +334,12 @@ void print_map(rvm_cfg_t *cfg)
 
 void buddy_memuse(rvm_cfg_t *cfg)
 {
-  uint32_t pg_sz;
   uint32_t used = 0;
   uint32_t used_prev = 0;
   uint32_t tot = 0;
   uint32_t amt_split; //the amount of this level this is allocated due to splitting
 
-  map_t *map = (map_t *)cfg->alloc_data;
+  map_t *map = (map_t *)rvm_get_alloc_data(cfg);
 
   printf("Pg_sz\t:\tnum_used\n");
   for(int lvl = 0; lvl <= map->max_lvl; lvl++)
@@ -338,5 +357,5 @@ void buddy_memuse(rvm_cfg_t *cfg)
     used = 0;
   }
   printf("Useful allocated space: %d\n", tot);
-  printf("Total allocated space: %d\n\n", tot + map->sz * sizeof(uint64_t));
+  printf("Total allocated space: %ld\n\n", tot + map->sz * sizeof(uint64_t));
 }
