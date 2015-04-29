@@ -1,14 +1,14 @@
 #include "common.h"
 #include "rmem.h"
-#include "log.h"
-#include "error.h"
+#include "utils/log.h"
+#include "utils/error.h"
 
 static const int HASH_SIZE = 10000;
 static const int TIMEOUT_IN_MS = 500;
 
 static 
 uintptr_t lookup_remote_addr(hash_t tag_to_addr, uint32_t tag) {
-    void *addr = get_item(tag_to_addr, tag);
+    void *addr = hash_get_item(tag_to_addr, tag);
     
     if (!addr)
         return 0;
@@ -100,7 +100,7 @@ void insert_tag_to_addr(struct rmem* rmem, uint32_t tag, uintptr_t addr) {
             ("Failure: error allocating memory for tag_to_addr entry\n"));
     *addr_ptr = addr;
 
-    insert_hash_item(rmem->tag_to_addr, tag, (void*)addr_ptr);
+    hash_insert_item(rmem->tag_to_addr, tag, (void*)addr_ptr);
 }
 
 static
@@ -147,7 +147,7 @@ void rmem_connect(struct rmem *rmem, const char *host, const char *port)
     TEST_NZ(sem_init(&rmem->ctx.recv_sem, 0, 0));
 
     // build tag_to_addr map
-    rmem->tag_to_addr = create_hash(HASH_SIZE);
+    rmem->tag_to_addr = hash_create(HASH_SIZE);
 
     while (rdma_get_cm_event(rmem->ec, &event) == 0) {
         struct rdma_cm_event event_copy;
@@ -328,7 +328,7 @@ int rmem_free(struct rmem *rmem, uint32_t tag)
     CHECK_ERROR(addr == 0,
             ("Failure: tag not found in tag_to_addr\n"));
 
-    delete_hash_item(rmem->tag_to_addr, tag);
+    hash_delete_item(rmem->tag_to_addr, tag);
 
     ctx->send_msg->data.free.addr = addr;
 

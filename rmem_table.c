@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 #include <sys/mman.h>
-#include "log.h"
+#include "utils/log.h"
 
 #define HASH_SIZE 10000
 #define DATA_OFFSET (sizeof(struct alloc_entry *))
@@ -92,7 +92,7 @@ void init_rmem_table(struct rmem_table *rmem)
     for (i = 0; i < NUM_BUCKETS; i++)
 	list_init(&rmem->htable[i]);
 
-    rmem->tag_to_addr = create_hash(HASH_SIZE);
+    rmem->tag_to_addr = hash_create(HASH_SIZE);
 }
 
 void free_rmem_table(struct rmem_table *rmem)

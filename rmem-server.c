@@ -1,19 +1,23 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <assert.h>
+#include <signal.h>
 
 #include "common.h"
 #include "messages.h"
 #include "rmem_table.h"
 #include "rmem.h"
-#include "log.h"
-#include "error.h"
+#include "utils/log.h"
+#include "utils/error.h"
+
+#include "utils/stats.h"
 
 #define MIN(a,b) ((a)<(b)?(a):(b))
 
 static const char *DEFAULT_PORT = "12345";
 static const size_t BUFFER_SIZE = 10 * 1024 * 1024;
 
+struct stats stats;
 struct rmem_table rmem;
 pthread_mutex_t alloc_mutex;
 
@@ -36,11 +40,13 @@ void insert_tag_to_addr(struct rmem_table* rmem, uint32_t tag, uintptr_t addr) {
     CHECK_ERROR(value == 0,
             ("Failure: error allocating value"));
     *value = addr;
-    insert_hash_item(rmem->tag_to_addr, tag, value);
+    hash_insert_item(rmem->tag_to_addr, tag, value);
 }
 
 static void send_message(struct rdma_cm_id *id)
 {
+    stats_start(KSTATS_SEND_MSG);
+
     struct conn_context *ctx = (struct conn_context *)id->context;
 
     struct ibv_send_wr wr, *bad_wr = NULL;
@@ -61,10 +67,14 @@ static void send_message(struct rdma_cm_id *id)
     LOG(1, ("posting sending WR\n"));
 
     TEST_NZ(ibv_post_send(id->qp, &wr, &bad_wr));
+    
+    stats_end(KSTATS_SEND_MSG);
 }
 
 static void post_msg_receive(struct rdma_cm_id *id)
 {
+    stats_start(KSTATS_POST_MSG_RECV);
+
     struct conn_context *ctx = (struct conn_context *)id->context;
 
     struct ibv_recv_wr wr, *bad_wr = NULL;
@@ -83,10 +93,14 @@ static void post_msg_receive(struct rdma_cm_id *id)
     LOG(1, ("posting receive WR\n"));
 
     TEST_NZ(ibv_post_recv(id->qp, &wr, &bad_wr));
+    
+    stats_end(KSTATS_POST_MSG_RECV);
 }
 
 static void on_pre_conn(struct rdma_cm_id *id)
 {
+    stats_start(KSTATS_PRE_CONN);
+
     struct conn_context *ctx = (struct conn_context *) malloc(
             sizeof(struct conn_context));
 
@@ -114,18 +128,20 @@ static void on_pre_conn(struct rdma_cm_id *id)
     cp_info_list_init(&ctx->cp_info);
 
     post_msg_receive(id);
+    
+    stats_end(KSTATS_PRE_CONN);
 }
 
 static void send_tag_to_addr_info(struct rdma_cm_id *id) 
 {
     struct conn_context *ctx = (struct conn_context *)id->context;
 
-    int hash_n = hash_elements(rmem.tag_to_addr);
+    int hash_n = hash_num_elements(rmem.tag_to_addr);
     int map_size_left = hash_n;
 
-    hash_iterator_t it = begin_hash(rmem.tag_to_addr);
+    hash_iterator_t it = hash_begin(rmem.tag_to_addr);
 
-    assert( (map_size_left == 0) == (is_iterator_null(it)) );
+    assert( (map_size_left == 0) == (hash_is_iterator_null(it)) );
 
     ctx->send_msg->id = MSG_TAG_ADDR_MAP;
 
@@ -134,7 +150,7 @@ static void send_tag_to_addr_info(struct rdma_cm_id *id)
 
     int i = 0;
     for (; i < to_send; ++i) {
-        assert(!is_iterator_null(it));
+        assert(!hash_is_iterator_null(it));
 
         ctx->send_msg->data.tag_addr_map.data[i].tag = 
             (uint32_t)hash_iterator_key(it);
@@ -142,7 +158,7 @@ static void send_tag_to_addr_info(struct rdma_cm_id *id)
         uintptr_t addr = *(uintptr_t*)hash_iterator_value(it);
         ctx->send_msg->data.tag_addr_map.data[i].addr = addr;
 
-        next_hash_iterator(it);
+        hash_next_iterator(it);
     }
 
     send_message(id);
@@ -150,6 +166,8 @@ static void send_tag_to_addr_info(struct rdma_cm_id *id)
 
 static void on_connection(struct rdma_cm_id *id)
 {
+    stats_start(KSTATS_ON_CONN);
+
     struct conn_context *ctx = (struct conn_context *)id->context;
 
     ctx->send_msg->id = MSG_MR;
@@ -165,10 +183,13 @@ static void on_connection(struct rdma_cm_id *id)
 
     send_tag_to_addr_info(id);
 
+    stats_end(KSTATS_ON_CONN);
 }
 
 static void on_completion(struct ibv_wc *wc)
 {
+    stats_start(KSTATS_ON_COMPL);
+
     struct rdma_cm_id *id = (struct rdma_cm_id *)(uintptr_t)wc->wr_id;
     struct conn_context *ctx = (struct conn_context *)id->context;
 
@@ -240,6 +261,8 @@ static void on_completion(struct ibv_wc *wc)
     } else {
         LOG(1, ("on_completion: else\n"));
     }
+    
+    stats_end(KSTATS_ON_COMPL);
 }
 
 static void on_disconnect(struct rdma_cm_id *id)
@@ -260,11 +283,30 @@ static void on_disconnect(struct rdma_cm_id *id)
     free(ctx);
 }
 
+void ctrlc_handler(int sig_num) 
+{
+    stats_dump();
+}
+
+void set_ctrlc_handler()
+{
+    struct sigaction sig_int_handler;
+
+    sig_int_handler.sa_handler = ctrlc_handler;
+    sigemptyset(&sig_int_handler.sa_mask);
+    sig_int_handler.sa_flags = 0;
+
+    sigaction(SIGINT, &sig_int_handler, NULL);
+}
+
 int main(int argc, char **argv)
 {
     LOG(1, ("starting rmem-server\n"));
     init_rmem_table(&rmem);
     pthread_mutex_init(&alloc_mutex, NULL);
+
+    stats_init();
+    set_ctrlc_handler();
 
     rc_init(
             on_pre_conn,
