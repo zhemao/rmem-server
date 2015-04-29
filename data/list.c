@@ -5,24 +5,29 @@
 
 typedef struct list_node *list_node_t;
 
-int nnodes = 0;
-
-typedef struct list_node {
+typedef struct list_node 
+{
     list_node_t prev;
     list_node_t next;
 
     void *data;
 } list_node;
 
-struct list {
+struct list 
+{
     int size;
 
     list_node_t head;
     list_node_t tail;
 };
 
+/*
+ * STATIC / PRIVATE METHODS
+ */ 
+
 static
-struct list_node* alloc_node(list_t list) {
+struct list_node* alloc_node(list_t list) 
+{
     list_node* node = 0;
     node = (list_node*)malloc(sizeof(list_node));
     assert(node);
@@ -30,17 +35,9 @@ struct list_node* alloc_node(list_t list) {
     return node;
 }
 
-list_t create_list() {
-    list_t list = 0;
-    list = (list_t)malloc(sizeof(struct list));
-    memset(list, 0, sizeof(struct list));
-    assert(list);
-
-    return list;
-}
-
 static
-list_node_t create_list_node(list_t list, void *data) {
+list_node_t create_list_node(list_t list, void *data) 
+{
     list_node_t node = alloc_node(list);
     assert(node);
 
@@ -50,7 +47,29 @@ list_node_t create_list_node(list_t list, void *data) {
     return node;
 }
 
-void push_back_list(list_t list, void* data) {
+inline static
+void free_node(list_t list, list_node_t node) 
+{
+    free(node);
+}
+
+/*
+ * PUBLIC METHODS
+ */ 
+
+list_t list_create() 
+{
+    list_t list = 0;
+    list = (list_t)malloc(sizeof(struct list));
+    memset(list, 0, sizeof(struct list));
+    assert(list);
+
+    return list;
+}
+
+
+void list_push_back(list_t list, void* data) 
+{
     list_node_t node = create_list_node(list, data);
 
     if (list->size == 0) {
@@ -65,12 +84,8 @@ void push_back_list(list_t list, void* data) {
     list->size++;
 }
 
-inline static
-void free_node(list_t list, list_node_t node) {
-    free(node);
-}
-
-void destroy_list(list_t* list) {
+void list_destroy(list_t* list) 
+{
     list_node_t node = (*list)->head;
 
     while (node) {
@@ -83,13 +98,36 @@ void destroy_list(list_t* list) {
     *list = 0;
 }
 
-void* pop_front(list_t list) {
+void* list_pop_back(list_t list) 
+{
+    assert(list->size);
+
+    list_node_t node = list->tail;
+    list->tail = list->tail->prev;
+
+    if (list->tail) {
+        list->tail->next = 0;
+    } else {
+        list->head = 0;
+    }
+
+    void* data = node->data;
+
+    free_node(list, node);
+    list->size--;
+
+    return data;
+}
+
+void* list_pop_front(list_t list) 
+{
     assert(list->size);
 
     list_node_t node = list->head;
     list->head = node->next;
     if (list->head)
         list->head->prev = 0;
+    else list->tail = 0;
 
     void* data = node->data;
 
@@ -100,29 +138,35 @@ void* pop_front(list_t list) {
 }
 
 inline
-int size_list(list_t list) {
+int list_size(list_t list) 
+{
     return list->size;
 }
 
 inline
-list_iterator_t begin_list(list_t list) {
+list_iterator_t list_begin(list_t list) 
+{
     return list->head;
 }
 
-void* get_value(list_iterator_t it) {
+void* list_get_value(list_iterator_t it) 
+{
     return it->data;
 }
 
 inline
-bool is_end(list_iterator_t it) {
+bool list_is_end(list_iterator_t it) 
+{
     return it == 0;
 }
 
-list_iterator_t next_iterator(list_iterator_t it) {
+list_iterator_t list_next_iterator(list_iterator_t it) 
+{
     return it->next;
 }
 
-void delete_list_node(list_t list, list_iterator_t it) {
+void list_delete_node(list_t list, list_iterator_t it) 
+{
     list->size--;
 
     list_node_t node = (list_node_t) it;
