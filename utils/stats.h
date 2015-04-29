@@ -13,23 +13,26 @@
 enum kstats_vector { KSTATS_PRE_CONN, KSTATS_ON_CONN, KSTATS_ON_COMPL, 
     KSTATS_SEND_MSG, KSTATS_POST_MSG_RECV, KSTATS_MAX};
 
-#define KSTATS_STRINGS {"none", "rmem_server_pre_conn", "rmem_server_on_conn", \
+#define KSTATS_STRINGS {"rmem_server_pre_conn", "rmem_server_on_conn", \
     "rmem_server_on_compl", "rmem_server_send_msg", "rmem_server_post_msg_recv", \
     "kstats-end"}
 
-typedef struct stats_distr {
+typedef struct stats_distr 
+{
     uint64_t n;
     uint64_t min;
     uint64_t max;
     uint64_t tot;
 } stats_distr_t;
 
-typedef struct stat_entry {
+typedef struct stat_entry 
+{
     struct timeval time;
     enum kstats_vector kvec;	
 } stat_entry_t;
 
-typedef struct stats { 
+typedef struct stats 
+{ 
     stats_distr_t kstats[KSTATS_MAX];
     stack_p stats_stack;
 } stats_t;
@@ -80,7 +83,8 @@ void stats_start(enum kstats_vector kvec)
 }
 
 static inline
-void stats_end(enum kstats_vector kvec) {
+void stats_end(enum kstats_vector kvec) 
+{
 #ifdef STATS_ENABLED
     CHECK_ERROR(stack_size(stats.stats_stack) <= 0,
             ("Error: stats_end requires a previous call to stats_start\n"))
@@ -126,11 +130,13 @@ void stats_dump()
 #endif
 }
 
-void stats_init() {
+void stats_init() 
+{
     stats.stats_stack = stack_create();
 }
 
-void stats_destroy() {
+void stats_destroy() 
+{
     stack_destroy(&stats.stats_stack);
 }
 
