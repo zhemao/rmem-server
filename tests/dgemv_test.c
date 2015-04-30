@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <string.h>
 #include "rvm.h"
+#include "buddy_malloc.h"
 
 /* Defaults for n, m and niter respectively */
 #ifndef N_DEF
@@ -121,6 +122,8 @@ int main(int argc, char *argv[])
     rvm_opt_t opt;
     opt.host = host;
     opt.port = port;
+    opt.alloc_fp = buddy_malloc;
+    opt.free_fp = buddy_free;
     opt.recovery = recover;
     rvm_cfg_t *cfg = rvm_cfg_create(&opt);
     if(cfg == NULL) {
@@ -138,7 +141,7 @@ int main(int argc, char *argv[])
 
     /* We first try to recover state, if this is the first run or if the
      * previous run failed before initializing rvm_rec will return NULL. */
-    state_t *state = rvm_rec(cfg);
+    state_t *state = rvm_get_usr_data(cfg);
     if(!state) {
         /* Starting from scratch */
         rvm_txid_t txid = rvm_txn_begin(cfg);
@@ -155,6 +158,9 @@ int main(int argc, char *argv[])
         }
         state->iter = 0;
         init_vec(state->vec, nrow);
+        
+        //Set the state as our recoverable state pointer
+        rvm_set_usr_data(cfg, state);
 
         res = rvm_txn_commit(cfg, txid);
         if(!res) {
