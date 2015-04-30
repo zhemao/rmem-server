@@ -552,9 +552,15 @@ void block_write_sighdl(int signum, siginfo_t *siginfo, void *uctx)
     }
     in_sighdl = true;
 
+    if(siginfo->si_addr == NULL) {
+        LOG(1, ("NULL Pointer Reference\n"));
+        signal(SIGSEGV, SIG_DFL);
+        return;
+    }
+
     if(!cfg_glob->in_txn) {
         /* Not allowed to change pages outside of a txn. Issue a warning. */
-        LOG(1, ("Recoverable page modified outside a txn\n"));
+        LOG(5, ("Recoverable page modified outside a txn\n"));
     }
 
     void *page_addr = (void*)(((uint64_t)siginfo->si_addr / cfg_glob->blk_sz) *
