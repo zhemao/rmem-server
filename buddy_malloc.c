@@ -22,11 +22,11 @@
 
 /** Size of the pool of recoverable pages used for buddy allocation. Must be
  * a multiple of the page size and a power of 2 */
-#define POOL_SZ (1 << 14)
+#define POOL_SZ (1 << 15)
 
 /** Minimum allocation returned by the buddy allocator in bytes. Must be a
- * power of 2 < POOL_SZ. */
-#define MIN_PG_SZ 64
+ * power of 2 and < POOL_SZ. */
+#define MIN_PG_SZ 32
 
 typedef struct {
   int32_t num_pg;
@@ -182,7 +182,7 @@ bool buddy_free(rvm_cfg_t *cfg, void *buf)
 
   /* Check if buf is managed by the buddy allocator */
   map_t *map = (map_t *)rvm_get_alloc_data(cfg);
-  if(buf < (void*)map || buf >= (void*)map + rvm_get_blk_sz(cfg)) {
+  if(buf < (void*)map || buf >= (void*)map + POOL_SZ) {
       //Assume memory was allocated by the block allocator
       return rvm_blk_free(cfg, buf);
   }

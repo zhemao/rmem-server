@@ -30,6 +30,10 @@ tests/dgemv_test: tests/dgemv_test.c rmem.o rvm.o rmem_table.o common.o data/has
 tests/rvm_test_normal: tests/rvm_test_normal.c rmem.o rvm.o rmem_table.o common.o data/hash.o data/list.o buddy_malloc.o
 	${LD} -o $@ $^ ${CFLAGS} ${LDFLAGS} ${INCLUDE}
 
+tests/rvm_test_full: tests/rvm_test_full.c rmem.o rvm.o rmem_table.o common.o data/hash.o data/list.o buddy_malloc.o
+	${LD} -o $@ $^ ${CFLAGS} ${LDFLAGS} ${INCLUDE}
+
+
 tests/rvm_test_txn_commit: tests/rvm_test_txn_commit.c rmem.o rvm.o rmem_table.o common.o data/hash.o data/list.o
 	${LD} -o $@ $^ ${CFLAGS} ${LDFLAGS} ${INCLUDE}
 
