@@ -8,8 +8,8 @@
 #include "rvm_int.h"
 #include "rmem.h"
 #include "common.h"
-#include "log.h"
-#include "error.h"
+#include "utils/log.h"
+#include "utils/error.h"
 
 static inline int rvm_protect(void *addr, size_t size)
 {

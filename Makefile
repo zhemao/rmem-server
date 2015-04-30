@@ -3,11 +3,11 @@
 CFLAGS  := -Wall -g -fPIC -std=gnu11
 LD      := gcc
 LDFLAGS := ${LDFLAGS} -lrdmacm -libverbs -lpthread -std=gnu11
-INCLUDE :=-I. -Idata
+INCLUDE :=-I. -Idata -Iutils
 
-FILES   := log.h common.o rmem_table.o rmem-server.o rvm.o rmem.o data/hash.o data/list.o
+FILES   := utils/log.h common.o rmem_table.o rmem-server.o rvm.o rmem.o data/hash.o data/list.o data/stack.o
 APPS    := rmem-server rmem-client rmem-test
-TESTS   := tests/rvm_test_normal tests/rvm_test_txn_commit tests/rvm_test_recovery tests/rvm_test_free tests/rvm_test_big_commit tests/rvm_test_size_alloc tests/dgemv_test
+TESTS   := tests/rvm_test_normal tests/rvm_test_txn_commit tests/rvm_test_recovery tests/rvm_test_free tests/rvm_test_big_commit tests/rvm_test_size_alloc
 #HEADERS := $(wildcard *.h)
 SRCS    := $(wildcard *.c)
 

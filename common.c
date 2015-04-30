@@ -3,7 +3,7 @@
 #include <netdb.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include "log.h"
+#include "utils/log.h"
 
 const int TIMEOUT_IN_MS = 500;
 
