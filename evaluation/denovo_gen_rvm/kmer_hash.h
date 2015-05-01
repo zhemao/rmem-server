@@ -8,6 +8,9 @@
 #include <string.h>
 #include "contig_generation.h"
 #include "packingDNAseq.h"
+#include <rvm.h>
+
+extern rvm_cfg_t* cfg;
 
 /* Creates a hash table and (pre)allocates memory for the memory heap */
 hash_table_t* create_hash_table(int64_t nEntries, memory_heap_t *memory_heap)
@@ -15,7 +18,7 @@ hash_table_t* create_hash_table(int64_t nEntries, memory_heap_t *memory_heap)
    hash_table_t *result;
    int64_t n_buckets = nEntries * LOAD_FACTOR;
 
-   result = (hash_table_t*) malloc(sizeof(hash_table_t));
+   result = (hash_table_t*) rvm_alloc(cfg,sizeof(hash_table_t));
    result->size = n_buckets;
    result->table = (bucket_t*) calloc(n_buckets , sizeof(bucket_t));
    
@@ -25,7 +28,8 @@ hash_table_t* create_hash_table(int64_t nEntries, memory_heap_t *memory_heap)
       exit(1);
    }
    
-   memory_heap->heap = (kmer_t *) malloc(nEntries * sizeof(kmer_t));
+   
+   memory_heap->heap = (kmer_t *) rvm_alloc(cfg, nEntries * sizeof(kmer_t));
    if (memory_heap->heap == NULL) {
       fprintf(stderr, "ERROR: Could not allocate memory for the heap!\n");
       exit(1);
@@ -107,7 +111,7 @@ void addKmerToStartList(memory_heap_t *memory_heap, start_kmer_t **startKmersLis
    
    int64_t prevPosInHeap = memory_heap->posInHeap - 1;
    ptrToKmer = &(memory_heap->heap[prevPosInHeap]);
-   new_entry = (start_kmer_t*) malloc(sizeof(start_kmer_t));
+   new_entry = (start_kmer_t*) rvm_alloc(cfg, sizeof(start_kmer_t));
    new_entry->next = (*startKmersList);
    new_entry->kmerPtr = ptrToKmer;
    (*startKmersList) = new_entry;
