@@ -8,12 +8,19 @@ INCLUDE :=-I. -Idata -Iutils
 FILES   := utils/log.h common.o rmem_table.o rmem-server.o rvm.o rmem.o data/hash.o data/list.o data/stack.o
 APPS    := rmem-server rmem-client rmem-test
 TESTS   := tests/rvm_test_normal tests/rvm_test_txn_commit tests/rvm_test_recovery tests/rvm_test_free tests/rvm_test_big_commit tests/rvm_test_size_alloc
-#HEADERS := $(wildcard *.h)
-SRCS    := $(wildcard *.c)
+HEADERS := $(wildcard *.h)
+SRCS    := $(wildcard *.c data/*.c)
+DOTO    := $(SRCS:.c=.o)
 
-all: ${APPS} ${TESTS}
+STATIC_LIBS = librvm.a
+TARGETS = $(APPS) $(TESTS) $(STATIC_LIBS)
+
+all: $(TARGETS)
 
 include .depend
+
+librvm.a: $(SRCS) $(DOTO)
+	$(AR) rcs $@ $(DOTO)
 
 rmem-server: ${FILES}
 	${LD} -o $@ $^ ${CFLAGS} ${LDFLAGS} ${INCLUDE}
@@ -52,5 +59,5 @@ depend: .depend
 	$(CC) $(CFLAGS) -MM $^ > ./.depend;
 
 clean:
-	rm -f *.o ${APPS} ${TESTS}
+	rm -f *.o ${APPS} ${TESTS} $(STATIC_LIBS)
 
