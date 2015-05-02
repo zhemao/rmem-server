@@ -205,7 +205,7 @@ static void on_connection(struct rdma_cm_id *id)
 
 static void on_completion(struct ibv_wc *wc)
 {
-    stats_start(KSTATS_ON_COMPL);
+    //stats_start(KSTATS_ON_COMPL);
 
     struct rdma_cm_id *id = (struct rdma_cm_id *)(uintptr_t)wc->wr_id;
     struct conn_context *ctx = (struct conn_context *)id->context;
@@ -282,7 +282,7 @@ static void on_completion(struct ibv_wc *wc)
         LOG(1, ("on_completion: else\n"));
     }
     
-    stats_end(KSTATS_ON_COMPL);
+    //stats_end(KSTATS_ON_COMPL);
 }
 
 static void on_disconnect(struct rdma_cm_id *id)
