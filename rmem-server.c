@@ -32,6 +32,8 @@ struct conn_context
     struct ibv_mr *send_msg_mr;
 
     struct rmem_cp_info_list cp_info;
+
+    sem_t ack_sem;
 };
 
 static
@@ -127,6 +129,8 @@ static void on_pre_conn(struct rdma_cm_id *id)
 
     cp_info_list_init(&ctx->cp_info);
 
+    TEST_NZ(sem_init(&ctx->ack_sem, 0, 0));
+
     post_msg_receive(id);
     
     stats_end(KSTATS_PRE_CONN);
@@ -145,23 +149,36 @@ static void send_tag_to_addr_info(struct rdma_cm_id *id)
 
     ctx->send_msg->id = MSG_TAG_ADDR_MAP;
 
-    int to_send = MIN(map_size_left, TAG_ADDR_MAP_SIZE_MSG);
-    ctx->send_msg->data.tag_addr_map.size = to_send;
-
-    int i = 0;
-    for (; i < to_send; ++i) {
-        assert(!hash_is_iterator_null(it));
-
-        ctx->send_msg->data.tag_addr_map.data[i].tag = 
-            (uint32_t)hash_iterator_key(it);
-
-        uintptr_t addr = *(uintptr_t*)hash_iterator_value(it);
-        ctx->send_msg->data.tag_addr_map.data[i].addr = addr;
-
-        hash_next_iterator(it);
+    if (map_size_left == 0) {
+	ctx->send_msg->data.tag_addr_map.size = 0;
+	send_message(id);
+	return;
     }
 
-    send_message(id);
+    while (map_size_left > 0) {
+	int to_send = MIN(map_size_left, TAG_ADDR_MAP_SIZE_MSG);
+	ctx->send_msg->data.tag_addr_map.size = to_send;
+
+	printf("Sending %d mappings\n", to_send);
+
+	int i = 0;
+	for (; i < to_send; ++i) {
+	    assert(!hash_is_iterator_null(it));
+
+	    ctx->send_msg->data.tag_addr_map.data[i].tag = 
+		(uint32_t)hash_iterator_key(it);
+
+	    uintptr_t addr = *(uintptr_t*)hash_iterator_value(it);
+	    ctx->send_msg->data.tag_addr_map.data[i].addr = addr;
+
+	    hash_next_iterator(it);
+	}
+
+	send_message(id);
+	post_msg_receive(id);
+	TEST_NZ(sem_wait(&ctx->ack_sem));
+	map_size_left -= to_send;
+    }
 }
 
 static void on_connection(struct rdma_cm_id *id)
@@ -252,6 +269,9 @@ static void on_completion(struct ibv_wc *wc)
                 LOG(1, ("MSG_CP_ABORT\n"));
                 cp_info_list_clear(&ctx->cp_info);
                 break;
+	    case MSG_TAG_ADDR_MAP_ACK:
+		TEST_NZ(sem_post(&ctx->ack_sem));
+		break;
             default:
                 fprintf(stderr, "Invalid message type %d\n", msg->id);
                 exit(EXIT_FAILURE);

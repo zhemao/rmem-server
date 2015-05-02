@@ -106,6 +106,8 @@ void insert_tag_to_addr(struct rmem* rmem, uint32_t tag, uintptr_t addr) {
 static
 void receive_tag_to_addr_info(struct rmem* rmem) 
 {
+    rmem->ctx.send_msg->id = MSG_TAG_ADDR_MAP_ACK;
+
     while (1) {
         TEST_NZ(post_receive(rmem->id));
         sem_wait(&rmem->ctx.recv_sem);
@@ -119,6 +121,8 @@ void receive_tag_to_addr_info(struct rmem* rmem)
         for (; i < size; ++i) {
             insert_tag_to_addr(rmem, entries[i].tag, entries[i].addr);
         }
+
+	TEST_NZ(send_message(rmem->id));
 
         if (size < TAG_ADDR_MAP_SIZE_MSG)
             break;
