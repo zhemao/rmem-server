@@ -39,10 +39,8 @@ static bool recover_blocks(rvm_cfg_t *cfg)
 {
     int err;
     rmem_layer_t* rmem_layer = (rmem_layer_t*)cfg->rmem_layer;
-    //struct rmem* rmem = (struct rmem*)rmem_layer->layer_data;
 
     /* Recover the block table */
-    //err = rmem_get(&(cfg->rmem), cfg->blk_tbl, cfg->blk_tbl_mr,
     err = rmem_layer->get(rmem_layer, cfg->blk_tbl, (struct ibv_mr*)cfg->blk_tbl_rec,
             BLOCK_TBL_ID, cfg->blk_sz);
     if(err != 0) {
@@ -56,7 +54,6 @@ static bool recover_blocks(rvm_cfg_t *cfg)
     for(bx = 0; bx < BLOCK_TBL_SIZE; bx += 2)
     {
         block_desc_t *blk = &(cfg->blk_tbl->tbl[bx]);
-        //block_desc_t *blk = &(cfg->blk_tbl->tbl[bx]);
         if(blk->local_addr == NULL)
             continue; //Freed memory
 
@@ -75,8 +72,6 @@ static bool recover_blocks(rvm_cfg_t *cfg)
 
         /* Register new memory with IB */
         blk->blk_rec = rmem_layer->register_data(rmem_layer, blk->local_addr, blk->size);
-        //blk->mr = rmem_layer->register_data(rmem_layer, blk->local_addr, blk->size);
-        //blk->mr = rmem_create_mr(blk->local_addr, blk->size);
         if(blk->blk_rec == NULL) {
             rvm_log("Failed to register memory for block\n");
             errno = EUNKNOWN;
@@ -84,7 +79,6 @@ static bool recover_blocks(rvm_cfg_t *cfg)
         }
 
         /* Actual fetch from server */
-        //err = rmem_get(&(cfg->rmem), blk->local_addr, blk->mr, bx + 1, blk->size);
         err = rmem_layer->get(rmem_layer, blk->local_addr, (struct ibv_mr*)blk->blk_rec, bx + 1, blk->size);
         if(err != 0) {
             rvm_log("Failed to recover block %d\n", bx);
@@ -110,9 +104,7 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer
     cfg->in_txn = false;
 
     rmem_layer_t* rmem_layer = cfg->rmem_layer = create_rmem_layer();
-    //struct rmem* cfg_rmem = cfg->rmem;
 
-    //rmem_connect(&cfg_rmem, opts->host, opts->port);
     rmem_layer->connect(rmem_layer, opts->host, opts->port);
 
     /* Allocate and initialize the block table locally */
@@ -127,13 +119,12 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer
     memset(blk_chlist, 0, BITNSLOTS(BLOCK_TBL_SIZE)*sizeof(int32_t));
 
     /* Register the local block table with IB */
-    //cfg->blk_tbl_mr = rmem_create_mr(cfg->blk_tbl, cfg->blk_sz);
-    rmem_layer->register_data(rmem_layer, cfg->blk_tbl, cfg->blk_sz);
-    /*if(cfg->blk_tbl_mr == NULL) {
+    cfg->blk_tbl_rec = rmem_layer->register_data(rmem_layer, cfg->blk_tbl, cfg->blk_sz);
+    if(cfg->blk_tbl_rec == NULL) {
         rvm_log("Failed to register memory for block table\n");
         errno = EUNKNOWN;
         return NULL;
-    }*/
+    }
 
     if (opts->recovery) {
         if(!recover_blocks(cfg))
@@ -141,17 +132,6 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer
     } else {
         /* Allocate and register the block table remotely */
         rmem_layer->malloc(rmem_layer, cfg->blk_sz, BLOCK_TBL_ID);
-                //&cfg->rmem_layer, cfg->blk_tbl, cfg->blk_sz);
-        //cfg->blk_tbl->raddr = rmem_malloc(&(cfg->rmem), cfg->blk_sz,
-         //       BLOCK_TBL_ID);
-
-        //LOG(5, ("Allocated remote table in raddr: %ld\n", cfg->blk_tbl->raddr));
-
-        //if(cfg->blk_tbl->raddr == 0) {
-        //    rvm_log("Failed to allocate remote memory for block table\n");
-        //    errno = EUNKNOWN;
-        //    return NULL;
-        //}
 
         cfg->blk_tbl->n_blocks = 0;
     }
@@ -193,8 +173,6 @@ bool rvm_cfg_destroy(rvm_cfg_t *cfg)
         rmem_layer->free(rmem_layer, bx + 2 ); // free 'shadow' block
         
         rmem_layer->deregister_data(rmem_layer, blk->blk_rec);
-        //if(blk->mr) //XXX fix this! jcar
-        //    ibv_dereg_mr(blk->mr); ///XXX fix this
 
         /* Unprotect block */
         rvm_unprotect(blk->local_addr, blk->size);
@@ -204,7 +182,6 @@ bool rvm_cfg_destroy(rvm_cfg_t *cfg)
     rmem_layer->free(rmem_layer, BLOCK_TBL_ID);
 
     rmem_layer->deregister_data(rmem_layer, cfg->blk_tbl_rec);
-    //ibv_dereg_mr(cfg->blk_tbl_mr); //XXX fix this
 
     rmem_layer->disconnect(rmem_layer);
 
@@ -235,11 +212,9 @@ bool check_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
             ("Failure: Error allocating table\n"));
 
     struct ibv_mr* block_mr = (struct ibv_mr*)rmem_layer->register_data(rmem_layer, block, sizeof(char) * cfg->blk_sz);
-    //struct ibv_mr* block_mr = rmem_create_mr(block, sizeof(char) * cfg->blk_sz);
 
     LOG(8, ("Getting block table\n"));
     int err = rmem_layer->get(rmem_layer, block, block_mr, BLOCK_TBL_ID, cfg->blk_sz);
-    //err = rmem_get(&cfg->rmem, block, block_mr, BLOCK_TBL_ID, cfg->blk_sz);
     LOG(8, ("Block table fetched\n"));
 
     RETURN_ERROR(err != 0, false,
@@ -279,7 +254,7 @@ bool check_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
     }
 
     free(block);
-    ibv_dereg_mr(block_mr); //XXX fix this
+    rmem_layer->deregister_data(rmem_layer, block_mr);
 
     cfg->in_txn = false;
 
@@ -295,14 +270,11 @@ bool rvm_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
      */
     int err;
     rmem_layer_t* rmem_layer = cfg->rmem_layer;
-    //struct rmem* rmem = (struct rmem*)&cfg->rmem_layer->layer_data;
 
     /* Copy the updated block table */
     err = rmem_layer->put(rmem_layer, BLOCK_TBL_ID, cfg->blk_tbl,
             cfg->blk_tbl_rec, cfg->blk_sz);
-            //rmem->blk_tbl_mr, cfg->blk_sz);
-    //err = rmem_put(&(cfg->rmem), BLOCK_TBL_ID, cfg->blk_tbl,
-    //        cfg->blk_tbl_mr, cfg->blk_sz);
+    
     if(err != 0) {
         rvm_log("Failed to write block table\n");
         errno = err;
@@ -327,8 +299,6 @@ bool rvm_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
          * Right now this should never trigger. */
         //assert(blk->mr != NULL);
 
-        //err = rmem_put(&(cfg->rmem), bx + 2, blk->local_addr, blk->mr,
-        //        blk->size);
         err = rmem_layer->put(rmem_layer, bx + 2, blk->local_addr, blk->blk_rec,
                 blk->size);
         if(err != 0) {
@@ -338,18 +308,12 @@ bool rvm_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
         }
 
         tags_src[count] = bx + 2;
-        tags_dst[count++] = bx + 1;
+        tags_dst[count] = bx + 1;
         tags_size[count++] = blk->size;
 
-        //int ret = rmem_multi_cp_add(&cfg->rmem, bx + 1, bx + 2, blk->size); //XXX fix this
-        //CHECK_ERROR(ret != 0,
-        //        ("Failure: rmem_multi_cp_add\n"));
-                
         /* Re-protect the block for the next txn */
         rvm_protect(blk->local_addr, blk->size);
     }
-
-    //int ret = rmem_multi_cp_go(&cfg->rmem); // XXX fix this
 
     int ret = rmem_layer->atomic_commit(rmem_layer, tags_src, tags_dst, tags_size, count);
     CHECK_ERROR(ret != 0,
@@ -429,12 +393,10 @@ void *rvm_alloc(rvm_cfg_t* cfg, size_t size)
 
     // allocate final block
     rmem_layer->malloc(rmem_layer, size, block->bid);
-    //block->raddr = rmem_malloc(&(cfg->rmem), size, block->bid);
     // allocate shadow block
     uintptr_t shadow_ptr = rmem_layer->malloc(rmem_layer, size, block->bid + 1);
     //uintptr_t shadow_ptr = rmem_malloc(&(cfg->rmem), size, block->bid + 1);
     if(shadow_ptr == 0) {
-    //if(block->raddr == 0 || shadow_ptr == 0) {
         rvm_log("Failed to allocate remote memory for block\n");
         errno = EUNKNOWN;
         return NULL;
@@ -470,15 +432,8 @@ bool rvm_free(rvm_cfg_t* cfg, void *buf)
 
     /* Cleanup remote info */
     rmem_layer->free(rmem_layer, bx + 1); 
-    //rmem_free(&cfg->rmem, bx + 1); 
-    
-    LOG(5, ("rmem_free id: %d\n", bx + 2));
     rmem_layer->free(rmem_layer, bx + 2); // free shadow block as well
-    //rmem_free(&cfg->rmem, bx + 2); // free shadow block as well
-    
     rmem_layer->deregister_data(rmem_layer, blk->blk_rec);
-    //if(blk->mr) //XXX fix this
-    //    ibv_dereg_mr(blk->mr);
         
 
     /* Free local info */
@@ -546,7 +501,7 @@ void block_write_sighdl(int signum, siginfo_t *siginfo, void *uctx)
     if(bx == BLOCK_TBL_SIZE) {
         /* Address not in block table, this must be a real segfault */
         fprintf(stderr, "can't find block: %lx\n", (uint64_t)siginfo->si_addr);
-            signal(SIGSEGV, SIG_DFL);
+        signal(SIGSEGV, SIG_DFL);
         return;
     }
 

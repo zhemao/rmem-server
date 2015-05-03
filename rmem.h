@@ -23,9 +23,6 @@ struct client_context {
     sem_t recv_sem;
 };
 
-
-
-
 struct rmem {
     struct rdma_cm_id *id;
     struct rdma_event_channel *ec;

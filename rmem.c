@@ -1,18 +1,12 @@
+#include <assert.h>
 #include "common.h"
 #include "rmem.h"
 #include "utils/log.h"
 #include "utils/error.h"
+#include "rmem_decs.h"
 
 static const int HASH_SIZE = 10000;
 static const int TIMEOUT_IN_MS = 500;
-
-void rmem_connect(rmem_layer_t*, const char*, const char*);
-void rmem_disconnect(rmem_layer_t*);
-uint64_t rmem_malloc(rmem_layer_t*, size_t size, uint32_t tag);
-int rmem_put(rmem_layer_t*, uint32_t tag, void *src, struct ibv_mr *src_mr, size_t size);
-int rmem_get(rmem_layer_t*, void *dst, struct ibv_mr *dst_mr, uint32_t tag, size_t size);
-int rmem_atomic_commit(rmem_layer_t*, uint32_t*, uint32_t*, uint32_t*, uint32_t);
-static void *rmem_register_data(rmem_layer_t*, void *data, size_t size);
 
 rmem_layer_t* create_rmem_layer()
 {
@@ -24,10 +18,12 @@ rmem_layer_t* create_rmem_layer()
     layer->connect = rmem_connect;
     layer->disconnect = rmem_disconnect;
     layer->malloc = rmem_malloc;
+    layer->free = rmem_free;
     layer->put = rmem_put;
     layer->get = rmem_get;
     layer->atomic_commit = rmem_atomic_commit;
     layer->register_data = rmem_register_data;
+    layer->deregister_data = rmem_deregister_data;
 
     layer->layer_data = (struct rmem*)malloc(sizeof(struct rmem));
     CHECK_ERROR(layer->layer_data == 0,
@@ -88,6 +84,8 @@ int rmem_multi_cp_add(struct rmem *rmem, uint32_t tag_dst, uint32_t tag_src, uin
     uint64_t dst = lookup_remote_addr(rmem->tag_to_addr, tag_dst);
     uint64_t src = lookup_remote_addr(rmem->tag_to_addr, tag_src);
 
+    assert(dst != 0 && src != 0);
+
     ctx->send_msg->id = MSG_CP_REQ;
     ctx->send_msg->data.cpreq.dst = dst;
     ctx->send_msg->data.cpreq.src = src;
@@ -96,7 +94,7 @@ int rmem_multi_cp_add(struct rmem *rmem, uint32_t tag_dst, uint32_t tag_src, uin
     if (send_message(rmem->id))
 	return -1;
     if (sem_wait(&ctx->send_sem))
-	return -1;
+	return -2;
 
     return 0;
 }
@@ -181,7 +179,7 @@ static void on_completion(struct ibv_wc *wc)
 static
 void insert_tag_to_addr(struct rmem* rmem, uint32_t tag, uintptr_t addr) {
     uintptr_t* addr_ptr = (uintptr_t*)malloc(sizeof(uintptr_t));
-    CHECK_ERROR(addr == 0,
+    CHECK_ERROR(addr_ptr == 0,
             ("Failure: error allocating memory for tag_to_addr entry\n"));
     *addr_ptr = addr;
 
@@ -337,10 +335,11 @@ uint64_t rmem_lookup(struct rmem *rmem, uint32_t tag)
 }
 */
 int rmem_put(rmem_layer_t *rmem_layer, uint32_t tag,
-        void *src, struct ibv_mr *src_mr, size_t size)
+        void *src, void *data_mr, size_t size)
 {
     struct rmem* rmem = (struct rmem*)rmem_layer->layer_data;
     struct client_context *ctx = &rmem->ctx;
+    struct ibv_mr* src_mr = (struct ibv_mr*)data_mr;
     int err;
 
     struct ibv_send_wr wr, *bad_wr = NULL;
@@ -374,11 +373,12 @@ int rmem_put(rmem_layer_t *rmem_layer, uint32_t tag,
     return 0;
 }
 
-int rmem_get(rmem_layer_t *rmem_layer, void *dst, struct ibv_mr *dst_mr,
+int rmem_get(rmem_layer_t *rmem_layer, void *dst, void *data_mr,
         uint32_t tag, size_t size)
 {
     struct rmem* rmem = (struct rmem*)rmem_layer->layer_data;
     struct client_context *ctx = &rmem->ctx;
+    struct ibv_mr* dst_mr = (struct ibv_mr*)data_mr;
     int err;
 
     struct ibv_send_wr wr, *bad_wr = NULL;
@@ -440,13 +440,15 @@ int rmem_atomic_commit(rmem_layer_t* rmem_layer, uint32_t* tags_src,
         uint32_t* tags_dst, uint32_t* tags_size,
         uint32_t num_tags)
 {
+    /*
+     * All these RTTs should be merged
+     */
     struct rmem* rmem = (struct rmem*)rmem_layer->layer_data;
-    int ret;
 
     for (int i = 0; i < num_tags; ++i) {
-        ret = rmem_multi_cp_add(rmem, tags_dst[i], tags_src[i], tags_size[i]);
-        CHECK_ERROR(ret == 0,
-                ("Failure: error adding tag to commit\n"));
+        int ret = rmem_multi_cp_add(rmem, tags_dst[i], tags_src[i], tags_size[i]);
+        CHECK_ERROR(ret != 0,
+                ("Failure: error adding tag to commit. ret: %d\n", ret));
     }
     return rmem_multi_cp_go(rmem);
 }
@@ -455,5 +457,12 @@ static
 void *rmem_register_data(rmem_layer_t* rmem_layer, void *data, size_t size)
 {
     return rmem_create_mr(data, size);
+}
+
+static
+void rmem_deregister_data(rmem_layer_t* rmem_layer, void *data)
+{
+    if(data)
+        ibv_dereg_mr(data);
 }
 
