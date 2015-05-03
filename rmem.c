@@ -6,6 +6,48 @@
 static const int HASH_SIZE = 10000;
 static const int TIMEOUT_IN_MS = 500;
 
+void rmem_connect(rmem_layer_t*, const char*, const char*);
+void rmem_disconnect(rmem_layer_t*);
+uint64_t rmem_malloc(rmem_layer_t*, size_t size, uint32_t tag);
+int rmem_put(rmem_layer_t*, uint32_t tag, void *src, struct ibv_mr *src_mr, size_t size);
+int rmem_get(rmem_layer_t*, void *dst, struct ibv_mr *dst_mr, uint32_t tag, size_t size);
+int rmem_atomic_commit(rmem_layer_t*, uint32_t*, uint32_t*, uint32_t*, uint32_t);
+static void *rmem_register_data(rmem_layer_t*, void *data, size_t size);
+
+rmem_layer_t* create_rmem_layer()
+{
+    rmem_layer_t* layer = (rmem_layer_t*)
+        malloc(sizeof(rmem_layer_t));
+    CHECK_ERROR(layer == 0,
+            ("Failure: Error allocating layer struct\n"));
+
+    layer->connect = rmem_connect;
+    layer->disconnect = rmem_disconnect;
+    layer->malloc = rmem_malloc;
+    layer->put = rmem_put;
+    layer->get = rmem_get;
+    layer->atomic_commit = rmem_atomic_commit;
+    layer->register_data = rmem_register_data;
+
+    layer->layer_data = (struct rmem*)malloc(sizeof(struct rmem));
+    CHECK_ERROR(layer->layer_data == 0,
+            ("Failure: error allocating layer-specific data\n"));
+
+    memset(layer->layer_data, 0, sizeof(struct rmem));
+    return layer;
+}
+
+/*
+ * PRIVATE /STATIC METHODS
+ */ 
+
+static
+struct ibv_mr *rmem_create_mr(void *data, size_t size)
+{
+    return ibv_reg_mr(rc_get_pd(), data,
+            size, IBV_ACCESS_LOCAL_WRITE);
+}
+
 static 
 uintptr_t lookup_remote_addr(hash_t tag_to_addr, uint32_t tag) {
     void *addr = hash_get_item(tag_to_addr, tag);
@@ -38,6 +80,27 @@ static int send_message(struct rdma_cm_id *id)
     return ibv_post_send(id->qp, &wr, &bad_wr);
 }
 
+static
+int rmem_multi_cp_add(struct rmem *rmem, uint32_t tag_dst, uint32_t tag_src, uint64_t size)
+{
+    struct client_context *ctx = &rmem->ctx;
+
+    uint64_t dst = lookup_remote_addr(rmem->tag_to_addr, tag_dst);
+    uint64_t src = lookup_remote_addr(rmem->tag_to_addr, tag_src);
+
+    ctx->send_msg->id = MSG_CP_REQ;
+    ctx->send_msg->data.cpreq.dst = dst;
+    ctx->send_msg->data.cpreq.src = src;
+    ctx->send_msg->data.cpreq.size = size;
+
+    if (send_message(rmem->id))
+	return -1;
+    if (sem_wait(&ctx->send_sem))
+	return -1;
+
+    return 0;
+}
+
 static int post_receive(struct rdma_cm_id *id)
 {
     struct client_context *ctx = (struct client_context *)id->context;
@@ -56,6 +119,28 @@ static int post_receive(struct rdma_cm_id *id)
     sge.lkey = ctx->recv_msg_mr->lkey;
 
     return ibv_post_recv(id->qp, &wr, &bad_wr);
+}
+
+static
+int rmem_multi_cp_go(struct rmem *rmem)
+{
+    struct client_context *ctx = &rmem->ctx;
+
+    ctx->send_msg->id = MSG_CP_GO;
+
+    if (send_message(rmem->id))
+	return -1;
+    if (sem_wait(&ctx->send_sem))
+	return -1;
+
+    if (post_receive(rmem->id))
+	return -1;
+    if (sem_wait(&ctx->recv_sem))
+	return -1;
+    if (ctx->recv_msg->id != MSG_CP_ACK)
+	return -1;
+
+    return 0;
 }
 
 static void setup_memory(struct client_context *ctx)
@@ -125,8 +210,13 @@ void receive_tag_to_addr_info(struct rmem* rmem)
     }
 }
 
-void rmem_connect(struct rmem *rmem, const char *host, const char *port)
+/*
+ * PRIVATE /STATIC METHODS
+ */ 
+
+void rmem_connect(rmem_layer_t *rmem_layer, const char *host, const char *port)
 {
+    struct rmem* rmem = (struct rmem*)rmem_layer->layer_data;
     struct addrinfo *addr;
     struct rdma_conn_param cm_params;
     struct rdma_cm_event *event = NULL;
@@ -175,8 +265,9 @@ void rmem_connect(struct rmem *rmem, const char *host, const char *port)
     receive_tag_to_addr_info(rmem);
 }
 
-void rmem_disconnect(struct rmem *rmem)
+void rmem_disconnect(rmem_layer_t *rmem_layer)
 {
+    struct rmem* rmem = (struct rmem*)rmem_layer->layer_data;
     rdma_disconnect(rmem->id);
 
     TEST_NZ(sem_destroy(&rmem->ctx.rdma_sem));
@@ -193,8 +284,9 @@ void rmem_disconnect(struct rmem *rmem)
     rdma_destroy_event_channel(rmem->ec);
 }
 
-uint64_t rmem_malloc(struct rmem *rmem, size_t size, uint32_t tag)
+uint64_t rmem_malloc(rmem_layer_t *rmem_layer, size_t size, uint32_t tag)
 {
+    struct rmem* rmem = (struct rmem*)rmem_layer->layer_data;
     struct client_context *ctx = &rmem->ctx;
 
     ctx->send_msg->id = MSG_ALLOC;
@@ -220,6 +312,7 @@ uint64_t rmem_malloc(struct rmem *rmem, size_t size, uint32_t tag)
     return addr;
 }
 
+/*
 uint64_t rmem_lookup(struct rmem *rmem, uint32_t tag)
 {
     struct client_context *ctx = &rmem->ctx;
@@ -242,12 +335,13 @@ uint64_t rmem_lookup(struct rmem *rmem, uint32_t tag)
 
     return ctx->recv_msg->data.memresp.addr;
 }
-
-int rmem_put(struct rmem *rmem, uint32_t tag,
+*/
+int rmem_put(rmem_layer_t *rmem_layer, uint32_t tag,
         void *src, struct ibv_mr *src_mr, size_t size)
 {
-    int err;
+    struct rmem* rmem = (struct rmem*)rmem_layer->layer_data;
     struct client_context *ctx = &rmem->ctx;
+    int err;
 
     struct ibv_send_wr wr, *bad_wr = NULL;
     struct ibv_sge sge;
@@ -280,9 +374,10 @@ int rmem_put(struct rmem *rmem, uint32_t tag,
     return 0;
 }
 
-int rmem_get(struct rmem *rmem, void *dst, struct ibv_mr *dst_mr,
+int rmem_get(rmem_layer_t *rmem_layer, void *dst, struct ibv_mr *dst_mr,
         uint32_t tag, size_t size)
 {
+    struct rmem* rmem = (struct rmem*)rmem_layer->layer_data;
     struct client_context *ctx = &rmem->ctx;
     int err;
 
@@ -318,8 +413,9 @@ int rmem_get(struct rmem *rmem, void *dst, struct ibv_mr *dst_mr,
     return 0;
 }
 
-int rmem_free(struct rmem *rmem, uint32_t tag)
+int rmem_free(rmem_layer_t *rmem_layer, uint32_t tag)
 {
+    struct rmem* rmem = (struct rmem*)rmem_layer->layer_data;
     struct client_context *ctx = &rmem->ctx;
 
     ctx->send_msg->id = MSG_FREE;
@@ -340,49 +436,24 @@ int rmem_free(struct rmem *rmem, uint32_t tag)
     return 0;
 }
 
-int rmem_multi_cp_add(struct rmem *rmem, uint32_t tag_dst, uint32_t tag_src, uint64_t size)
+int rmem_atomic_commit(rmem_layer_t* rmem_layer, uint32_t* tags_src,
+        uint32_t* tags_dst, uint32_t* tags_size,
+        uint32_t num_tags)
 {
-    struct client_context *ctx = &rmem->ctx;
+    struct rmem* rmem = (struct rmem*)rmem_layer->layer_data;
+    int ret;
 
-    uint64_t dst = lookup_remote_addr(rmem->tag_to_addr, tag_dst);
-    uint64_t src = lookup_remote_addr(rmem->tag_to_addr, tag_src);
-
-    ctx->send_msg->id = MSG_CP_REQ;
-    ctx->send_msg->data.cpreq.dst = dst;
-    ctx->send_msg->data.cpreq.src = src;
-    ctx->send_msg->data.cpreq.size = size;
-
-    if (send_message(rmem->id))
-	return -1;
-    if (sem_wait(&ctx->send_sem))
-	return -1;
-
-    return 0;
+    for (int i = 0; i < num_tags; ++i) {
+        ret = rmem_multi_cp_add(rmem, tags_dst[i], tags_src[i], tags_size[i]);
+        CHECK_ERROR(ret == 0,
+                ("Failure: error adding tag to commit\n"));
+    }
+    return rmem_multi_cp_go(rmem);
 }
 
-int rmem_multi_cp_go(struct rmem *rmem)
+static
+void *rmem_register_data(rmem_layer_t* rmem_layer, void *data, size_t size)
 {
-    struct client_context *ctx = &rmem->ctx;
-
-    ctx->send_msg->id = MSG_CP_GO;
-
-    if (send_message(rmem->id))
-	return -1;
-    if (sem_wait(&ctx->send_sem))
-	return -1;
-
-    if (post_receive(rmem->id))
-	return -1;
-    if (sem_wait(&ctx->recv_sem))
-	return -1;
-    if (ctx->recv_msg->id != MSG_CP_ACK)
-	return -1;
-
-    return 0;
+    return rmem_create_mr(data, size);
 }
 
-struct ibv_mr *rmem_create_mr(void *data, size_t size)
-{
-    return ibv_reg_mr(rc_get_pd(), data,
-            size, IBV_ACCESS_LOCAL_WRITE);
-}
