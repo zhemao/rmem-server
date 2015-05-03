@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <assert.h>
 
+#include <rmem.h>
 #include <rvm.h>
 #include <log.h>
 #include <error.h>
@@ -48,7 +49,7 @@ int main(int argc, char **argv)
 
     /* Try to recover from server */
     opt.recovery = true;
-    rvm_cfg_t *cfg = rvm_cfg_create(&opt);
+    rvm_cfg_t *cfg = rvm_cfg_create(&opt, create_rmem_layer);
 
     /* Get the new addresses for arr0 and arr1 */
     int *safe_arr0 = rvm_rec(cfg);
