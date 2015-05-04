@@ -8,11 +8,12 @@
 #include <unistd.h>
 #include <errno.h>
 
-#include <rvm.h>
 #include <log.h>
 #include <error.h>
 #include <sys/queue.h>
 
+#include "rvm.h"
+#include "rmem.h"
 //#include "malloc_simple.h"
 #include "buddy_malloc.h"
 
@@ -37,7 +38,7 @@
 
 #define TX_COMMIT   do {                                                 \
         bool TX_COMMIT_res = rvm_txn_commit(cfg, txid);                  \
-        CHECK_ERROR(!TX_COMMIT_res, ("FAILURE: Could not commit txn"))   \
+        CHECK_ERROR(!TX_COMMIT_res, ("FAILURE: Could not commit txn\n"))   \
         } while(0)
 
 typedef struct qelem
@@ -124,7 +125,7 @@ rvm_cfg_t* initialize_rvm(char* host, char* port, bool rec) {
     opt.recovery = rec;
 
     LOG(8, ("rvm_cfg_create\n"));
-    rvm_cfg_t *cfg = rvm_cfg_create(&opt);
+    rvm_cfg_t *cfg = rvm_cfg_create(&opt, create_rmem_layer);
     CHECK_ERROR(cfg == NULL, 
             ("FAILURE: Failed to initialize rvm configuration - %s\n", strerror(errno)));
 
@@ -306,7 +307,7 @@ int main(int argc, char **argv)
         break;
 
     default:
-        LOG(1, ("FAILURE: Corrupted State"));
+        LOG(1, ("FAILURE: Corrupted State, tried phase %d\n", state->phase));
         return EXIT_FAILURE;
     }
 

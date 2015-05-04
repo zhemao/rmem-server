@@ -44,14 +44,14 @@ typedef struct
 /** Top-level rvm configuration info */
 struct rvm_cfg
 {
-    //struct rmem rmem;            /**< rmem connection information */
+    /* Generic Config Info */
     size_t blk_sz;               /**< Size of minimum rvm allocation */
     bool in_txn;                 /**< Are we currently in a transaction? */
-    rmem_layer_t* rmem_layer;
+    rmem_layer_t* rmem_layer;    /**< State info for low-level interface */
     
+    /* Block Table */
     blk_tbl_t *blk_tbl;          /**< Info about all blocks tracked by rvm */
-    void* blk_tbl_rec;           /**< Ugly hack to get IB registration info
-    bool in_txn;                 /**< Are we currently in a transaction? */
+    void* blk_tbl_rec;           /**< Ugly hack to get IB registration info */
 
     /* User-level allocator */
     rvm_alloc_t alloc_fp;        /**< Function pointer for allocation */

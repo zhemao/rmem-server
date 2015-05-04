@@ -89,18 +89,25 @@ int main(int argc, char **argv)
 
         /* Get the new addresses for arr0 and arr1 */
         int **arr_ptr = rvm_get_usr_data(cfg);
+        if(arr_ptr == NULL) {
+            printf("FAILURE: pointer to arrays is null!\n");
+            return EXIT_FAILURE;
+        }
+
+        if(arr_ptr[0] == NULL || arr_ptr[1] == NULL) {
+            printf("FAILURE: pointer to arrays corrupted\n");
+            return EXIT_FAILURE;
+        }
 
         /* Check their values */
         if(!check_arr(arr_ptr[0], 1, ARR_SIZE)) {
             printf("FAILURE: Arr0 Doesn't look right\n");
-
             return EXIT_FAILURE;
         }
 
         /* Check their values */
         if(!check_arr(arr_ptr[1], 2, ARR_SIZE)) {
             printf("FAILURE: Arr1 doesn't look right\n");
-
             return EXIT_FAILURE;
         }
 
