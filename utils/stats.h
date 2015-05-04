@@ -6,7 +6,7 @@
 #include "../utils/error.h"
 #include "../data/stack.h"
 
-#define STATS_ENABLED // comment to turn make stat calls free
+//#define STATS_ENABLED // comment to turn make stat calls free
 
 #define US_IN_SEC (1000*1000)
 

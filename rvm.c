@@ -58,7 +58,7 @@ static bool recover_blocks(rvm_cfg_t *cfg)
 
         /* Allocate local storage for recovered block */
         void *new_addr = mmap(blk->local_addr, cfg->blk_sz,
-                PROT_READ | PROT_WRITE | PROT_EXEC,
+                (PROT_READ | PROT_WRITE | PROT_EXEC),
                 MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED,
                 -1, 0);
         if(new_addr != blk->local_addr) {
@@ -95,8 +95,6 @@ static bool recover_blocks(rvm_cfg_t *cfg)
 
 rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts)
 {
-    int err;
-
     rvm_cfg_t *cfg = malloc(sizeof(rvm_cfg_t));
     if(cfg == NULL)
         return NULL;
@@ -109,9 +107,13 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts)
     rmem_connect(&(cfg->rmem), opts->host, opts->port);
 
     /* Allocate and initialize the block table locally */
-    err = posix_memalign((void**)&(cfg->blk_tbl), cfg->blk_sz, cfg->blk_sz);
-    if(err != 0) {
-        errno = err;
+//    err = posix_memalign((void**)&(cfg->blk_tbl), cfg->blk_sz, cfg->blk_sz);
+    cfg->blk_tbl = mmap(NULL, cfg->blk_sz, PROT_READ | PROT_WRITE | PROT_EXEC, 
+            (MAP_ANONYMOUS | MAP_PRIVATE), -1, 0);
+    assert((size_t)cfg->blk_tbl % sysconf(_SC_PAGESIZE) == 0);
+
+    if(cfg->blk_tbl == NULL) {
+        errno = EUNKNOWN;
         return NULL;
     }
 
@@ -193,7 +195,8 @@ bool rvm_cfg_destroy(rvm_cfg_t *cfg)
 
     /* Free local memory */
     free(blk_chlist);
-    free(cfg->blk_tbl);
+    //free(cfg->blk_tbl);
+    munmap(cfg->blk_tbl, cfg->blk_sz);
     free(cfg);
 
     return true;
@@ -355,8 +358,6 @@ void *rvm_alloc(rvm_cfg_t *cfg, size_t size)
  * of allocations. */
 void *rvm_blk_alloc(rvm_cfg_t* cfg, size_t size)
 {
-    int err;
-
     if (size == 0) {
         return NULL;
     }
@@ -371,8 +372,6 @@ void *rvm_blk_alloc(rvm_cfg_t* cfg, size_t size)
 
     /* Number of blocks is the ceiling of size / block_size */
     size_t nblocks = INT_DIV_CEIL(size, cfg->blk_sz);
-    //XXX
-    printf("nblocks: %ld\n", nblocks);
 
     // search for a run of free blocks big enough for this size
     int bx;
@@ -390,8 +389,6 @@ void *rvm_blk_alloc(rvm_cfg_t* cfg, size_t size)
             b_start = bx + 1;
         }
     }
-    //XXX
-    printf("Found slot: %ld\n", b_start);
     CHECK_ERROR(bx >= BLOCK_TBL_SIZE,
             ("Failure: Block table is full and we should have caught this earlier\n"));
 
@@ -399,16 +396,19 @@ void *rvm_blk_alloc(rvm_cfg_t* cfg, size_t size)
     /* Allocate local memory for this region.
      * Note: It's important to allocate an integer number of blocks instead of
      * just using size. This is because we protect whole pages. */
+    /* TODO: I'm pretty sure that mmap called with a multiple of the page size
+       will return page-aligned memory, but it's not documented officially.*/
     void *start_addr;
-    err = posix_memalign(&start_addr, cfg->blk_sz, nblocks*cfg->blk_sz);
-    if(err != 0) {
-        errno = err;
+    start_addr = mmap(NULL, nblocks*cfg->blk_sz, 
+            (PROT_READ | PROT_WRITE | PROT_EXEC), 
+            (MAP_ANONYMOUS | MAP_PRIVATE), -1, 0);
+    assert((size_t)start_addr % sysconf(_SC_PAGESIZE) == 0);
+
+    if(start_addr == NULL) {
         LOG(8, ("Failed to allocate local memory for block\n"));
+        errno = EUNKNOWN;
         return NULL;
     }
-
-    //XXX
-    printf("Base addr: %p\n", start_addr);
 
     for(bx = b_start; bx < b_start + nblocks; bx++)
     {
@@ -422,8 +422,6 @@ void *rvm_blk_alloc(rvm_cfg_t* cfg, size_t size)
 
         /* Calculate the start address of each block in the region */
         block->local_addr = start_addr + (bx - b_start)*cfg->blk_sz;
-        //XXX
-        printf("Local addr: %p\n", block->local_addr);
 
         /* Allocate and register the block table remotely */
         /* TODO Right now we pin everything, all the time. Eventually we may want
@@ -437,10 +435,8 @@ void *rvm_blk_alloc(rvm_cfg_t* cfg, size_t size)
         }
 
         // allocate final block
-        //XXX
-        printf("rmem_malloc: bid %d\n", block->bid);
-        printf("rmem_malloc: bid %d\n", BLK_SHDW_TAG(bx));
         block->raddr = rmem_malloc(&(cfg->rmem), cfg->blk_sz, block->bid);
+
         // allocate shadow block
         uintptr_t shadow_ptr = rmem_malloc(&(cfg->rmem), cfg->blk_sz,
                 BLK_SHDW_TAG(bx));
@@ -449,6 +445,9 @@ void *rvm_blk_alloc(rvm_cfg_t* cfg, size_t size)
             errno = EUNKNOWN;
             return NULL;
         }
+
+        LOG(9, ("Allocated block %d (shadow %d) - local addr: %p\n",
+                    block->bid, BLK_SHDW_TAG(bx), block->local_addr));
     }
 
     /* Protect the local blocks so that we can keep track of changes */
@@ -483,9 +482,10 @@ bool rvm_blk_free(rvm_cfg_t* cfg, void *buf)
     }
 
     /* Cleanup remote info */
+    LOG(9, ("rmem_free block: %d (%d) - local addr: %p\n",
+                BLK_REAL_TAG(bx), BLK_SHDW_TAG(bx), buf));
     rmem_free(&cfg->rmem, BLK_REAL_TAG(bx)); 
     
-    LOG(5, ("rmem_free id: %d\n", BLK_SHDW_TAG(bx)));
     rmem_free(&cfg->rmem, BLK_SHDW_TAG(bx)); // free shadow block as well
     if(blk->mr)
         ibv_dereg_mr(blk->mr);
@@ -495,7 +495,9 @@ bool rvm_blk_free(rvm_cfg_t* cfg, void *buf)
      * want to deal with fragmentation yet.
      */
     rvm_unprotect(blk->local_addr, cfg->blk_sz);
-    free(blk->local_addr);
+    //free(blk->local_addr);
+    munmap(blk->local_addr, cfg->blk_sz);
+
     blk->local_addr = NULL;
 
     cfg->blk_tbl->n_blocks--;

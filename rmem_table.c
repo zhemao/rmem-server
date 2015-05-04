@@ -213,11 +213,14 @@ void *rmem_alloc(struct rmem_table *rmem, size_t size, tag_t tag)
     struct list_head *free_node;
     int bucket;
 
-    // error out if the tag is not unique
+    /* Warn if the tag is not unique, then return the original allocation as
+       if the caller had used rmem_table_lookup. This can happen if the user
+       fails before committing any allocations, and doesn't know it already
+       allocated something. */
     entry = find_entry(rmem, tag);
     if (entry != NULL) {
         LOG(5, ("Requested tag is not unique\n"));
-    	return NULL;
+    	return entry->start;
     }
 
     free_node = rmem->free_list.next;
