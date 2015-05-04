@@ -1,6 +1,7 @@
 #ifndef __RMEM_H__
 #define __RMEM_H__
 
+#include "rmem_generic_interface.h"
 #include "messages.h"
 
 #include <rdma/rdma_cma.h>
@@ -27,17 +28,11 @@ struct rmem {
     struct rdma_event_channel *ec;
     struct client_context ctx;
     hash_t tag_to_addr;
+    
+//    struct ibv_mr *blk_tbl_mr;   /**< IB registration info for block table */
 };
 
-void rmem_connect(struct rmem *rmem, const char *host, const char *port);
-void rmem_disconnect(struct rmem *rmem);
-uint64_t rmem_malloc(struct rmem *rmem, size_t size, uint32_t tag);
-uint64_t rmem_lookup(struct rmem *rmem, uint32_t tag);
-int rmem_put(struct rmem *rmem, uint32_t tag, void *src, struct ibv_mr *src_mr, size_t size);
-int rmem_get(struct rmem *rmem, void *dst, struct ibv_mr *dst_mr, uint32_t tag, size_t size);
-int rmem_free(struct rmem *rmem, uint32_t tag);
-struct ibv_mr *rmem_create_mr(void *data, size_t size);
-int rmem_multi_cp_add(struct rmem *rmem, uint32_t tag_dst, uint32_t tag_src, uint64_t size);
-int rmem_multi_cp_go(struct rmem *rmem);
+rmem_layer_t* create_rmem_layer();
 
 #endif
+
