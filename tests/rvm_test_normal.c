@@ -8,6 +8,7 @@
 #include <errno.h>
 
 #include <rvm.h>
+#include <rmem.h>
 #include <log.h>
 #include <error.h>
 
@@ -61,7 +62,7 @@ rvm_cfg_t* initialize_rvm(char* host, char* port) {
     opt.recovery = false;
 
     LOG(8, ("rvm_cfg_create\n"));
-    rvm_cfg_t *cfg = rvm_cfg_create(&opt);
+    rvm_cfg_t *cfg = rvm_cfg_create(&opt, create_rmem_layer);
     CHECK_ERROR(cfg == NULL, 
             ("FAILURE: Failed to initialize rvm configuration - %s\n", strerror(errno)));
 
@@ -84,7 +85,7 @@ int main(int argc, char **argv)
     if(restart) {
         /* Try to recover from server */
         opt.recovery = true;
-        rvm_cfg_t *cfg = rvm_cfg_create(&opt);
+        rvm_cfg_t *cfg = rvm_cfg_create(&opt, create_rmem_layer);
 
         /* Get the new addresses for arr0 and arr1 */
         int **arr_ptr = rvm_get_usr_data(cfg);

@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <errno.h>
 
+#include <rmem.h>
 #include <rvm.h>
 #include <log.h>
 #include <error.h>
@@ -23,7 +24,7 @@ rvm_cfg_t* initialize_rvm(char* host, char* port) {
     /* Non-recovery case */
     opt.recovery = false;
 
-    rvm_cfg_t *cfg = rvm_cfg_create(&opt);
+    rvm_cfg_t *cfg = rvm_cfg_create(&opt, create_rmem_layer);
     CHECK_ERROR(cfg == NULL, 
             ("FAILURE: Failed to initialize rvm configuration - %s\n", strerror(errno)));
 

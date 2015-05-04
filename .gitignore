@@ -1,4 +1,11 @@
 *.o
 /rmem-server
-/rmem-client
 /rmem-test
+/librvm.a
+/.depend
+/tests/rvm_test_big_commit
+/tests/rvm_test_free
+/tests/rvm_test_normal
+/tests/rvm_test_recovery
+/tests/rvm_test_size_alloc
+/tests/rvm_test_txn_commit

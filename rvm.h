@@ -11,6 +11,8 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "rmem_generic_interface.h"
+
 /** Transaction ID
  *  Valid txid's have positive values. Negative valued txid's indicate errors*/
 typedef int8_t rvm_txid_t;
@@ -50,7 +52,7 @@ typedef struct
  *  description of each option.
  *  \returns A newly allocated configuration or NULL on error. Sets errno.
  */
-rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts);
+rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem);
 
 /** Free a previously created rvm configuration.
  *

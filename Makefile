@@ -4,50 +4,54 @@ CFLAGS  := -Wall -g -fPIC -std=gnu11
 LD      := gcc
 LDFLAGS := ${LDFLAGS} -lrdmacm -libverbs -lpthread -std=gnu11
 INCLUDE :=-I. -Idata -Iutils
+RVM_LIB := -L. -lrvm
 
-FILES   := utils/log.h common.o rmem_table.o rmem-server.o rvm.o rmem.o data/hash.o data/list.o data/stack.o
-APPS    := rmem-server rmem-client rmem-test
+COMMON_FILES := common.o data/hash.o data/list.o data/stack.o
+SERVER_FILES := rmem_table.o $(COMMON_FILES)
+CLIENT_FILES := rvm.o rmem.o buddy_malloc.o $(COMMON_FILES)
+APPS    := rmem-server rmem-test
 TESTS   := tests/rvm_test_normal tests/rvm_test_txn_commit tests/rvm_test_recovery tests/rvm_test_free tests/rvm_test_big_commit tests/rvm_test_size_alloc
-#HEADERS := $(wildcard *.h)
-SRCS    := $(wildcard *.c)
+HEADERS := $(wildcard *.h)
 
-all: ${APPS} ${TESTS}
+STATIC_LIB = librvm.a
+TARGETS = $(APPS) $(TESTS)
+
+all: $(TARGETS)
 
 include .depend
 
-rmem-server: ${FILES}
+librvm.a: $(CLIENT_FILES)
+	$(AR) rcs $@ $(CLIENT_FILES)
+
+rmem-server: $(SERVER_FILES) rmem-server.o
 	${LD} -o $@ $^ ${CFLAGS} ${LDFLAGS} ${INCLUDE}
 
-rmem-client: ${FILES}
+rmem-test: $(SERVER_FILES) rmem-test.o
 	${LD} -o $@ $^ ${CFLAGS} ${LDFLAGS} ${INCLUDE}
 
-rmem-test: ${FILES}
-	${LD} -o $@ $^ ${CFLAGS} ${LDFLAGS} ${INCLUDE}
+tests/dgemv_test: tests/dgemv_test.c $(STATIC_LIB)
+	${LD} -o $@ $^ -lblas $(RVM_LIB) ${CFLAGS} ${LDFLAGS} ${INCLUDE} 
 
-tests/dgemv_test: tests/dgemv_test.c rmem.o rvm.o rmem_table.o common.o data/hash.o data/list.o buddy_malloc.o
-	${LD} -o $@ $^ -lblas ${CFLAGS} ${LDFLAGS} ${INCLUDE} 
+tests/rvm_test_normal: tests/rvm_test_normal.c $(STATIC_LIB)
+	${LD} -o $@ $< $(RVM_LIB) ${CFLAGS} ${LDFLAGS} ${INCLUDE}
 
-tests/rvm_test_normal: tests/rvm_test_normal.c rmem.o rvm.o rmem_table.o common.o data/hash.o data/list.o buddy_malloc.o
-	${LD} -o $@ $^ ${CFLAGS} ${LDFLAGS} ${INCLUDE}
+tests/rvm_test_full: tests/rvm_test_full.c $(STATIC_LIB)
+	${LD} -o $@ $^ $(RVM_LIB) ${CFLAGS} ${LDFLAGS} ${INCLUDE}
 
-tests/rvm_test_full: tests/rvm_test_full.c rmem.o rvm.o rmem_table.o common.o data/hash.o data/list.o buddy_malloc.o
-	${LD} -o $@ $^ ${CFLAGS} ${LDFLAGS} ${INCLUDE}
+tests/rvm_test_txn_commit: tests/rvm_test_txn_commit.c $(STATIC_LIB)
+	${LD} -o $@ $< $(RVM_LIB) ${CFLAGS} ${LDFLAGS} ${INCLUDE}
 
+tests/rvm_test_recovery: tests/rvm_test_recovery.c $(STATIC_LIB)
+	${LD} -o $@ $< $(RVM_LIB) ${CFLAGS} ${LDFLAGS} ${INCLUDE}
 
-tests/rvm_test_txn_commit: tests/rvm_test_txn_commit.c rmem.o rvm.o rmem_table.o common.o data/hash.o data/list.o
-	${LD} -o $@ $^ ${CFLAGS} ${LDFLAGS} ${INCLUDE}
+tests/rvm_test_free: tests/rvm_test_free.c $(STATIC_LIB)
+	${LD} -o $@ $< $(RVM_LIB) ${CFLAGS} ${LDFLAGS} ${INCLUDE}
 
-tests/rvm_test_recovery: tests/rvm_test_recovery.c rmem.o rvm.o rmem_table.o common.o data/hash.o data/list.o
-	${LD} -o $@ $^ ${CFLAGS} ${LDFLAGS} ${INCLUDE}
+tests/rvm_test_big_commit: tests/rvm_test_big_commit.c $(STATIC_LIB)
+	${LD} -o $@ $< $(RVM_LIB) ${CFLAGS} ${LDFLAGS} ${INCLUDE}
 
-tests/rvm_test_free: tests/rvm_test_free.c rmem.o rvm.o rmem_table.o common.o data/hash.o data/list.o
-	${LD} -o $@ $^ ${CFLAGS} ${LDFLAGS} ${INCLUDE}
-
-tests/rvm_test_big_commit: tests/rvm_test_big_commit.c rmem.o rvm.o rmem_table.o common.o data/hash.o data/list.o
-	${LD} -o $@ $^ ${CFLAGS} ${LDFLAGS} ${INCLUDE}
-
-tests/rvm_test_size_alloc: tests/rvm_test_size_alloc.c rmem.o rvm.o rmem_table.o common.o data/hash.o data/list.o
-	${LD} -o $@ $^ ${CFLAGS} ${LDFLAGS} ${INCLUDE}
+tests/rvm_test_size_alloc: tests/rvm_test_size_alloc.c $(STATIC_LIB)
+	${LD} -o $@ $< $(RVM_LIB) ${CFLAGS} ${LDFLAGS} ${INCLUDE}
 
 depend: .depend
 
@@ -56,5 +60,5 @@ depend: .depend
 	$(CC) $(CFLAGS) -MM $^ > ./.depend;
 
 clean:
-	rm -f *.o ${APPS} ${TESTS}
+	rm -f *.o ${APPS} ${TESTS} $(STATIC_LIBS)
 

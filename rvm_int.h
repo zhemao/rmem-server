@@ -1,6 +1,6 @@
 /* Private (internal) interfaces, types and constants for RVM */
 #include "rvm.h"
-#include "rmem.h"
+#include "rmem_generic_interface.h"
 #include <stdbool.h>
 
 /* Block table always has this tag */
@@ -24,14 +24,13 @@ typedef struct
 {
     uint32_t bid;        /**< Block identifier (tag) on the server */
     void *local_addr;    /**< Address of block on client (also flag for whether block is being used)*/
-    uint64_t raddr;      /**< Address of block on server */
-    struct ibv_mr *mr;   /**< IB registration info (invalid during rec) */
+    void* blk_rec;       // ugly
 } block_desc_t;
 
 /** The block table is a page-sized list of every block tracked by rvm */
 typedef struct
 {
-    uint64_t raddr; /**< Remote address of block table */
+    //uint64_t raddr; /**< Remote address of block table */
     
     uint64_t n_blocks; /**< Counter of how many blocks are currently being used (also shadow blocks) */
 
@@ -45,10 +44,13 @@ typedef struct
 /** Top-level rvm configuration info */
 struct rvm_cfg
 {
-    struct rmem rmem;            /**< rmem connection information */
+    //struct rmem rmem;            /**< rmem connection information */
     size_t blk_sz;               /**< Size of minimum rvm allocation */
+    bool in_txn;                 /**< Are we currently in a transaction? */
+    rmem_layer_t* rmem_layer;
+    
     blk_tbl_t *blk_tbl;          /**< Info about all blocks tracked by rvm */
-    struct ibv_mr *blk_tbl_mr;   /**< IB registration info for block table */
+    void* blk_tbl_rec;           /**< Ugly hack to get IB registration info
     bool in_txn;                 /**< Are we currently in a transaction? */
 
     /* User-level allocator */
