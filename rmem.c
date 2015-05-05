@@ -135,10 +135,10 @@ int rmem_multi_cp_go(struct rmem *rmem)
 
     if (send_message(rmem->id))
 	return -1;
-    if (sem_wait(&ctx->send_sem))
+    if (post_receive(rmem->id))
 	return -1;
 
-    if (post_receive(rmem->id))
+    if (sem_wait(&ctx->send_sem))
 	return -1;
     if (sem_wait(&ctx->recv_sem))
 	return -1;
