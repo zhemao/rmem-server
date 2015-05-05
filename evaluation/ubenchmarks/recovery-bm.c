@@ -69,9 +69,6 @@ void recover_pages(char *host, char *port,
 	exit(EXIT_FAILURE);
     }
 
-    for (int i = 0; i < npages; i++)
-	rvm_free(rvm, pages[i]);
-
     rvm_cfg_destroy(rvm);
 }
 
