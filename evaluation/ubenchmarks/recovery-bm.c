@@ -3,6 +3,7 @@
 
 #include <rvm.h>
 #include <rmem.h>
+#include <buddy_malloc.h>
 
 #include "util.h"
 
@@ -10,14 +11,23 @@ void setup_pages(char *host, char *port, int **pages, int npages)
 {
     rvm_cfg_t *rvm;
     rvm_opt_t opt;
+    rvm_txid_t txid;
 
     opt.host = host;
     opt.port = port;
+    opt.alloc_fp = buddy_malloc;
+    opt.free_fp = buddy_free;
     opt.recovery = false;
 
     rvm = rvm_cfg_create(&opt, create_rmem_layer);
     if (rvm == NULL) {
 	perror("rvm_cfg_create");
+	exit(EXIT_FAILURE);
+    }
+
+    txid = rvm_txn_begin(rvm);
+    if (txid < 0) {
+	perror("rvm_txn_begin");
 	exit(EXIT_FAILURE);
     }
 
@@ -29,17 +39,28 @@ void setup_pages(char *host, char *port, int **pages, int npages)
 	}
     }
 
+    printf("Committing allocations.\n");
+
+    if (!rvm_txn_commit(rvm, txid)) {
+	perror("rvm_txn_commit");
+	exit(EXIT_FAILURE);
+    }
+
+    printf("Commit successful\n");
+
     rvm_cfg_destroy(rvm);
 }
 
 void recover_pages(char *host, char *port,
-	int **pages, int npages, bool free_at_end)
+	int **pages, int npages)
 {
     rvm_cfg_t *rvm;
     rvm_opt_t opt;
 
     opt.host = host;
     opt.port = port;
+    opt.alloc_fp = buddy_malloc;
+    opt.free_fp = buddy_free;
     opt.recovery = true;
 
     rvm = rvm_cfg_create(&opt, create_rmem_layer);
@@ -48,18 +69,8 @@ void recover_pages(char *host, char *port,
 	exit(EXIT_FAILURE);
     }
 
-    for (int i = 0; i < npages; i++) {
-	pages[i] = rvm_rec(rvm);
-	if (pages[i] == NULL) {
-	    perror("rvm_rec");
-	    exit(EXIT_FAILURE);
-	}
-    }
-
-    if (free_at_end) {
-	for (int i = 0; i < npages; i++)
-	    rvm_free(rvm, pages[i]);
-    }
+    for (int i = 0; i < npages; i++)
+	rvm_free(rvm, pages[i]);
 
     rvm_cfg_destroy(rvm);
 }
@@ -85,11 +96,8 @@ int main(int argc, char *argv[])
     alloctime = gettime() - starttime;
 
     starttime = gettime();
-    recover_pages(host, port, pages, npages, false);
+    recover_pages(host, port, pages, npages);
     rectime = gettime() - starttime;
-
-    recover_pages(host, port, pages, npages, true);
-
     free(pages);
 
     printf("alloc time %f, recovery time %f\n", alloctime, rectime);
