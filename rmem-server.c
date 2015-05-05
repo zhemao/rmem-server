@@ -256,6 +256,8 @@ static void on_completion(struct ibv_wc *wc)
                         (void *) msg->data.cpreq.dst,
                         (void *) msg->data.cpreq.src,
                         (size_t) msg->data.cpreq.size);
+                ctx->send_msg->id = MSG_CP_ACK;
+                send_message(id);
                 break;
             case MSG_CP_GO:
                 LOG(1, ("MSG_CP_GO\n"));
@@ -267,6 +269,8 @@ static void on_completion(struct ibv_wc *wc)
             case MSG_CP_ABORT:
                 LOG(1, ("MSG_CP_ABORT\n"));
                 cp_info_list_clear(&ctx->cp_info);
+                ctx->send_msg->id = MSG_CP_ACK;
+                send_message(id);
                 break;
 	    case MSG_TAG_ADDR_MAP_ACK:
 		TEST_NZ(sem_post(&ctx->ack_sem));

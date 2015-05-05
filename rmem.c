@@ -76,29 +76,6 @@ static int send_message(struct rdma_cm_id *id)
     return ibv_post_send(id->qp, &wr, &bad_wr);
 }
 
-static
-int rmem_multi_cp_add(struct rmem *rmem, uint32_t tag_dst, uint32_t tag_src, uint64_t size)
-{
-    struct client_context *ctx = &rmem->ctx;
-
-    uint64_t dst = lookup_remote_addr(rmem->tag_to_addr, tag_dst);
-    uint64_t src = lookup_remote_addr(rmem->tag_to_addr, tag_src);
-
-    assert(dst != 0 && src != 0);
-
-    ctx->send_msg->id = MSG_CP_REQ;
-    ctx->send_msg->data.cpreq.dst = dst;
-    ctx->send_msg->data.cpreq.src = src;
-    ctx->send_msg->data.cpreq.size = size;
-
-    if (send_message(rmem->id))
-	return -1;
-    if (sem_wait(&ctx->send_sem))
-	return -2;
-
-    return 0;
-}
-
 static int post_receive(struct rdma_cm_id *id)
 {
     struct client_context *ctx = (struct client_context *)id->context;
@@ -117,6 +94,36 @@ static int post_receive(struct rdma_cm_id *id)
     sge.lkey = ctx->recv_msg_mr->lkey;
 
     return ibv_post_recv(id->qp, &wr, &bad_wr);
+}
+
+static
+int rmem_multi_cp_add(struct rmem *rmem, uint32_t tag_dst, uint32_t tag_src, uint64_t size)
+{
+    struct client_context *ctx = &rmem->ctx;
+
+    uint64_t dst = lookup_remote_addr(rmem->tag_to_addr, tag_dst);
+    uint64_t src = lookup_remote_addr(rmem->tag_to_addr, tag_src);
+
+    assert(dst != 0 && src != 0);
+
+    ctx->send_msg->id = MSG_CP_REQ;
+    ctx->send_msg->data.cpreq.dst = dst;
+    ctx->send_msg->data.cpreq.src = src;
+    ctx->send_msg->data.cpreq.size = size;
+
+    if (send_message(rmem->id))
+	return -1;
+    if (post_receive(rmem->id))
+	return -2;
+    if (sem_wait(&ctx->send_sem))
+	return -3;
+    if (sem_wait(&ctx->recv_sem))
+	return -4;
+
+    if (ctx->recv_msg->id != MSG_CP_ACK)
+	return -5;
+
+    return 0;
 }
 
 static
@@ -452,8 +459,6 @@ int rmem_atomic_commit(rmem_layer_t* rmem_layer, uint32_t* tags_src,
     for (int i = 0; i < num_tags; ++i) {
         int ret = rmem_multi_cp_add(rmem, tags_dst[i], tags_src[i], tags_size[i]);
         LOG(9, ("Commiting %d -> %d (size %d)\n", tags_src[i], tags_dst[i], tags_size[i]));
-        //XXX FIXME!
-        usleep(250000);
         CHECK_ERROR(ret != 0,
                 ("Failure: error adding tag to commit. ret: %d\n", ret));
     }
