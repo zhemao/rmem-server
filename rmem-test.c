@@ -12,23 +12,23 @@ int main(void)
 
     init_rmem_table(&rmem);
 
-    data1 = rmem_alloc(&rmem, 100, 1);
-    data2 = rmem_alloc(&rmem, 50, 2);
-    data3 = rmem_alloc(&rmem, 120, 3);
+    data1 = rmem_table_alloc(&rmem, 100, 1);
+    data2 = rmem_table_alloc(&rmem, 50, 2);
+    data3 = rmem_table_alloc(&rmem, 120, 3);
 
     memset(data1, '1', 100);
     memset(data2, '2', 50);
     memset(data3, '3', 120);
 
     rmem_table_free(&rmem, data2);
-    data2 = rmem_alloc(&rmem, 70, 2);
+    data2 = rmem_table_alloc(&rmem, 70, 2);
     memset(data2, '2', 70);
 
-    data4 = rmem_alloc(&rmem, 25, 4);
+    data4 = rmem_table_alloc(&rmem, 25, 4);
     memset(data4, '4', 25);
 
     rmem_table_free(&rmem, data3);
-    data3 = rmem_alloc(&rmem, 120, 3);
+    data3 = rmem_table_alloc(&rmem, 120, 3);
     memset(data3, '3', 120);
 
     assert(data1 == rmem_table_lookup(&rmem, 1));

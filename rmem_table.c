@@ -206,7 +206,7 @@ static struct alloc_entry *find_entry(struct rmem_table *rmem, tag_t tag)
     return NULL;
 }
 
-void *rmem_alloc(struct rmem_table *rmem, size_t size, tag_t tag)
+void *rmem_table_alloc(struct rmem_table *rmem, size_t size, tag_t tag)
 {
     size_t req_size = size + DATA_OFFSET;
     struct alloc_entry *entry = NULL;
@@ -220,7 +220,7 @@ void *rmem_alloc(struct rmem_table *rmem, size_t size, tag_t tag)
     entry = find_entry(rmem, tag);
     if (entry != NULL) {
         LOG(5, ("Requested tag is not unique\n"));
-    	return entry->start;
+    	return entry->start + DATA_OFFSET;
     }
 
     free_node = rmem->free_list.next;

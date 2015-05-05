@@ -217,7 +217,7 @@ static void on_completion(struct ibv_wc *wc)
         switch (msg->id) {
             case MSG_ALLOC:
                 TEST_NZ(pthread_mutex_lock(&alloc_mutex));
-                ptr = rmem_alloc(&rmem, msg->data.alloc.size,
+                ptr = rmem_table_alloc(&rmem, msg->data.alloc.size,
                         msg->data.alloc.tag);
                 TEST_NZ(pthread_mutex_unlock(&alloc_mutex));
                 ctx->send_msg->id = MSG_MEMRESP;

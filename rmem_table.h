@@ -48,7 +48,7 @@ struct rmem_cp_info_list {
 };
 
 void init_rmem_table(struct rmem_table *rmem);
-void *rmem_alloc(struct rmem_table *rmem, size_t size, tag_t tag);
+void *rmem_table_alloc(struct rmem_table *rmem, size_t size, tag_t tag);
 void rmem_table_free(struct rmem_table *rmem, void *ptr);
 void *rmem_table_lookup(struct rmem_table *rmem, tag_t tag);
 void free_rmem_table(struct rmem_table *rmem);
