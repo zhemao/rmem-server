@@ -1,11 +1,14 @@
 #!/bin/bash
 set -e
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
-$DIR/rvm_test_full f2 12345 -1
-$DIR/rvm_test_full f2 12345 0
-$DIR/rvm_test_full f2 12345 1
-$DIR/rvm_test_full f2 12345 2
-$DIR/rvm_test_full f2 12345 3
-$DIR/rvm_test_full f2 12345 4
-$DIR/rvm_test_full f2 12345 5
-$DIR/rvm_test_full f2 12345 6
+HOST=$1
+PORT=$2
+
+$DIR/rvm_test_full $HOST $PORT -1
+$DIR/rvm_test_full $HOST $PORT 0
+$DIR/rvm_test_full $HOST $PORT 1
+$DIR/rvm_test_full $HOST $PORT 2
+$DIR/rvm_test_full $HOST $PORT 3
+$DIR/rvm_test_full $HOST $PORT 4
+$DIR/rvm_test_full $HOST $PORT 5
+$DIR/rvm_test_full $HOST $PORT 6
