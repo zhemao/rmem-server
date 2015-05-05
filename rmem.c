@@ -196,7 +196,7 @@ void insert_tag_to_addr(struct rmem* rmem, uint32_t tag, uintptr_t addr) {
 static
 void receive_tag_to_addr_info(struct rmem* rmem) 
 {
-    rmem->ctx.send_msg->id = MSG_TAG_ADDR_MAP_ACK;
+    rmem->ctx.send_msg->id = MSG_STARTUP_ACK;
 
     while (1) {
         TEST_NZ(post_receive(rmem->id));

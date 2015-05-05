@@ -19,7 +19,7 @@ enum message_id {
     MSG_CP_ABORT,
     MSG_CP_ACK,
     MSG_TAG_ADDR_MAP,
-    MSG_TAG_ADDR_MAP_ACK
+    MSG_STARTUP_ACK
 };
 
 typedef struct tag_addr_entry {

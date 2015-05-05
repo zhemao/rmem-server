@@ -194,8 +194,8 @@ static void on_connection(struct rdma_cm_id *id)
                 (uintptr_t)rmem.mem));
 
     send_message(id);
-
-    sleep(1);
+    post_msg_receive(id);
+    TEST_NZ(sem_init(&ctx->ack_sem, 0, 0));
 
     send_tag_to_addr_info(id);
 
@@ -272,7 +272,7 @@ static void on_completion(struct ibv_wc *wc)
                 ctx->send_msg->id = MSG_CP_ACK;
                 send_message(id);
                 break;
-	    case MSG_TAG_ADDR_MAP_ACK:
+	    case MSG_STARTUP_ACK:
 		TEST_NZ(sem_post(&ctx->ack_sem));
 		break;
             default:
