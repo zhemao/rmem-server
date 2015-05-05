@@ -114,14 +114,14 @@ static void on_pre_conn(struct rdma_cm_id *id)
                 IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE |
                 IBV_ACCESS_REMOTE_READ));
 
-    posix_memalign((void **)&ctx->recv_msg, sysconf(_SC_PAGESIZE),
-            sizeof(*ctx->recv_msg));
+    TEST_NZ(posix_memalign((void **)&ctx->recv_msg, sysconf(_SC_PAGESIZE),
+            sizeof(*ctx->recv_msg)));
     TEST_Z(ctx->recv_msg_mr = ibv_reg_mr(
                 rc_get_pd(), ctx->recv_msg, sizeof(*ctx->recv_msg),
                 IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE));
 
-    posix_memalign((void **)&ctx->send_msg, sysconf(_SC_PAGESIZE),
-            sizeof(*ctx->send_msg));
+    TEST_NZ(posix_memalign((void **)&ctx->send_msg, sysconf(_SC_PAGESIZE),
+            sizeof(*ctx->send_msg)));
     TEST_Z(ctx->send_msg_mr = ibv_reg_mr(
                 rc_get_pd(), ctx->send_msg, sizeof(*ctx->send_msg),
                 IBV_ACCESS_LOCAL_WRITE));
@@ -320,6 +320,13 @@ void set_ctrlc_handler()
 
 int main(int argc, char **argv)
 {
+    const char *port;
+
+    if (argc > 1)
+	port = argv[1];
+    else
+	port = DEFAULT_PORT;
+
     LOG(1, ("starting rmem-server\n"));
     init_rmem_table(&rmem);
     pthread_mutex_init(&alloc_mutex, NULL);
@@ -335,7 +342,7 @@ int main(int argc, char **argv)
 
     printf("waiting for connections. interrupt (^C) to exit.\n");
 
-    rc_server_loop(DEFAULT_PORT);
+    rc_server_loop(port);
 
     free_rmem_table(&rmem);
     pthread_mutex_destroy(&alloc_mutex);
