@@ -426,8 +426,8 @@ void multi_cp(struct rmem_cp_info_list *list)
     struct list_head *node = list->head.next;
 
     while (node != &list->head) {
-	info = cp_info_of_list(node);
-	memcpy(info->dst, info->src, info->size);
-	node = node->next;
+        info = cp_info_of_list(node);
+        memcpy(info->dst, info->src, info->size);
+        node = node->next;
     }
 }

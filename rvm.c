@@ -90,6 +90,9 @@ static bool recover_blocks(rvm_cfg_t *cfg)
 
         /* Protect the block to detect changes */
         rvm_protect(blk->local_addr, cfg->blk_sz);
+
+        LOG(9, ("Recovered block %d (shadow %d) - local addr: %p\n",
+                    blk->bid, BLK_SHDW_TAG(bx), blk->local_addr));
     }
 
     return true;

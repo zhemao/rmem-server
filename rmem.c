@@ -451,6 +451,7 @@ int rmem_atomic_commit(rmem_layer_t* rmem_layer, uint32_t* tags_src,
 
     for (int i = 0; i < num_tags; ++i) {
         int ret = rmem_multi_cp_add(rmem, tags_dst[i], tags_src[i], tags_size[i]);
+        LOG(9, ("Commiting %d -> %d (size %d)\n", tags_src[i], tags_dst[i], tags_size[i]));
         CHECK_ERROR(ret != 0,
                 ("Failure: error adding tag to commit. ret: %d\n", ret));
     }
