@@ -49,7 +49,7 @@ void setup_pages(char *host, char *port, int **pages, int npages)
 }
 
 void recover_pages(char *host, char *port,
-	int **pages, int npages)
+	int **pages, int npages, bool free_on_exit)
 {
     rvm_cfg_t *rvm;
     rvm_opt_t opt;
@@ -66,6 +66,20 @@ void recover_pages(char *host, char *port,
 	exit(EXIT_FAILURE);
     }
 
+    if (free_on_exit) {
+	rvm_txid_t txid = rvm_txn_begin(rvm);
+	if (txid < 0) {
+	    perror("rvm_txn_begin");
+	    exit(EXIT_FAILURE);
+	}
+	for (int i = 0; i < npages; i++)
+	    rvm_free(rvm, pages[i]);
+	if (!rvm_txn_commit(rvm, txid)) {
+	    perror("rvm_txn_commit");
+	    exit(EXIT_FAILURE);
+	}
+    }
+
     rvm_cfg_destroy(rvm);
 }
 
@@ -75,8 +89,8 @@ int main(int argc, char *argv[])
     double starttime, endtime;
     char *host, *port;
 
-    if (argc < 5) {
-	fprintf(stderr, "%s <host> <port> <npages> <recovery>\n", argv[0]);
+    if (argc < 4) {
+	fprintf(stderr, "%s <host> <port> <npages>\n", argv[0]);
 	return -1;
     }
 
@@ -85,15 +99,17 @@ int main(int argc, char *argv[])
     npages = atoi(argv[3]);
     pages = calloc(npages, sizeof(*pages));
 
-    if (argv[4][0] == 'y') {
-	starttime = gettime();
-	recover_pages(host, port, pages, npages);
-	endtime = gettime();
-	free(pages);
-	printf("recovery time %f\n", endtime - starttime);
-    } else {
-	setup_pages(host, port, pages, npages);
-    }
+    setup_pages(host, port, pages, npages);
+
+    starttime = gettime();
+    recover_pages(host, port, pages, npages, false);
+    endtime = gettime();
+
+    // free the pages
+    recover_pages(host, port, pages, npages, true);
+    free(pages);
+
+    printf("recovery time %f\n", endtime - starttime);
 
     return 0;
 }
