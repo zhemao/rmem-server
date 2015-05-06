@@ -30,7 +30,7 @@ struct conn_context
     struct message *send_msg;
     struct ibv_mr *send_msg_mr;
 
-    struct rmem_cp_info_list cp_info;
+    struct rmem_txn_list txn_list;
 
     sem_t ack_sem;
 };
@@ -126,12 +126,10 @@ static void on_pre_conn(struct rdma_cm_id *id)
                 rc_get_pd(), ctx->send_msg, sizeof(*ctx->send_msg),
                 IBV_ACCESS_LOCAL_WRITE));
 
-    cp_info_list_init(&ctx->cp_info);
+    txn_list_init(&ctx->txn_list);
 
     TEST_NZ(sem_init(&ctx->ack_sem, 0, 0));
 
-    post_msg_receive(id);
-    
     stats_end(KSTATS_PRE_CONN);
 }
 
@@ -174,7 +172,6 @@ static void send_tag_to_addr_info(struct rdma_cm_id *id)
 	}
 
 	send_message(id);
-	post_msg_receive(id);
 	TEST_NZ(sem_wait(&ctx->ack_sem));
 	map_size_left -= to_send;
     }
@@ -186,16 +183,18 @@ static void on_connection(struct rdma_cm_id *id)
 
     struct conn_context *ctx = (struct conn_context *)id->context;
 
+    // post the initial receive
+    post_msg_receive(id);
+
     ctx->send_msg->id = MSG_MR;
     ctx->send_msg->data.mr.addr = (uintptr_t)ctx->rmem_mr->addr;
     ctx->send_msg->data.mr.rkey = ctx->rmem_mr->rkey;
 
+    send_message(id);
+    TEST_NZ(sem_wait(&ctx->ack_sem));
+
     LOG(5, ("On connection. mr.addrd: %ld rmem.mem: %ld\n", (uintptr_t)ctx->send_msg->data.mr.addr,
                 (uintptr_t)rmem.mem));
-
-    send_message(id);
-
-    sleep(1);
 
     send_tag_to_addr_info(id);
 
@@ -217,7 +216,7 @@ static void on_completion(struct ibv_wc *wc)
         switch (msg->id) {
             case MSG_ALLOC:
                 TEST_NZ(pthread_mutex_lock(&alloc_mutex));
-                ptr = rmem_alloc(&rmem, msg->data.alloc.size,
+                ptr = rmem_table_alloc(&rmem, msg->data.alloc.size,
                         msg->data.alloc.tag);
                 TEST_NZ(pthread_mutex_unlock(&alloc_mutex));
                 ctx->send_msg->id = MSG_MEMRESP;
@@ -245,34 +244,35 @@ static void on_completion(struct ibv_wc *wc)
                 ctx->send_msg->data.memresp.error = (ptr == NULL);
                 send_message(id);
                 break;
-            case MSG_FREE:
-                LOG(1, ("MSG_FREE\n"));
-                ptr = (void *) msg->data.free.addr;
-                rmem_table_free(&rmem, ptr);
-                break;
-            case MSG_CP_REQ:
-                LOG(1, ("MSG_CP_REQ\n"));
-                cp_info_list_add(&ctx->cp_info,
-                        (void *) msg->data.cpreq.dst,
-                        (void *) msg->data.cpreq.src,
-                        (size_t) msg->data.cpreq.size);
-                ctx->send_msg->id = MSG_CP_ACK;
+            case MSG_TXN_FREE:
+                LOG(1, ("MSG_TXN_FREE\n"));
+		txn_list_add_free(&ctx->txn_list,
+			(void *) msg->data.free.addr);
+                ctx->send_msg->id = MSG_TXN_ACK;
                 send_message(id);
                 break;
-            case MSG_CP_GO:
-                LOG(1, ("MSG_CP_GO\n"));
-                multi_cp(&ctx->cp_info);
-                cp_info_list_clear(&ctx->cp_info);
-                ctx->send_msg->id = MSG_CP_ACK;
+            case MSG_TXN_CP:
+                LOG(1, ("MSG_TXN_CP\n"));
+                txn_list_add_cp(&ctx->txn_list,
+                        (void *) msg->data.cp.dst,
+                        (void *) msg->data.cp.src,
+                        (size_t) msg->data.cp.size);
+                ctx->send_msg->id = MSG_TXN_ACK;
                 send_message(id);
                 break;
-            case MSG_CP_ABORT:
-                LOG(1, ("MSG_CP_ABORT\n"));
-                cp_info_list_clear(&ctx->cp_info);
-                ctx->send_msg->id = MSG_CP_ACK;
+            case MSG_TXN_GO:
+                LOG(1, ("MSG_TXN_GO\n"));
+		txn_commit(&rmem, &ctx->txn_list);
+                ctx->send_msg->id = MSG_TXN_ACK;
                 send_message(id);
                 break;
-	    case MSG_TAG_ADDR_MAP_ACK:
+            case MSG_TXN_ABORT:
+                LOG(1, ("MSG_TXN_ABORT\n"));
+		txn_list_clear(&ctx->txn_list);
+                ctx->send_msg->id = MSG_TXN_ACK;
+                send_message(id);
+                break;
+	    case MSG_STARTUP_ACK:
 		TEST_NZ(sem_post(&ctx->ack_sem));
 		break;
             default:
@@ -294,7 +294,7 @@ static void on_disconnect(struct rdma_cm_id *id)
 
     LOG(1, ("on_disconnect\n"));
 
-    cp_info_list_clear(&ctx->cp_info);
+    txn_list_clear(&ctx->txn_list);
 
     ibv_dereg_mr(ctx->rmem_mr);
     ibv_dereg_mr(ctx->recv_msg_mr);

@@ -29,11 +29,11 @@ static inline struct alloc_entry *entry_of_htable(struct list_head *list)
     return (struct alloc_entry *) (((void *) list) - offset);
 }
 
-static inline struct rmem_cp_info *cp_info_of_list(struct list_head *list)
+static inline struct rmem_txn *txn_of_list(struct list_head *list)
 {
-    struct rmem_cp_info info;
-    int offset = ((void *) &info.list) - ((void *) &info);
-    return (struct rmem_cp_info *) (((void *) list) - offset);
+    struct rmem_txn txn;
+    int offset = ((void *) &txn.list) - ((void *) &txn);
+    return (struct rmem_txn *) (((void *) list) - offset);
 }
 
 static inline void list_init(struct list_head *node)
@@ -206,7 +206,7 @@ static struct alloc_entry *find_entry(struct rmem_table *rmem, tag_t tag)
     return NULL;
 }
 
-void *rmem_alloc(struct rmem_table *rmem, size_t size, tag_t tag)
+void *rmem_table_alloc(struct rmem_table *rmem, size_t size, tag_t tag)
 {
     size_t req_size = size + DATA_OFFSET;
     struct alloc_entry *entry = NULL;
@@ -220,7 +220,7 @@ void *rmem_alloc(struct rmem_table *rmem, size_t size, tag_t tag)
     entry = find_entry(rmem, tag);
     if (entry != NULL) {
         LOG(5, ("Requested tag is not unique\n"));
-    	return entry->start;
+    	return entry->start + DATA_OFFSET;
     }
 
     free_node = rmem->free_list.next;
@@ -345,6 +345,11 @@ void rmem_table_free(struct rmem_table *rmem, void *ptr)
 
     memcpy(&entry, start, sizeof(struct alloc_entry *));
 
+    if (entry->free) {
+	fprintf(stderr, "This block has already been freed.\n");
+	abort();
+    }
+
     entry->free = 1;
     entry->tag = 0;
     //dump_free_list(rmem);
@@ -386,48 +391,95 @@ void dump_rmem_table(struct rmem_table *rmem)
     //dump_free_list(rmem);
 }
 
-void cp_info_list_init(struct rmem_cp_info_list *list)
+void txn_list_init(struct rmem_txn_list *list)
 {
     list_init(&list->head);
 }
 
-void cp_info_list_clear(struct rmem_cp_info_list *list)
+void txn_list_clear(struct rmem_txn_list *list)
 {
-    struct rmem_cp_info *info;
+    struct rmem_txn *txn;
 
     while (!list_empty(&list->head)) {
-	info = cp_info_of_list(list->head.next);
+	txn = txn_of_list(list->head.next);
 	list_delete(list->head.next);
-	free(info);
+	free(txn);
     }
 }
 
-int cp_info_list_add(struct rmem_cp_info_list *list,
+int txn_list_add_cp(struct rmem_txn_list *list,
 	void *dst, void *src, size_t size)
 {
-    struct rmem_cp_info *info;
+    struct rmem_txn *txn;
 
-    info = malloc(sizeof(struct rmem_cp_info));
-    if (info == NULL)
+    txn = malloc(sizeof(struct rmem_txn));
+    if (txn == NULL)
 	return -1;
 
-    info->src = src;
-    info->dst = dst;
-    info->size = size;
+    txn->type = TXN_CP;
+    txn->src = src;
+    txn->dst = dst;
+    txn->size = size;
 
-    list_append(&list->head, &info->list);
+    list_append(&list->head, &txn->list);
 
     return 0;
 }
 
-void multi_cp(struct rmem_cp_info_list *list)
+/*int txn_list_add_alloc(struct rmem_txn_list *list, size_t size)
 {
-    struct rmem_cp_info *info;
+    struct rmem_txn *txn;
+
+    txn = malloc(sizeof(struct rmem_txn));
+    if (txn == NULL)
+	return -1;
+
+    txn->type = TXN_ALLOC;
+    txn->src = 0;
+    txn->dst = 0;
+    txn->size = size;
+
+    list_append(&list->head, &txn->list);
+
+    return 0;
+}*/
+
+int txn_list_add_free(struct rmem_txn_list *list, void *addr)
+{
+    struct rmem_txn *txn;
+
+    txn = malloc(sizeof(struct rmem_txn));
+    if (txn == NULL)
+	return -1;
+
+    txn->type = TXN_FREE;
+    txn->src = addr;
+    txn->dst = 0;
+    txn->size = 0;
+
+    list_append(&list->head, &txn->list);
+
+    return 0;
+}
+
+void txn_commit(struct rmem_table *rmem, struct rmem_txn_list *list)
+{
+    struct rmem_txn *txn;
     struct list_head *node = list->head.next;
 
     while (node != &list->head) {
-        info = cp_info_of_list(node);
-        memcpy(info->dst, info->src, info->size);
+        txn = txn_of_list(node);
+	switch (txn->type) {
+	case TXN_CP:
+	    memcpy(txn->dst, txn->src, txn->size);
+	    break;
+	case TXN_FREE:
+	    rmem_table_free(rmem, txn->src);
+	    break;
+	default:
+	    fprintf(stderr, "Unknown TXN type\n");
+	    abort();
+	}
         node = node->next;
     }
 }

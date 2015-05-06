@@ -10,7 +10,7 @@ COMMON_FILES := common.o data/hash.o data/list.o data/stack.o
 SERVER_FILES := rmem_table.o $(COMMON_FILES)
 CLIENT_FILES := rvm.o rmem.o buddy_malloc.o $(COMMON_FILES)
 APPS    := rmem-server rmem-test
-TESTS   := tests/rvm_test_normal tests/rvm_test_txn_commit tests/rvm_test_recovery tests/rvm_test_free tests/rvm_test_big_commit tests/rvm_test_size_alloc
+TESTS   := tests/rvm_test_normal tests/rvm_test_txn_commit tests/rvm_test_recovery tests/rvm_test_free tests/rvm_test_big_commit tests/rvm_test_size_alloc tests/rvm_test_full
 HEADERS := $(wildcard *.h)
 
 STATIC_LIB = librvm.a
