@@ -8,7 +8,7 @@
 #include <errno.h>
 #include <assert.h>
 
-#include <rmem.h>
+#include <backends/rmem_backend.h>
 #include <rvm.h>
 #include <log.h>
 #include <error.h>
@@ -52,8 +52,8 @@ int main(int argc, char **argv)
     rvm_cfg_t *cfg = rvm_cfg_create(&opt, create_rmem_layer);
 
     /* Get the new addresses for arr0 and arr1 */
-    int *safe_arr0 = rvm_rec(cfg);
-    int *safe_arr1 = rvm_rec(cfg);
+    int *safe_arr0 = (int*)rvm_rec(cfg);
+    int *safe_arr1 = (int*)rvm_rec(cfg);
 
     assert(safe_arr0);
     assert(safe_arr1);
@@ -73,5 +73,4 @@ int main(int argc, char **argv)
 
     return 0;
 }
-
 

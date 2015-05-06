@@ -10,7 +10,7 @@
 #include <unistd.h>
 #include <errno.h>
 
-#include <rmem.h>
+#include <backends/rmem_backend.h>
 #include <rvm.h>
 #include <log.h>
 #include <error.h>
@@ -64,7 +64,7 @@ int main(int argc, char **argv)
 
     int i = 0;
     for (; i < SAFE_ARR_SIZE; ++i) {
-        safe_arr[i] = rvm_alloc(cfg, ARR_SIZE*sizeof(int));
+        safe_arr[i] = (int*)rvm_alloc(cfg, ARR_SIZE*sizeof(int));
         CHECK_ERROR(safe_arr[i] == NULL,
                 ("Failed to allocate array inside a txn - %s", strerror(errno)));
         memset(safe_arr[i], 0, ARR_SIZE*sizeof(int));

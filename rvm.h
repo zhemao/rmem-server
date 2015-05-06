@@ -11,7 +11,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "rmem_generic_interface.h"
+#include "backends/rmem_generic_interface.h"
 
 /** Transaction ID
  *  Valid txid's have positive values. Negative valued txid's indicate errors*/

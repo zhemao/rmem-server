@@ -6,7 +6,6 @@
 #include <assert.h>
 #include "rvm.h"
 #include "rvm_int.h"
-#include "rmem.h"
 #include "common.h"
 #include "utils/log.h"
 #include "utils/error.h"
@@ -98,9 +97,11 @@ static bool recover_blocks(rvm_cfg_t *cfg)
     return true;
 }
 
-rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer)
+rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer_function)
 {
-    rvm_cfg_t *cfg = malloc(sizeof(rvm_cfg_t));
+    int err;
+
+    rvm_cfg_t *cfg = (rvm_cfg_t*)malloc(sizeof(rvm_cfg_t));
     if(cfg == NULL)
         return NULL;
     cfg->blk_sz = sysconf(_SC_PAGESIZE);
@@ -109,7 +110,7 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer
     cfg->free_fp = opts->free_fp;
     cfg->alloc_data = NULL;
 
-    rmem_layer_t* rmem_layer = cfg->rmem_layer = create_rmem_layer();
+    rmem_layer_t* rmem_layer = cfg->rmem_layer = create_rmem_layer_function();
 
     rmem_layer->connect(rmem_layer, opts->host, opts->port);
 
@@ -123,8 +124,10 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer
         return NULL;
     }
 
+    memset(cfg->blk_tbl, 0, cfg->blk_sz);
+
     /* Allocate and initialize the block change list */
-    blk_chlist = malloc(BITNSLOTS(BLOCK_TBL_SIZE)*sizeof(int32_t));
+    blk_chlist = (bitmap_t*)malloc(BITNSLOTS(BLOCK_TBL_SIZE)*sizeof(int32_t));
     memset(blk_chlist, 0, BITNSLOTS(BLOCK_TBL_SIZE)*sizeof(int32_t));
 
     /* Register the local block table with IB */

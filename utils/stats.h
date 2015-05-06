@@ -61,7 +61,7 @@ static inline void KSTATS_RECORD(int kvec, uint64_t val)
 static stat_entry_t*
 create_stat_entry(enum kstats_vector kvec, struct timeval time)
 {
-    stat_entry_t* se = malloc(sizeof(stat_entry_t));
+    stat_entry_t* se = (stat_entry_t*)malloc(sizeof(stat_entry_t));
     CHECK_ERROR(se == 0,
             ("Error: allocating stat_entry_t\n"));
 
@@ -89,7 +89,7 @@ void stats_end(enum kstats_vector kvec)
     CHECK_ERROR(stack_size(stats.stats_stack) <= 0,
             ("Error: stats_end requires a previous call to stats_start\n"))
 
-    stat_entry_t* se = stack_pop(stats.stats_stack);
+    stat_entry_t* se = (stat_entry_t*)stack_pop(stats.stats_stack);
 
     assert(se->kvec == kvec);
 

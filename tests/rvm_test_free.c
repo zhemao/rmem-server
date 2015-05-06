@@ -9,7 +9,7 @@
 #include <unistd.h>
 #include <errno.h>
 
-#include <rmem.h>
+#include <backends/rmem_backend.h>
 #include <rvm.h>
 #include <log.h>
 #include <error.h>
@@ -41,7 +41,7 @@ int main(int argc, char **argv)
 
     rvm_cfg_t* cfg = initialize_rvm(argv[1], argv[2]);
 
-    int *safe_arr0 = rvm_alloc(cfg, ARR_SIZE*sizeof(int));
+    int *safe_arr0 = (int*)rvm_alloc(cfg, ARR_SIZE*sizeof(int));
     CHECK_ERROR(safe_arr0 == NULL, 
             ("FAILURE: Failed to allocate array outside of a txn - %s\n", strerror(errno)));
 

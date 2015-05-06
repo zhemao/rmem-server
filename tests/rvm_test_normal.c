@@ -8,7 +8,7 @@
 #include <errno.h>
 
 #include <rvm.h>
-#include <rmem.h>
+#include <rmem_backend.h>
 #include <log.h>
 #include <error.h>
 
@@ -88,7 +88,7 @@ int main(int argc, char **argv)
         rvm_cfg_t *cfg = rvm_cfg_create(&opt, create_rmem_layer);
 
         /* Get the new addresses for arr0 and arr1 */
-        int **arr_ptr = rvm_get_usr_data(cfg);
+        int **arr_ptr = (int**)rvm_get_usr_data(cfg);
         if(arr_ptr == NULL) {
             printf("FAILURE: pointer to arrays is null!\n");
             return EXIT_FAILURE;
@@ -122,7 +122,7 @@ int main(int argc, char **argv)
        
         /* Allocate a "state" structure to test pointers */
         LOG(8, ("Allocating state structure\n"));
-        int **arr_ptr = rvm_alloc(cfg, 2*sizeof(int*));
+        int **arr_ptr = (int**)rvm_alloc(cfg, 2*sizeof(int*));
         CHECK_ERROR(arr_ptr == NULL,
                 ("FAILURE: Failed to allocate tracking structure -%s\n",
                  strerror(errno)));
@@ -132,13 +132,13 @@ int main(int argc, char **argv)
 
         /* Arr0 gets incremented once */
         LOG(8,("rvm_alloc\n"));
-        arr_ptr[0] = rvm_alloc(cfg, ARR_SIZE*sizeof(int));
+        arr_ptr[0] = (int*)rvm_alloc(cfg, ARR_SIZE*sizeof(int));
         CHECK_ERROR(arr_ptr[0] == NULL, 
                 ("FAILURE: Failed to allocate array0 - %s\n", strerror(errno)));
 
         /* Arr1 gets incremented twice */
         LOG(8, ("rvm_alloc\n"));
-        arr_ptr[1] = rvm_alloc(cfg, ARR_SIZE*sizeof(int));
+        arr_ptr[1] = (int*)rvm_alloc(cfg, ARR_SIZE*sizeof(int));
         CHECK_ERROR(arr_ptr[1] == NULL,
                 ("Failed to allocate array1 - %s", strerror(errno)));
 
