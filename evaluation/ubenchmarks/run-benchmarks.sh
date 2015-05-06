@@ -25,7 +25,7 @@ for i in {1..20}; do
     printf "%d" $i
     for trial in {1..3}; do
         start_server
-        result=$(ssh $CLIENT "$UBM_DIR/commit-bm $SERVER $PORT $i" | tail -n 1)
+        result=$(ssh $CLIENT "$UBM_DIR/commit-bm-rm $SERVER $PORT $i" | tail -n 1)
         printf ",%f" $result
         stop_server
     done
@@ -36,7 +36,7 @@ for i in {1..20}; do
     printf "%d" $i
     for trial in {1..3}; do
         start_server
-        result=$(ssh $CLIENT "$UBM_DIR/recovery-bm $SERVER $PORT $i" | tail -n 1)
+        result=$(ssh $CLIENT "$UBM_DIR/recovery-bm-rm $SERVER $PORT $i" | tail -n 1)
         printf ",%f" $result
         stop_server
     done

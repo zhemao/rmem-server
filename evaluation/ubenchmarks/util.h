@@ -6,6 +6,14 @@
 #define PAGE_SIZE sysconf(_SC_PAGESIZE)
 #define NS_PER_SEC (1000.0 * 1000.0 * 1000.0)
 
+#ifdef RAMC
+#include <ramcloud_backend.h>
+#define backend_layer create_ramcloud_layer
+#else
+#include <rmem_backend.h>
+#define backend_layer create_rmem_layer
+#endif
+
 static inline double gettime(void)
 {
     struct timespec ts;

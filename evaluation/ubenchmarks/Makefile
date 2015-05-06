@@ -1,18 +1,27 @@
-INCLUDES := -I../..
-CFLAGS  := $(INCLUDES) -Wall -g -std=gnu11
-LIBS := -lrvm -lrdmacm -libverbs -lpthread
-LDFLAGS := -L../.. -std=gnu11 $(LIBS)
-LD := gcc
+INCLUDES := -I../.. -I../../backends
+CFLAGS  := $(INCLUDES) -Wall -O3 -std=gnu11
+RVM_LIB := -L../.. -lrvm
+RAMC_LIBS := $(RVM_LIB) -L/nscratch/joao/ramcloud/obj.master \
+	-lramcloud -lboost_system -lboost_program_options -lstdc++
+RMEM_LIBS := $(RVM_LIB) -lrvm -lrdmacm -libverbs -lpthread
+RAMC_OBJS := /nscratch/joao/ramcloud/obj.master/OptionParser.o
+LD := g++
 
-BENCHMARKS := commit-bm recovery-bm
+BENCHMARKS := commit-bm-rm recovery-bm-rm commit-bm-rc recovery-bm-rc
 
 all: $(BENCHMARKS)
 
-commit-bm: commit-bm.o
-	$(LD) $^ -o $@ $(LDFLAGS)
+%-rm: %-rm.o
+	$(LD) $^ -o $@ $(RMEM_LIBS)
 
-recovery-bm: recovery-bm.o
-	$(LD) $^ -o $@ $(LDFLAGS)
+%-rm.o: %.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+%-rc: %-rc.o $(RAMC_OBJS)
+	$(LD) $^ -o $@ $(RAMC_LIBS)
+
+%-rc.o: %.c
+	$(CC) $(CFLAGS) -DRAMC -c -o $@ $<
 
 clean:
 	rm -f $(BENCHMARKS) *.o

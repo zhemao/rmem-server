@@ -2,7 +2,6 @@
 #include <stdlib.h>
 
 #include <rvm.h>
-#include <rmem.h>
 #include <buddy_malloc.h>
 
 #include "util.h"
@@ -19,7 +18,7 @@ void setup_pages(char *host, char *port, int **pages, int npages)
     opt.free_fp = buddy_free;
     opt.recovery = false;
 
-    rvm = rvm_cfg_create(&opt, create_rmem_layer);
+    rvm = rvm_cfg_create(&opt, backend_layer);
     if (rvm == NULL) {
 	perror("rvm_cfg_create");
 	exit(EXIT_FAILURE);
@@ -62,7 +61,7 @@ double recover_pages(char *host, char *port, int **pages, int npages)
     opt.recovery = true;
 
     starttime = gettime();
-    rvm = rvm_cfg_create(&opt, create_rmem_layer);
+    rvm = rvm_cfg_create(&opt, backend_layer);
     endtime = gettime();
     if (rvm == NULL) {
 	perror("rvm_cfg_create");

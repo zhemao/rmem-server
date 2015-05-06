@@ -4,7 +4,6 @@
 #include <sys/mman.h>
 
 #include <rvm.h>
-#include <rmem.h>
 #include <buddy_malloc.h>
 
 #include "util.h"
@@ -23,7 +22,7 @@ double rvm_test(int **pages, int npages, char *host, char *port)
     opt.free_fp = buddy_free;
     opt.recovery = false;
 
-    rvm = rvm_cfg_create(&opt, create_rmem_layer);
+    rvm = rvm_cfg_create(&opt, backend_layer);
     if (rvm == NULL) {
 	perror("rvm_cfg_create");
 	exit(EXIT_FAILURE);
