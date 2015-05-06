@@ -6,7 +6,7 @@
 #include "common.h"
 #include "messages.h"
 #include "rmem_table.h"
-#include "rmem.h"
+#include "backends/rmem_backend.h"
 #include "utils/log.h"
 #include "utils/error.h"
 #include "utils/stats.h"
