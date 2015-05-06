@@ -61,6 +61,8 @@ enum phase_t
         DONE
     } phase;
 
+typedef enum phase_t phase_t;
+
 typedef struct test_state
 {
     /* Which phase are we in? */

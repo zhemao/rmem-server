@@ -157,7 +157,7 @@ static void send_tag_to_addr_info(struct rdma_cm_id *id)
 	int to_send = MIN(map_size_left, TAG_ADDR_MAP_SIZE_MSG);
 	ctx->send_msg->data.tag_addr_map.size = to_send;
 
-	printf("Sending %d mappings\n", to_send);
+	LOG(5, ("Sending %d mappings\n", to_send));
 
 	int i = 0;
 	for (; i < to_send; ++i) {

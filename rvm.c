@@ -99,8 +99,6 @@ static bool recover_blocks(rvm_cfg_t *cfg)
 
 rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer_function)
 {
-    int err;
-
     rvm_cfg_t *cfg = (rvm_cfg_t*)malloc(sizeof(rvm_cfg_t));
     if(cfg == NULL)
         return NULL;

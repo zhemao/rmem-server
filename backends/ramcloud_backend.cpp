@@ -1,6 +1,5 @@
 #include <assert.h>
 #include "../common.h"
-#include "ramcloud_backend.h"
 #include "../utils/error.h"
 #include <RamCloud.h>
 #include <OptionParser.h>
@@ -16,6 +15,10 @@
 #define MAIN_ENTRY_KEY "M"
 #define TAG_TO_MAIN_KEY(tag) int_to_str(tag)
 #define TAG_TO_SHADOW_KEY(tag) (TAG_TO_MAIN_KEY(tag)+"s")
+
+extern "C" {
+#include "ramcloud_backend.h"
+}
 
 using namespace RAMCloud;
 
@@ -104,7 +107,7 @@ int rc_put(rmem_layer_t *rmem_layer, uint32_t tag,
     uint64_t table_id = data->table_id;
 
     assert(size < VALUE_MAX_SIZE);
-    fprintf(stderr, "rc_put4 tag: %d key:%s table_id:%d key_size:%d size:%d\n", tag, write_key.c_str(), table_id, write_key.size(), size);
+    fprintf(stderr, "rc_put4 tag: %u key:%s table_id:%lu key_size:%lu size:%lu\n", tag, write_key.c_str(), table_id, write_key.size(), size);
 
     data->client->write(table_id, write_key.c_str(), write_key.size(), src, size);
     data->tag_written->operator[](tag) = true;
@@ -124,7 +127,7 @@ int rc_get(rmem_layer_t *rmem_layer, void *dst, void *data_mr,
     std::string key = it->second;
     uint64_t table_id = data->table_id;
 
-    fprintf(stderr, "rc_get table id: %d key: %s\n", table_id, key.c_str());
+    fprintf(stderr, "rc_get table id: %lu key: %s\n", table_id, key.c_str());
 
     Buffer buffer;
     data->client->read(table_id, key.c_str(), key.size(), &buffer);
@@ -175,10 +178,9 @@ int rc_atomic_commit(rmem_layer_t* rmem_layer, uint32_t* tags_src,
      * We write it to a new place, update atomically the main table in RC
      * and remove the old entries
      */
-    for (int i = 0; i < num_tags; ++i) {
+    for (unsigned int i = 0; i < num_tags; ++i) {
         int tag_src = tags_src[i];
         int tag_dst = tags_dst[i];
-        int tag_size = tags_size[i];
 
         std::map<int, std::string>::iterator src_key_it = tag_to_key->find(tag_src);
         std::map<int, std::string>::iterator dst_key_it = tag_to_key->find(tag_dst);
@@ -256,7 +258,8 @@ void ramcloud_connect(rmem_layer_t *rmem_layer, char *host, char *port)
 
         std::string arg = std::string("infrc:host=") + host + ",port=" + port;
         int argc = 3;
-        char *argv[] = {"test", "-C", const_cast<char*>(arg.c_str())};
+        char *argv[] = {(char *) "test", (char *) "-C",
+            const_cast<char*>(arg.c_str())};
 
         OptionParser* optionParser = new OptionParser(*clientOptions, argc, argv);
 
@@ -286,7 +289,7 @@ void ramcloud_connect(rmem_layer_t *rmem_layer, char *host, char *port)
                     buffer.getRange(0, buffer.size()));
             memcpy(main_table, bufferString, sizeof(*main_table));
 
-            for (int i = 0; i < main_table->num_tags; ++i) {
+            for (unsigned int i = 0; i < main_table->num_tags; ++i) {
                 int tag = main_table->tag_entries[i].tag;
                 char* key = main_table->tag_entries[i].key;
 
@@ -300,7 +303,7 @@ void ramcloud_connect(rmem_layer_t *rmem_layer, char *host, char *port)
             client->createTable(TABLE_NAME);
             table_id = client->getTableId(TABLE_NAME);
 
-            fprintf(stderr,"Table does not exist. id: %d\n", table_id);
+            fprintf(stderr,"Table does not exist. id: %lu\n", table_id);
 
             // write main table
             // this basically tells this layer where each tag's data lives
@@ -326,25 +329,26 @@ void ramcloud_connect(rmem_layer_t *rmem_layer, char *host, char *port)
 }
 
 
-rmem_layer_t* create_ramcloud_layer()
-{
-    rmem_layer_t* layer = (rmem_layer_t*)
-        malloc(sizeof(rmem_layer_t));
-    CHECK_ERROR(layer == 0,
-            ("Failure: Error allocating layer struct\n"));
+extern "C" {
+    rmem_layer_t* create_ramcloud_layer()
+    {
+        rmem_layer_t* layer = (rmem_layer_t*)
+            malloc(sizeof(rmem_layer_t));
+        CHECK_ERROR(layer == 0,
+                ("Failure: Error allocating layer struct\n"));
 
-    memset(layer, 0, sizeof(rmem_layer_t));
+        memset(layer, 0, sizeof(rmem_layer_t));
 
-    layer->connect = ramcloud_connect;
-    layer->disconnect = rmc_disconnect;
-    layer->malloc = rc_malloc;
-    layer->free = rc_free;
-    layer->put = rc_put;
-    layer->get = rc_get;
-    layer->atomic_commit = rc_atomic_commit;
-    layer->register_data = rc_register_data;
-    layer->deregister_data = rc_deregister_data;
+        layer->connect = ramcloud_connect;
+        layer->disconnect = rmc_disconnect;
+        layer->malloc = rc_malloc;
+        layer->free = rc_free;
+        layer->put = rc_put;
+        layer->get = rc_get;
+        layer->atomic_commit = rc_atomic_commit;
+        layer->register_data = rc_register_data;
+        layer->deregister_data = rc_deregister_data;
 
-    return layer;
+        return layer;
+    }
 }
-

@@ -178,14 +178,14 @@ int rmem_txn_go(struct rmem *rmem)
 
 static void setup_memory(struct client_context *ctx)
 {
-    posix_memalign((void **)&ctx->recv_msg, sysconf(_SC_PAGESIZE),
-            sizeof(*ctx->recv_msg));
+    TEST_NZ(posix_memalign((void **)&ctx->recv_msg, sysconf(_SC_PAGESIZE),
+            sizeof(*ctx->recv_msg)));
     TEST_Z(ctx->recv_msg_mr = ibv_reg_mr(rc_get_pd(), ctx->recv_msg,
             sizeof(*ctx->recv_msg),
             IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE));
 
-    posix_memalign((void **)&ctx->send_msg, sysconf(_SC_PAGESIZE),
-            sizeof(*ctx->send_msg));
+    TEST_NZ(posix_memalign((void **)&ctx->send_msg, sysconf(_SC_PAGESIZE),
+            sizeof(*ctx->send_msg)));
     TEST_Z(ctx->send_msg_mr = ibv_reg_mr(rc_get_pd(), ctx->send_msg,
             sizeof(*ctx->send_msg), IBV_ACCESS_LOCAL_WRITE));
 }
@@ -231,7 +231,7 @@ void receive_tag_to_addr_info(struct rmem* rmem)
         sem_wait(&rmem->ctx.recv_sem);
 
         int size = rmem->ctx.recv_msg->data.tag_addr_map.size;
-	printf("Received %d mappings\n", size);
+	LOG(5, ("Received %d mappings\n", size));
 
         tag_addr_entry_t* entries = 
             (tag_addr_entry_t*)rmem->ctx.recv_msg->data.tag_addr_map.data;
