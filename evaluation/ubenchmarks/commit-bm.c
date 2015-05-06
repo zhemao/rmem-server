@@ -9,39 +9,6 @@
 
 #include "util.h"
 
-#define ITERATIONS 1000
-
-/* A test without RVM as the baseline */
-double norvm_test(int **pages, int npages)
-{
-    double starttime, endtime;
-
-    for (int i = 0; i < npages; i++) {
-	pages[i] = mmap(NULL, PAGE_SIZE, PROT_READ | PROT_WRITE,
-		MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-	if (pages[i] == MAP_FAILED) {
-	    perror("mmap");
-	    exit(EXIT_FAILURE);
-	}
-    }
-
-    starttime = gettime();
-
-    for (int j = 0; j < ITERATIONS; j++) {
-	for (int i = 0; i < npages; i++)
-	    touch_page(pages[i]);
-    }
-
-    endtime = gettime();
-
-    for (int i = 0; i < npages; i++) {
-	munmap(pages[i], PAGE_SIZE);
-    }
-
-    return endtime - starttime;
-}
-
-/* A test with RVM */
 double rvm_test(int **pages, int npages, char *host, char *port)
 {
     double starttime, endtime;
@@ -81,22 +48,20 @@ double rvm_test(int **pages, int npages, char *host, char *port)
 	exit(EXIT_FAILURE);
     }
 
-    starttime = gettime();
-
-    for (int j = 0; j < ITERATIONS; j++) {
-	txid = rvm_txn_begin(rvm);
-	if (txid < 0) {
-	    perror("rvm_txn_begin");
-	    exit(EXIT_FAILURE);
-	}
-	for (int i = 0; i < npages; i++)
-	    touch_page(pages[i]);
-	if (!rvm_txn_commit(rvm, txid)) {
-	    perror("rvm_txn_commit");
-	    exit(EXIT_FAILURE);
-	}
+    txid = rvm_txn_begin(rvm);
+    if (txid < 0) {
+	perror("rvm_txn_begin");
+	exit(EXIT_FAILURE);
     }
 
+    for (int i = 0; i < npages; i++)
+	touch_page(pages[i]);
+
+    starttime = gettime();
+    if (!rvm_txn_commit(rvm, txid)) {
+	perror("rvm_txn_commit");
+	exit(EXIT_FAILURE);
+    }
     endtime = gettime();
 
     txid = rvm_txn_begin(rvm);
@@ -121,7 +86,7 @@ double rvm_test(int **pages, int npages, char *host, char *port)
 int main(int argc, char *argv[])
 {
     int **pages, npages;
-    double t1, t2, txn_time;
+    double txn_time;
 
     if (argc < 4) {
 	fprintf(stderr, "Usage: %s <host> <port> <npages>\n", argv[0]);
@@ -131,12 +96,9 @@ int main(int argc, char *argv[])
     npages = atoi(argv[3]);
     pages = calloc(npages, sizeof(*pages));
 
-    t1 = norvm_test(pages, npages);
-    t2 = rvm_test(pages, npages, argv[1], argv[2]);
-    txn_time = (t2 - t1) / ITERATIONS;
+    txn_time = rvm_test(pages, npages, argv[1], argv[2]);
 
-    printf("%d,%f\n", npages, txn_time);
-
+    printf("%f\n", txn_time);
     free(pages);
 
     return 0;
