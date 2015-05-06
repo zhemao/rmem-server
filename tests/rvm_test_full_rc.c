@@ -13,7 +13,7 @@
 #include <sys/queue.h>
 
 #include "rvm.h"
-#include "backends/rmem_backend.h"
+#include "backends/ramcloud_backend.h"
 //#include "malloc_simple.h"
 #include "buddy_malloc.h"
 
@@ -129,7 +129,7 @@ rvm_cfg_t* initialize_rvm(char* host, char* port, bool rec) {
     opt.recovery = rec;
 
     LOG(8, ("rvm_cfg_create\n"));
-    rvm_cfg_t *cfg = rvm_cfg_create(&opt, create_rmem_layer);
+    rvm_cfg_t *cfg = rvm_cfg_create(&opt, create_ramcloud_layer);
     CHECK_ERROR(cfg == NULL, 
             ("FAILURE: Failed to initialize rvm configuration - %s\n", strerror(errno)));
 

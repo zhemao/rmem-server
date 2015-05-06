@@ -1,12 +1,40 @@
 #include <assert.h>
-#include "common.h"
-#include "rmem.h"
-#include "utils/log.h"
-#include "utils/error.h"
+#include "../common.h"
+#include "rmem_backend.h"
+#include "../utils/log.h"
+#include "../utils/error.h"
 #include "rmem_decs.h"
+#include "../data/hash.h"
+#include "../messages.h"
+#include <semaphore.h>
 
 static const int HASH_SIZE = 10000;
 static const int TIMEOUT_IN_MS = 500;
+
+struct client_context {
+    struct message *send_msg;
+    struct ibv_mr *send_msg_mr;
+
+    struct message *recv_msg;
+    struct ibv_mr *recv_msg_mr;
+
+    uint64_t peer_addr;
+    uint32_t peer_rkey;
+
+    sem_t rdma_sem;
+    sem_t send_sem;
+    sem_t recv_sem;
+};
+
+struct rmem {
+    struct rdma_cm_id *id;
+    struct rdma_event_channel *ec;
+    struct client_context ctx;
+    hash_t tag_to_addr;
+    
+//    struct ibv_mr *blk_tbl_mr;   /**< IB registration info for block table */
+};
+
 
 rmem_layer_t* create_rmem_layer()
 {
@@ -150,14 +178,14 @@ int rmem_txn_go(struct rmem *rmem)
 
 static void setup_memory(struct client_context *ctx)
 {
-    posix_memalign((void **)&ctx->recv_msg, sysconf(_SC_PAGESIZE),
-            sizeof(*ctx->recv_msg));
+    TEST_NZ(posix_memalign((void **)&ctx->recv_msg, sysconf(_SC_PAGESIZE),
+            sizeof(*ctx->recv_msg)));
     TEST_Z(ctx->recv_msg_mr = ibv_reg_mr(rc_get_pd(), ctx->recv_msg,
             sizeof(*ctx->recv_msg),
             IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE));
 
-    posix_memalign((void **)&ctx->send_msg, sysconf(_SC_PAGESIZE),
-            sizeof(*ctx->send_msg));
+    TEST_NZ(posix_memalign((void **)&ctx->send_msg, sysconf(_SC_PAGESIZE),
+            sizeof(*ctx->send_msg)));
     TEST_Z(ctx->send_msg_mr = ibv_reg_mr(rc_get_pd(), ctx->send_msg,
             sizeof(*ctx->send_msg), IBV_ACCESS_LOCAL_WRITE));
 }
@@ -203,7 +231,7 @@ void receive_tag_to_addr_info(struct rmem* rmem)
         sem_wait(&rmem->ctx.recv_sem);
 
         int size = rmem->ctx.recv_msg->data.tag_addr_map.size;
-	printf("Received %d mappings\n", size);
+	LOG(5, ("Received %d mappings\n", size));
 
         tag_addr_entry_t* entries = 
             (tag_addr_entry_t*)rmem->ctx.recv_msg->data.tag_addr_map.data;
@@ -225,7 +253,7 @@ void receive_tag_to_addr_info(struct rmem* rmem)
  * PRIVATE /STATIC METHODS
  */ 
 
-void rmem_connect(rmem_layer_t *rmem_layer, const char *host, const char *port)
+void rmem_connect(rmem_layer_t *rmem_layer, char *host, char *port)
 {
     struct rmem* rmem = (struct rmem*)rmem_layer->layer_data;
     struct addrinfo *addr;
@@ -489,6 +517,6 @@ static
 void rmem_deregister_data(rmem_layer_t* rmem_layer, void *data)
 {
     if(data)
-        ibv_dereg_mr(data);
+        ibv_dereg_mr((struct ibv_mr*)data);
 }
 

@@ -48,9 +48,10 @@ void setup_pages(char *host, char *port, int **pages, int npages)
     rvm_cfg_destroy(rvm);
 }
 
-void recover_pages(char *host, char *port,
-	int **pages, int npages, bool free_on_exit)
+double recover_pages(char *host, char *port, int **pages, int npages)
 {
+    double starttime, endtime;
+
     rvm_cfg_t *rvm;
     rvm_opt_t opt;
 
@@ -60,34 +61,36 @@ void recover_pages(char *host, char *port,
     opt.free_fp = buddy_free;
     opt.recovery = true;
 
+    starttime = gettime();
     rvm = rvm_cfg_create(&opt, create_rmem_layer);
+    endtime = gettime();
     if (rvm == NULL) {
 	perror("rvm_cfg_create");
 	exit(EXIT_FAILURE);
     }
 
-    if (free_on_exit) {
-	rvm_txid_t txid = rvm_txn_begin(rvm);
-	if (txid < 0) {
-	    perror("rvm_txn_begin");
-	    exit(EXIT_FAILURE);
-	}
-	for (int i = 0; i < npages; i++)
-	    rvm_free(rvm, pages[i]);
-	if (!rvm_txn_commit(rvm, txid)) {
-	    perror("rvm_txn_commit");
-	    exit(EXIT_FAILURE);
-	}
+    rvm_txid_t txid = rvm_txn_begin(rvm);
+    if (txid < 0) {
+	perror("rvm_txn_begin");
+	exit(EXIT_FAILURE);
+    }
+    for (int i = 0; i < npages; i++)
+	rvm_free(rvm, pages[i]);
+    if (!rvm_txn_commit(rvm, txid)) {
+	perror("rvm_txn_commit");
+	exit(EXIT_FAILURE);
     }
 
     rvm_cfg_destroy(rvm);
+
+    return endtime - starttime;
 }
 
 int main(int argc, char *argv[])
 {
     int **pages, npages;
-    double starttime, endtime;
     char *host, *port;
+    double rectime;
 
     if (argc < 4) {
 	fprintf(stderr, "%s <host> <port> <npages>\n", argv[0]);
@@ -100,16 +103,11 @@ int main(int argc, char *argv[])
     pages = calloc(npages, sizeof(*pages));
 
     setup_pages(host, port, pages, npages);
+    rectime = recover_pages(host, port, pages, npages);
 
-    starttime = gettime();
-    recover_pages(host, port, pages, npages, false);
-    endtime = gettime();
-
-    // free the pages
-    recover_pages(host, port, pages, npages, true);
     free(pages);
 
-    printf("recovery time %f\n", endtime - starttime);
+    printf("%f\n", rectime);
 
     return 0;
 }

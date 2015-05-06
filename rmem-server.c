@@ -2,11 +2,12 @@
 #include <sys/stat.h>
 #include <assert.h>
 #include <signal.h>
+#include <semaphore.h>
 
 #include "common.h"
 #include "messages.h"
 #include "rmem_table.h"
-#include "rmem.h"
+#include "backends/rmem_backend.h"
 #include "utils/log.h"
 #include "utils/error.h"
 #include "utils/stats.h"
@@ -156,7 +157,7 @@ static void send_tag_to_addr_info(struct rdma_cm_id *id)
 	int to_send = MIN(map_size_left, TAG_ADDR_MAP_SIZE_MSG);
 	ctx->send_msg->data.tag_addr_map.size = to_send;
 
-	printf("Sending %d mappings\n", to_send);
+	LOG(5, ("Sending %d mappings\n", to_send));
 
 	int i = 0;
 	for (; i < to_send; ++i) {
@@ -322,6 +323,15 @@ void set_ctrlc_handler()
     sigaction(SIGINT, &sig_int_handler, NULL);
 }
 
+void write_pid(void)
+{
+    FILE *f;
+
+    TEST_Z(f = fopen("/tmp/rmem-server.pid", "w"));
+    fprintf(f, "%d\n", getpid());
+    fclose(f);
+}
+
 int main(int argc, char **argv)
 {
     const char *port;
@@ -330,6 +340,8 @@ int main(int argc, char **argv)
 	port = argv[1];
     else
 	port = DEFAULT_PORT;
+
+    write_pid();
 
     LOG(1, ("starting rmem-server\n"));
     init_rmem_table(&rmem);

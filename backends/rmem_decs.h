@@ -1,4 +1,4 @@
-void rmem_connect(rmem_layer_t*, const char*, const char*);
+void rmem_connect(rmem_layer_t*, char*, char*);
 void rmem_disconnect(rmem_layer_t*);
 
 uint64_t rmem_malloc(rmem_layer_t*, size_t size, uint32_t tag);
