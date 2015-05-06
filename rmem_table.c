@@ -448,7 +448,7 @@ int txn_list_add_free(struct rmem_txn_list *list, void *addr)
 {
     struct rmem_txn *txn;
 
-    txn = malloc(sizeof(struct rmem_txn));
+    txn = (struct rmem_txn*)malloc(sizeof(struct rmem_txn));
     if (txn == NULL)
 	return -1;
 

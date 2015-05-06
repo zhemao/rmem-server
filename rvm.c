@@ -115,7 +115,7 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer
     rmem_layer->connect(rmem_layer, opts->host, opts->port);
 
     /* Allocate and initialize the block table locally */
-    cfg->blk_tbl = mmap(NULL, cfg->blk_sz, PROT_READ | PROT_WRITE | PROT_EXEC, 
+    cfg->blk_tbl = (blk_tbl_t *)mmap(NULL, cfg->blk_sz, PROT_READ | PROT_WRITE | PROT_EXEC, 
             (MAP_ANONYMOUS | MAP_PRIVATE), -1, 0);
     assert((size_t)cfg->blk_tbl % sysconf(_SC_PAGESIZE) == 0);
 

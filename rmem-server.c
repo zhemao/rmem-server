@@ -2,6 +2,7 @@
 #include <sys/stat.h>
 #include <assert.h>
 #include <signal.h>
+#include <semaphore.h>
 
 #include "common.h"
 #include "messages.h"

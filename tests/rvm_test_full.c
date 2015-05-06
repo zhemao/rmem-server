@@ -13,7 +13,7 @@
 #include <sys/queue.h>
 
 #include "rvm.h"
-#include "rmem.h"
+#include "backends/rmem_backend.h"
 //#include "malloc_simple.h"
 #include "buddy_malloc.h"
 
@@ -48,11 +48,8 @@ typedef struct qelem
 } qelem_t;
 
 typedef LIST_HEAD(circq, qelem) qhead_t;
-
-typedef struct test_state
-{
-    /* Which phase are we in? */
-    enum phase_t
+    
+enum phase_t
     {
         PHASE0,
         PHASE1,
@@ -63,6 +60,11 @@ typedef struct test_state
         PHASE6,
         DONE
     } phase;
+
+typedef struct test_state
+{
+    /* Which phase are we in? */
+    phase_t phase;
     int iter; /* Some phases can iterate */
 
     qhead_t list;
@@ -150,7 +152,7 @@ int main(int argc, char **argv)
         cfg = initialize_rvm(argv[1], argv[2], true);
 
         /* Recover the state (if any) */
-        state = rvm_get_usr_data(cfg);
+        state = (test_state_t*)rvm_get_usr_data(cfg);
     } else {
         /* Starting from scratch */
         cfg = initialize_rvm(argv[1], argv[2], false);
@@ -170,7 +172,7 @@ int main(int argc, char **argv)
         TX_START;
 
         /* Allocate a "state" structure to test pointers */
-        state = rvm_alloc(cfg, sizeof(test_state_t));
+        state = (test_state_t*)rvm_alloc(cfg, sizeof(test_state_t));
         CHECK_ERROR(state == NULL, ("FAILURE: Couldn't allocate state\n"));
 
         /* Initialize the arrays */ 
@@ -325,13 +327,13 @@ bool phase0(rvm_cfg_t *cfg, test_state_t *state)
 
     /* Allocating big array */
     LOG(8,("Allocating array 0. It's a bigun\n"));
-    state->arr0 = rvm_alloc(cfg, ARR0_SIZE*sizeof(int));
+    state->arr0 = (int*)rvm_alloc(cfg, ARR0_SIZE*sizeof(int));
     RETURN_ERROR(state->arr0 == NULL, false,
             ("FAILURE: Failed to allocate array0 - %s\n", strerror(errno)));
 
     /* Allocating smaller array */
     LOG(8, ("Allocating array 1, smaller arraay\n"));
-    state->arr1 = rvm_alloc(cfg, ARR1_SIZE*sizeof(int));
+    state->arr1 = (int*)rvm_alloc(cfg, ARR1_SIZE*sizeof(int));
     RETURN_ERROR(state->arr1 == NULL, false,
             ("Failed to allocate array1 - %s", strerror(errno)));
 
@@ -368,7 +370,7 @@ bool phase3(rvm_cfg_t *cfg, test_state_t *state)
 {
     for(int i = 0; i < LIST_SZ; i++)
     {
-        qelem_t *elem = rvm_alloc(cfg, sizeof(qelem_t));
+        qelem_t *elem = (qelem_t*)rvm_alloc(cfg, sizeof(qelem_t));
         RETURN_ERROR(elem == NULL, false, ("Failed to alloc list elem\n"));
 
         elem->self = elem;
@@ -404,7 +406,7 @@ bool phase5(rvm_cfg_t *cfg, test_state_t *state)
 {
     for(int i = 0; i < LIST_SZ / 2; i++)
     {
-        qelem_t *elem = rvm_alloc(cfg, sizeof(qelem_t));
+        qelem_t *elem = (qelem_t*)rvm_alloc(cfg, sizeof(qelem_t));
         RETURN_ERROR(elem == NULL, false, ("Failed to alloc list elem\n"));
 
         elem->self = elem;

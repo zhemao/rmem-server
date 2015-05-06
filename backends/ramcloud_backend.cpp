@@ -104,7 +104,7 @@ int rc_put(rmem_layer_t *rmem_layer, uint32_t tag,
     uint64_t table_id = data->table_id;
 
     assert(size < VALUE_MAX_SIZE);
-    LOG(8, ("rc_put4 tag: %d key:%s table_id:%d key_size:%d size:%d\n", tag, write_key.c_str(), table_id, write_key.size(), size));
+    fprintf(stderr, "rc_put4 tag: %d key:%s table_id:%d key_size:%d size:%d\n", tag, write_key.c_str(), table_id, write_key.size(), size);
 
     data->client->write(table_id, write_key.c_str(), write_key.size(), src, size);
     data->tag_written->operator[](tag) = true;
@@ -124,7 +124,7 @@ int rc_get(rmem_layer_t *rmem_layer, void *dst, void *data_mr,
     std::string key = it->second;
     uint64_t table_id = data->table_id;
 
-    LOG(8, (stderr, "rc_get table id: %d key: %s\n", table_id, key.c_str()));
+    fprintf(stderr, "rc_get table id: %d key: %s\n", table_id, key.c_str());
 
     Buffer buffer;
     data->client->read(table_id, key.c_str(), key.size(), &buffer);
@@ -263,7 +263,7 @@ void ramcloud_connect(rmem_layer_t *rmem_layer, char *host, char *port)
 
         std::string locator = optionParser->options.getCoordinatorLocator();
         
-        LOG(8,("Connecting to %s locator: %s\n", arg.c_str(), locator.c_str());
+        fprintf(stderr, "Connecting to %s locator: %s\n", arg.c_str(), locator.c_str());
 
         RamCloud* client = new RamCloud(context, locator.c_str(),
                 optionParser->options.getClusterName().c_str());
@@ -300,7 +300,7 @@ void ramcloud_connect(rmem_layer_t *rmem_layer, char *host, char *port)
             client->createTable(TABLE_NAME);
             table_id = client->getTableId(TABLE_NAME);
 
-            LOG(8,("Table does not exist. id: %d\n", table_id));
+            fprintf(stderr,"Table does not exist. id: %d\n", table_id);
 
             // write main table
             // this basically tells this layer where each tag's data lives
