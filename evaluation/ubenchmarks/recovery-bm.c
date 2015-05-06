@@ -109,7 +109,7 @@ int main(int argc, char *argv[])
     recover_pages(host, port, pages, npages, true);
     free(pages);
 
-    printf("recovery time %f\n", endtime - starttime);
+    printf("%d,%f\n", npages, endtime - starttime);
 
     return 0;
 }

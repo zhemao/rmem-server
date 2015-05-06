@@ -135,7 +135,7 @@ int main(int argc, char *argv[])
     t2 = rvm_test(pages, npages, argv[1], argv[2]);
     txn_time = (t2 - t1) / ITERATIONS;
 
-    printf("Avg. commit time %f seconds\n", txn_time);
+    printf("%d,%f\n", npages, txn_time);
 
     free(pages);
 

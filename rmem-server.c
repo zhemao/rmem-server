@@ -323,6 +323,15 @@ void set_ctrlc_handler()
     sigaction(SIGINT, &sig_int_handler, NULL);
 }
 
+void write_pid(void)
+{
+    FILE *f;
+
+    TEST_Z(f = fopen("/tmp/rmem-server.pid", "w"));
+    fprintf(f, "%d\n", getpid());
+    fclose(f);
+}
+
 int main(int argc, char **argv)
 {
     const char *port;
@@ -331,6 +340,8 @@ int main(int argc, char **argv)
 	port = argv[1];
     else
 	port = DEFAULT_PORT;
+
+    write_pid();
 
     LOG(1, ("starting rmem-server\n"));
     init_rmem_table(&rmem);
