@@ -32,10 +32,7 @@
     "\t-m NUMBER The m dimension of the matrix\n"                   \
     "\t-n NUMBER The n dimension of the matrix\n"                   \
     "\t-i NUMBER The number of iterations\n"                        \
-    "\t-h NAME The hostname of the server\n"                        \
-    "\t-p NUMBER The port used by the server"                       \
     "\t-f PATH Optional output file\n"                              \
-    "\t-r Are we recovering from a failure?\n"                      \
     "\t-s Shall we simulate a failure?\n"
 
 typedef struct
@@ -65,7 +62,6 @@ int main(int argc, char *argv[])
     int ncol = N_DEF, nrow = M_DEF;  /* Matrix dimensions */
     int64_t niter = NITER_DEF; /* Number of iterations */
     char *out_filename = NULL;
-    bool recover = false;
     bool fail = false;
 
     int c;
@@ -83,9 +79,6 @@ int main(int argc, char *argv[])
             break;
         case 'f':
             out_filename = optarg;
-            break;
-        case 'r':
-            recover = true;
             break;
         case 's':
             fail = true;
@@ -225,7 +218,7 @@ bool commit_state(state_t *state, size_t size)
     /* Flush everything to disk */
     fflush(rec);
     int fd = fileno(rec);
-    fsync(rec);
+    fsync(fd);
     fclose(rec);
 
     /* Atomically swap the tmp to the permanent */

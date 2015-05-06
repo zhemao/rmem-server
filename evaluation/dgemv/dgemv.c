@@ -46,8 +46,6 @@ void print_vec(FILE* out, double *v, int m);
 
 int main(int argc, char *argv[])
 {
-    rvm_txid_t txid;
-
     /* Parse Inputs */
     int ncol = N_DEF, nrow = M_DEF;  /* Matrix dimensions */
     int64_t niter = NITER_DEF; /* Number of iterations */

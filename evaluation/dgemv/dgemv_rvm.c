@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <string.h>
 #include "rvm.h"
+#include "rmem.h"
 #include "buddy_malloc.h"
 
 /* Defaults for n, m and niter respectively */
@@ -125,7 +126,7 @@ int main(int argc, char *argv[])
     opt.alloc_fp = buddy_malloc;
     opt.free_fp = buddy_free;
     opt.recovery = recover;
-    rvm_cfg_t *cfg = rvm_cfg_create(&opt);
+    rvm_cfg_t *cfg = rvm_cfg_create(&opt, create_rmem_layer);
     if(cfg == NULL) {
         printf("Failed to initialize rvm: %s\n", strerror(errno));
         return EXIT_FAILURE;
