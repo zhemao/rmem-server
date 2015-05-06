@@ -130,8 +130,6 @@ static void on_pre_conn(struct rdma_cm_id *id)
 
     TEST_NZ(sem_init(&ctx->ack_sem, 0, 0));
 
-    post_msg_receive(id);
-    
     stats_end(KSTATS_PRE_CONN);
 }
 
@@ -174,7 +172,6 @@ static void send_tag_to_addr_info(struct rdma_cm_id *id)
 	}
 
 	send_message(id);
-	post_msg_receive(id);
 	TEST_NZ(sem_wait(&ctx->ack_sem));
 	map_size_left -= to_send;
     }
@@ -186,16 +183,18 @@ static void on_connection(struct rdma_cm_id *id)
 
     struct conn_context *ctx = (struct conn_context *)id->context;
 
+    // post the initial receive
+    post_msg_receive(id);
+
     ctx->send_msg->id = MSG_MR;
     ctx->send_msg->data.mr.addr = (uintptr_t)ctx->rmem_mr->addr;
     ctx->send_msg->data.mr.rkey = ctx->rmem_mr->rkey;
 
+    send_message(id);
+    TEST_NZ(sem_wait(&ctx->ack_sem));
+
     LOG(5, ("On connection. mr.addrd: %ld rmem.mem: %ld\n", (uintptr_t)ctx->send_msg->data.mr.addr,
                 (uintptr_t)rmem.mem));
-
-    send_message(id);
-    post_msg_receive(id);
-    TEST_NZ(sem_init(&ctx->ack_sem, 0, 0));
 
     send_tag_to_addr_info(id);
 

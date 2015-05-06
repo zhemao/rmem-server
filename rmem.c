@@ -203,6 +203,7 @@ void receive_tag_to_addr_info(struct rmem* rmem)
         sem_wait(&rmem->ctx.recv_sem);
 
         int size = rmem->ctx.recv_msg->data.tag_addr_map.size;
+	printf("Received %d mappings\n", size);
 
         tag_addr_entry_t* entries = 
             (tag_addr_entry_t*)rmem->ctx.recv_msg->data.tag_addr_map.data;
@@ -213,6 +214,7 @@ void receive_tag_to_addr_info(struct rmem* rmem)
         }
 
 	TEST_NZ(send_message(rmem->id));
+	sem_wait(&rmem->ctx.send_sem);
 
         if (size < TAG_ADDR_MAP_SIZE_MSG)
             break;
@@ -270,6 +272,11 @@ void rmem_connect(rmem_layer_t *rmem_layer, const char *host, const char *port)
     sem_wait(&rmem->ctx.recv_sem);
     rmem->ctx.peer_addr = rmem->ctx.recv_msg->data.mr.addr;
     rmem->ctx.peer_rkey = rmem->ctx.recv_msg->data.mr.rkey;
+
+    // acknowledge that we received the MR
+    rmem->ctx.send_msg->id = MSG_STARTUP_ACK;
+    TEST_NZ(send_message(rmem->id));
+    sem_wait(&rmem->ctx.send_sem);
 
     receive_tag_to_addr_info(rmem);
 }
@@ -434,6 +441,8 @@ int rmem_free(rmem_layer_t *rmem_layer, uint32_t tag)
     uintptr_t addr = lookup_remote_addr(rmem->tag_to_addr, tag);
     CHECK_ERROR(addr == 0,
             ("Failure: tag not found in tag_to_addr\n"));
+
+    LOG(8, ("rmem_free addr: %ld tag: %d\n", addr, tag));
 
     hash_delete_item(rmem->tag_to_addr, tag);
 
