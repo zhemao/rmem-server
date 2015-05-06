@@ -1,12 +1,40 @@
 #include <assert.h>
-#include "common.h"
-#include "rmem.h"
-#include "utils/log.h"
-#include "utils/error.h"
+#include "../common.h"
+#include "rmem_backend.h"
+#include "../utils/log.h"
+#include "../utils/error.h"
 #include "rmem_decs.h"
+#include "../data/hash.h"
+#include "../messages.h"
+#include <semaphore.h>
 
 static const int HASH_SIZE = 10000;
 static const int TIMEOUT_IN_MS = 500;
+
+struct client_context {
+    struct message *send_msg;
+    struct ibv_mr *send_msg_mr;
+
+    struct message *recv_msg;
+    struct ibv_mr *recv_msg_mr;
+
+    uint64_t peer_addr;
+    uint32_t peer_rkey;
+
+    sem_t rdma_sem;
+    sem_t send_sem;
+    sem_t recv_sem;
+};
+
+struct rmem {
+    struct rdma_cm_id *id;
+    struct rdma_event_channel *ec;
+    struct client_context ctx;
+    hash_t tag_to_addr;
+    
+//    struct ibv_mr *blk_tbl_mr;   /**< IB registration info for block table */
+};
+
 
 rmem_layer_t* create_rmem_layer()
 {
@@ -225,7 +253,7 @@ void receive_tag_to_addr_info(struct rmem* rmem)
  * PRIVATE /STATIC METHODS
  */ 
 
-void rmem_connect(rmem_layer_t *rmem_layer, const char *host, const char *port)
+void rmem_connect(rmem_layer_t *rmem_layer, char *host, char *port)
 {
     struct rmem* rmem = (struct rmem*)rmem_layer->layer_data;
     struct addrinfo *addr;
@@ -489,6 +517,6 @@ static
 void rmem_deregister_data(rmem_layer_t* rmem_layer, void *data)
 {
     if(data)
-        ibv_dereg_mr(data);
+        ibv_dereg_mr((struct ibv_mr*)data);
 }
 
