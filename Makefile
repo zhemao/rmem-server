@@ -29,9 +29,6 @@ rmem-server: $(SERVER_FILES) rmem-server.o
 rmem-test: $(SERVER_FILES) rmem-test.o
 	${LD} -o $@ $^ ${CFLAGS} ${LDFLAGS} ${INCLUDE}
 
-tests/dgemv_test: tests/dgemv_test.c $(STATIC_LIB)
-	${LD} -o $@ $^ -lblas $(RVM_LIB) ${CFLAGS} ${LDFLAGS} ${INCLUDE} 
-
 tests/rvm_test_normal: tests/rvm_test_normal.c $(STATIC_LIB)
 	${LD} -o $@ $< $(RVM_LIB) ${CFLAGS} ${LDFLAGS} ${INCLUDE}
 
