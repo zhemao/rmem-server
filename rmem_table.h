@@ -36,14 +36,20 @@ struct rmem_table {
     hash_t tag_to_addr;
 };
 
-struct rmem_cp_info {
+enum rmem_txn_type {
+    TXN_CP,
+    TXN_FREE
+};
+
+struct rmem_txn {
     struct list_head list;
+    enum rmem_txn_type type;
     void *src;
     void *dst;
     size_t size;
 };
 
-struct rmem_cp_info_list {
+struct rmem_txn_list {
     struct list_head head;
 };
 
@@ -54,10 +60,12 @@ void *rmem_table_lookup(struct rmem_table *rmem, tag_t tag);
 void free_rmem_table(struct rmem_table *rmem);
 void dump_rmem_table(struct rmem_table *rmem);
 
-void cp_info_list_init(struct rmem_cp_info_list *list);
-void cp_info_list_clear(struct rmem_cp_info_list *list);
-int cp_info_list_add(struct rmem_cp_info_list *list,
+void txn_list_init(struct rmem_txn_list *list);
+void txn_list_clear(struct rmem_txn_list *list);
+int txn_list_add_cp(struct rmem_txn_list *list,
 	void *dst, void *src, size_t size);
-void multi_cp(struct rmem_cp_info_list *list);
+//int txn_list_add_alloc(struct rmem_txn_list *list, size_t size);
+int txn_list_add_free(struct rmem_txn_list *list, void *addr);
+void txn_commit(struct rmem_table *rmem, struct rmem_txn_list *list);
 
 #endif

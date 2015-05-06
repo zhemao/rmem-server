@@ -12,12 +12,12 @@ enum message_id {
     MSG_MR,
     MSG_ALLOC,
     MSG_LOOKUP,
-    MSG_FREE,
     MSG_MEMRESP,
-    MSG_CP_REQ,
-    MSG_CP_GO,
-    MSG_CP_ABORT,
-    MSG_CP_ACK,
+    MSG_TXN_FREE,
+    MSG_TXN_CP,
+    MSG_TXN_GO,
+    MSG_TXN_ABORT,
+    MSG_TXN_ACK,
     MSG_TAG_ADDR_MAP,
     MSG_STARTUP_ACK
 };
@@ -53,7 +53,7 @@ struct message {
 	    uint64_t dst;
 	    uint64_t src;
 	    uint64_t size;
-	} cpreq;
+	} cp;
 	struct {
             int size;
 	    tag_addr_entry_t data[TAG_ADDR_MAP_SIZE_MSG];
