@@ -99,6 +99,20 @@ double rvm_test(int **pages, int npages, char *host, char *port)
 
     endtime = gettime();
 
+    txid = rvm_txn_begin(rvm);
+    if (txid < 0) {
+	perror("rvm_txn_begin");
+	exit(EXIT_FAILURE);
+    }
+
+    for (int i = 0; i < npages; i++)
+	rvm_free(rvm, pages[i]);
+
+    if (!rvm_txn_commit(rvm, txid)) {
+	perror("rvm_txn_commit");
+	exit(EXIT_FAILURE);
+    }
+
     rvm_cfg_destroy(rvm);
 
     return endtime - starttime;

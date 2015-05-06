@@ -37,16 +37,13 @@ void setup_pages(char *host, char *port, int **pages, int npages)
 	    perror("rvm_alloc");
 	    exit(EXIT_FAILURE);
 	}
+	touch_page(pages[i]);
     }
-
-    printf("Committing allocations.\n");
 
     if (!rvm_txn_commit(rvm, txid)) {
 	perror("rvm_txn_commit");
 	exit(EXIT_FAILURE);
     }
-
-    printf("Commit successful\n");
 
     rvm_cfg_destroy(rvm);
 }
@@ -75,11 +72,11 @@ void recover_pages(char *host, char *port,
 int main(int argc, char *argv[])
 {
     int **pages, npages;
-    double starttime, alloctime, rectime;
+    double starttime, endtime;
     char *host, *port;
 
-    if (argc < 4) {
-	fprintf(stderr, "%s <host> <port> <npages>\n", argv[0]);
+    if (argc < 5) {
+	fprintf(stderr, "%s <host> <port> <npages> <recovery>\n", argv[0]);
 	return -1;
     }
 
@@ -88,16 +85,15 @@ int main(int argc, char *argv[])
     npages = atoi(argv[3]);
     pages = calloc(npages, sizeof(*pages));
 
-    starttime = gettime();
-    setup_pages(host, port, pages, npages);
-    alloctime = gettime() - starttime;
-
-    starttime = gettime();
-    recover_pages(host, port, pages, npages);
-    rectime = gettime() - starttime;
-    free(pages);
-
-    printf("alloc time %f, recovery time %f\n", alloctime, rectime);
+    if (argv[4][0] == 'y') {
+	starttime = gettime();
+	recover_pages(host, port, pages, npages);
+	endtime = gettime();
+	free(pages);
+	printf("recovery time %f\n", endtime - starttime);
+    } else {
+	setup_pages(host, port, pages, npages);
+    }
 
     return 0;
 }
