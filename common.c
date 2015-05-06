@@ -133,6 +133,12 @@ void event_loop(struct rdma_event_channel *ec, int exit_on_disconnect)
     }
 }
 
+void dump_wc(struct ibv_wc *wc)
+{
+    fprintf(stderr, "status: %d\n", wc->status);
+    fprintf(stderr, "opcode: %d\n", wc->opcode);
+}
+
 void * poll_cq(void *ctx)
 {
     struct ibv_cq *cq;
@@ -146,8 +152,10 @@ void * poll_cq(void *ctx)
         while (ibv_poll_cq(cq, 1, &wc)) {
             if (wc.status == IBV_WC_SUCCESS)
                 s_on_completion_cb(&wc);
-            else
+            else {
+		dump_wc(&wc);
                 rc_die("poll_cq: status is not IBV_WC_SUCCESS");
+	    }
         }
     }
 
