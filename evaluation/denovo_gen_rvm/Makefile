@@ -1,14 +1,15 @@
 CC = gcc
+RVM_DIR = ../../
 KMER_LENGTH 		= 19
 KMER_PACKED_LENGTH 	= $(shell echo $$((($(KMER_LENGTH)+3)/4)))
 
 #CFLAGS 	= -O3
-CFLAGS 	= -g
+CFLAGS 	= -g -I$(RVM_DIR)
 DEFINE 	= -DKMER_LENGTH=$(KMER_LENGTH) -DKMER_PACKED_LENGTH=$(KMER_PACKED_LENGTH)
 HEADERS	= contig_generation.h kmer_hash.h packingDNAseq.h build.h
 LIBS	=
 PGEN_OBJS = build.o probe.o packingDNAseq.o contig_generation.o kmer_hash.o
-TARGETS	= pgen
+TARGETS	= gen_assemble
 
 all: 	$(TARGETS)
 
