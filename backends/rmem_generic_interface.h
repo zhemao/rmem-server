@@ -5,7 +5,7 @@
 
 typedef struct rmem_layer rmem_layer_t;
 
-typedef void (*rmem_connect_f)(rmem_layer_t*, const char*, const char*);
+typedef void (*rmem_connect_f)(rmem_layer_t*, char*, char*);
 typedef void (*rmem_disconnect_f)(rmem_layer_t*);
 
 typedef uint64_t (*rmem_malloc_f)(rmem_layer_t*, 

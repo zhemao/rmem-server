@@ -9,7 +9,7 @@
 #include <unistd.h>
 #include <errno.h>
 
-#include <rmem.h>
+#include <backends/rmem_backend.h>
 #include <rvm.h>
 #include <log.h>
 #include <error.h>
@@ -58,10 +58,10 @@ int main(int argc, char **argv)
     CHECK_ERROR(txid < 0,
             ("FAILURE: Could not start transaction - %s\n", strerror(errno)));
 
-    int *safe_arr1 = rvm_alloc(cfg, ARR_SIZE*sizeof(int));
-    int *safe_arr2 = rvm_alloc(cfg, 0);
-    int *safe_arr3 = rvm_alloc(cfg, 1*sizeof(int));
-    int *safe_arr4 = rvm_alloc(cfg, 2*ARR_SIZE*sizeof(int));
+    int *safe_arr1 = (int*)rvm_alloc(cfg, ARR_SIZE*sizeof(int));
+    int *safe_arr2 = (int*)rvm_alloc(cfg, 0);
+    int *safe_arr3 = (int*)rvm_alloc(cfg, 1*sizeof(int));
+    int *safe_arr4 = (int*)rvm_alloc(cfg, 2*ARR_SIZE*sizeof(int));
     CHECK_ERROR(safe_arr1 == NULL,
             ("Failed to allocate array inside a txn - %s", strerror(errno)));
     CHECK_ERROR(safe_arr2 != NULL,

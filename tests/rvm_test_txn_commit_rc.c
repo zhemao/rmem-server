@@ -12,7 +12,7 @@
 #include <errno.h>
 
 #include <rvm.h>
-#include <backends/rmem_backend.h>
+#include <backends/ramcloud_backend.h>
 #include <log.h>
 #include <error.h>
 
@@ -39,7 +39,7 @@ rvm_cfg_t* initialize_rvm(char* host, char* port)
     opt.recovery = false;
 
     LOG(8, ("rvm_cfg_create\n"));
-    rvm_cfg_t *cfg = rvm_cfg_create(&opt, create_rmem_layer);
+    rvm_cfg_t *cfg = rvm_cfg_create(&opt, create_ramcloud_layer);
     CHECK_ERROR(cfg == NULL, 
             ("FAILURE: Failed to initialize rvm configuration - %s\n", strerror(errno)));
 
@@ -68,22 +68,21 @@ int main(int argc, char **argv)
     CHECK_ERROR(safe_arr1 == NULL,
             ("Failed to allocate array inside a txn - %s", strerror(errno)));
 
-    for (int i = 0; i < ARR_SIZE; ++i) {
-        printf("i: %d\n", i);
-        safe_arr0[i] = 0;
-    }
     memset(safe_arr0, 0, ARR_SIZE*sizeof(int));
     memset(safe_arr1, 0, ARR_SIZE*sizeof(int));
 
     fill_arr(safe_arr0);
     fill_arr(safe_arr1);
-    
-    CHECK_ERROR(check_txn_commit(cfg, txid) == true,
-            ("FAILURE: data got through before commit - %s", strerror(errno)));
+   
+//   fprintf(stderr, "Check txn commit before commit\n"); 
+//    CHECK_ERROR(check_txn_commit(cfg, txid) == true,
+//            ("FAILURE: data got through before commit - %s", strerror(errno)));
 
+   fprintf(stderr, "commit\n");
     CHECK_ERROR(!rvm_txn_commit(cfg, txid),
             ("FAILURE: Failed to commit transaction - %s", strerror(errno)));
 
+   fprintf(stderr, "Check txn commit after commit\n"); 
     CHECK_ERROR(check_txn_commit(cfg, txid) == false,
             ("FAILURE: commit did not get through - %s", strerror(errno)));
 

@@ -8,8 +8,8 @@
 #include <errno.h>
 #include <assert.h>
 
-#include <backends/rmem_backend.h>
 #include <rvm.h>
+#include <backends/ramcloud_backend.h>
 #include <log.h>
 #include <error.h>
 
@@ -49,7 +49,7 @@ int main(int argc, char **argv)
 
     /* Try to recover from server */
     opt.recovery = true;
-    rvm_cfg_t *cfg = rvm_cfg_create(&opt, create_rmem_layer);
+    rvm_cfg_t *cfg = rvm_cfg_create(&opt, create_ramcloud_layer);
 
     /* Get the new addresses for arr0 and arr1 */
     int *safe_arr0 = (int*)rvm_rec(cfg);

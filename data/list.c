@@ -31,7 +31,9 @@ struct list_node* alloc_node(list_t list)
     list_node* node = 0;
     node = (list_node*)malloc(sizeof(list_node));
     assert(node);
-    node->prev = node->next = node->data = 0;
+    node->prev = (list_node*)0;
+    node->next = (list_node*)0;
+    node->data = (list_node*)0;
     return node;
 }
 
@@ -137,13 +139,11 @@ void* list_pop_front(list_t list)
     return data;
 }
 
-inline
 int list_size(list_t list) 
 {
     return list->size;
 }
 
-inline
 list_iterator_t list_begin(list_t list) 
 {
     return list->head;
@@ -154,7 +154,6 @@ void* list_get_value(list_iterator_t it)
     return it->data;
 }
 
-inline
 bool list_is_end(list_iterator_t it) 
 {
     return it == 0;

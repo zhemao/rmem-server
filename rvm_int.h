@@ -1,6 +1,6 @@
 /* Private (internal) interfaces, types and constants for RVM */
 #include "rvm.h"
-#include "rmem_generic_interface.h"
+#include "backends/rmem_generic_interface.h"
 #include <stdbool.h>
 
 /* Block table always has this tag */

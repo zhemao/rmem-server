@@ -8,14 +8,11 @@
 #include <errno.h>
 
 #include <rvm.h>
-#include <rmem_backend.h>
+#include <ramcloud_backend.h>
 #include <log.h>
 #include <error.h>
 
-//#include "malloc_simple.h"
-#include "buddy_malloc.h"
-
-#define ARR_SIZE 2048
+#define ARR_SIZE 10
 
 static void fill_arr(int *a)
 {
@@ -29,7 +26,7 @@ static void fill_arr(int *a)
 }
 
 /* Check if the array is filled with the expeceted value. */
-static bool check_arr(int *a, int expect, int size)
+static bool check_arr(int *a, int expect)
 {
     int i = 0;
     for(;i < ARR_SIZE; i++)
@@ -53,16 +50,12 @@ rvm_cfg_t* initialize_rvm(char* host, char* port) {
     rvm_opt_t opt;
     opt.host = host;
     opt.port = port;
-//    opt.alloc_fp = simple_malloc;
-//    opt.free_fp = simple_free;
-    opt.alloc_fp = buddy_malloc;
-    opt.free_fp = buddy_free;
         
     /* Non-recovery case */
     opt.recovery = false;
 
     LOG(8, ("rvm_cfg_create\n"));
-    rvm_cfg_t *cfg = rvm_cfg_create(&opt, create_rmem_layer);
+    rvm_cfg_t *cfg = rvm_cfg_create(&opt, create_ramcloud_layer);
     CHECK_ERROR(cfg == NULL, 
             ("FAILURE: Failed to initialize rvm configuration - %s\n", strerror(errno)));
 
@@ -76,6 +69,9 @@ int main(int argc, char **argv)
                 argv[0]);
         return EXIT_FAILURE;
     }
+
+    create_ramcloud_layer();
+
     bool restart = (strcmp(argv[3],"y") == 0 || strcmp(argv[3],"Y") == 0) ? true : false;
 
     rvm_opt_t opt;
@@ -85,35 +81,40 @@ int main(int argc, char **argv)
     if(restart) {
         /* Try to recover from server */
         opt.recovery = true;
-        rvm_cfg_t *cfg = rvm_cfg_create(&opt, create_rmem_layer);
+        rvm_cfg_t *cfg = rvm_cfg_create(&opt, create_ramcloud_layer);
 
         /* Get the new addresses for arr0 and arr1 */
-        int **arr_ptr = (int**)rvm_get_usr_data(cfg);
-        if(arr_ptr == NULL) {
-            printf("FAILURE: pointer to arrays is null!\n");
-            return EXIT_FAILURE;
-        }
+        int **arr_ptr = (int**)rvm_rec(cfg);
+        int *arr0 = (int*)rvm_rec(cfg);
+        int *arr1 = (int*)rvm_rec(cfg);
 
-        if(arr_ptr[0] == NULL || arr_ptr[1] == NULL) {
-            printf("FAILURE: pointer to arrays corrupted\n");
+        /* Check their values */
+        if(!check_arr(arr_ptr[0], 1)) {
+            if(!check_arr(arr0, 1)) {
+                printf("FAILURE: Arr0 doesn't look right\n");
+            } else {
+                printf("FAILURE: Couldn't access array 0 through pointer\n");
+            }
+
             return EXIT_FAILURE;
         }
 
         /* Check their values */
-        if(!check_arr(arr_ptr[0], 1, ARR_SIZE)) {
-            printf("FAILURE: Arr0 Doesn't look right\n");
-            return EXIT_FAILURE;
-        }
+        if(!check_arr(arr_ptr[1], 2)) {
+            if(!check_arr(arr1, 2)) {
+                printf("FAILURE: Arr1 doesn't look right\n");
+            } else {
+                printf("FAILURE: Couldn't access array 1 through pointer\n");
+            }
 
-        /* Check their values */
-        if(!check_arr(arr_ptr[1], 2, ARR_SIZE)) {
-            printf("FAILURE: Arr1 doesn't look right\n");
             return EXIT_FAILURE;
         }
 
         printf("SUCCESS: Memory recovered after \"failure\"\n");
     } else {
+
         rvm_cfg_t* cfg = initialize_rvm(argv[1], argv[2]);
+    
 
         LOG(8,("rvm_txn_begin\n"));
         rvm_txid_t txid = rvm_txn_begin(cfg);
@@ -126,9 +127,6 @@ int main(int argc, char **argv)
         CHECK_ERROR(arr_ptr == NULL,
                 ("FAILURE: Failed to allocate tracking structure -%s\n",
                  strerror(errno)));
-
-        /* Register the state structure as our usr_data with rvm */
-        rvm_set_usr_data(cfg, arr_ptr);
 
         /* Arr0 gets incremented once */
         LOG(8,("rvm_alloc\n"));
@@ -160,7 +158,9 @@ int main(int argc, char **argv)
         printf("rvm_txn_begin\n");
         /* Start a new transaction */
         txid = rvm_txn_begin(cfg);
+        printf("fill_arr1\n");
         fill_arr(arr_ptr[0]);
+        printf("fill_arr2\n");
         fill_arr(arr_ptr[1]);
 
         //Ohs Noes! Our program has mysteriously crashed without committing!
@@ -170,3 +170,5 @@ int main(int argc, char **argv)
     }
     return 0;
 }
+
+

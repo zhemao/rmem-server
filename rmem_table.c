@@ -11,28 +11,28 @@
 static inline struct alloc_entry *entry_of_list(struct list_head *list)
 {
     struct alloc_entry dummy;
-    int offset = ((void *) &dummy.list) - ((void *) &dummy);
+    int offset = ((uintptr_t) &dummy.list) - ((uintptr_t) &dummy);
     return (struct alloc_entry *) (((void *) list) - offset);
 }
 
 static inline struct alloc_entry *entry_of_free_list(struct list_head *list)
 {
     struct alloc_entry dummy;
-    int offset = ((void *) &dummy.free_list) - ((void *) &dummy);
+    int offset = ((uintptr_t) &dummy.free_list) - ((uintptr_t) &dummy);
     return (struct alloc_entry *) (((void *) list) - offset);
 }
 
 static inline struct alloc_entry *entry_of_htable(struct list_head *list)
 {
     struct alloc_entry dummy;
-    int offset = ((void *) &dummy.htable) - ((void *) &dummy);
+    int offset = ((uintptr_t) &dummy.htable) - ((uintptr_t)&dummy);
     return (struct alloc_entry *) (((void *) list) - offset);
 }
 
 static inline struct rmem_txn *txn_of_list(struct list_head *list)
 {
     struct rmem_txn txn;
-    int offset = ((void *) &txn.list) - ((void *) &txn);
+    int offset = ((uintptr_t) &txn.list) - ((uintptr_t) &txn);
     return (struct rmem_txn *) (((void *) list) - offset);
 }
 
@@ -83,7 +83,7 @@ void init_rmem_table(struct rmem_table *rmem)
     list_init(&rmem->free_list);
     rmem->alloc_size = 0;
 
-    rmem->htable = malloc(sizeof(struct list_head) * NUM_BUCKETS);
+    rmem->htable = (struct list_head*)malloc(sizeof(struct list_head) * NUM_BUCKETS);
     if (rmem->htable == NULL) {
 	fprintf(stderr, "Failed to allocate hash table\n");
 	exit(EXIT_FAILURE);
@@ -170,10 +170,10 @@ static inline void reserve_entry(struct rmem_table *rmem,
         free_entry = entry_of_free_list(entry->free_list.next);
         free_entry_end = free_entry->start + free_entry->size;
         free_entry->start = entry_end;
-        free_entry->size = free_entry_end - entry_end;
+        free_entry->size = (uintptr_t)free_entry_end - (uintptr_t)entry_end;
         free_node = &free_entry->free_list;
     } else {
-        TEST_Z(free_entry = malloc(sizeof(struct alloc_entry)));
+        TEST_Z(free_entry = (struct alloc_entry*)malloc(sizeof(struct alloc_entry)));
         free_entry->free = 1;
         free_entry->tag = 0;
         free_entry->size = free_size;
@@ -242,7 +242,7 @@ void *rmem_table_alloc(struct rmem_table *rmem, size_t size, tag_t tag)
             return NULL;
         }
 
-        TEST_Z(entry = malloc(sizeof(struct alloc_entry)));
+        TEST_Z(entry = (struct alloc_entry*)malloc(sizeof(struct alloc_entry)));
         list_append(&rmem->list, &entry->list);
         entry->free_list.next = &rmem->free_list;
         entry->free_list.prev = free_node->prev;
@@ -279,7 +279,7 @@ static inline struct alloc_entry *merge_free_blocks(
         prev_entry = entry_of_list(entry->list.prev);
         if (prev_entry->free) {
             start = prev_entry->start;
-            prev_entry->size = end - start;
+            prev_entry->size = (uintptr_t)end - (uintptr_t)start;
             list_delete(&entry->list);
             free(entry);
             entry = prev_entry;
@@ -287,7 +287,7 @@ static inline struct alloc_entry *merge_free_blocks(
             struct list_head *last_free;
             start = prev_entry->start + prev_entry->size;
             entry->start = start;
-            entry->size = end - start;
+            entry->size = (uintptr_t)end - (uintptr_t)start;
             last_free = entry->free_list.prev;
             list_insert(last_free, &entry->free_list);
         }
@@ -312,7 +312,7 @@ static inline struct alloc_entry *merge_free_blocks(
     } else {
         end = next_entry->start;
     }
-    entry->size = end - start;
+    entry->size = (uintptr_t)end - (uintptr_t)start;
 
     return entry;
 }
@@ -412,7 +412,7 @@ int txn_list_add_cp(struct rmem_txn_list *list,
 {
     struct rmem_txn *txn;
 
-    txn = malloc(sizeof(struct rmem_txn));
+    txn = (struct rmem_txn*)malloc(sizeof(struct rmem_txn));
     if (txn == NULL)
 	return -1;
 
@@ -448,7 +448,7 @@ int txn_list_add_free(struct rmem_txn_list *list, void *addr)
 {
     struct rmem_txn *txn;
 
-    txn = malloc(sizeof(struct rmem_txn));
+    txn = (struct rmem_txn*)malloc(sizeof(struct rmem_txn));
     if (txn == NULL)
 	return -1;
 

@@ -120,7 +120,7 @@ void *buddy_malloc(rvm_cfg_t *cfg, size_t n_bytes)
 
   map_t *map = (map_t *)rvm_get_alloc_data(cfg);
   if(map == NULL) {
-      map = buddy_meminit(cfg);
+      map = (map_t*)buddy_meminit(cfg);
       rvm_set_alloc_data(cfg, map);
   }
 

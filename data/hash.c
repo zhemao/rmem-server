@@ -53,7 +53,7 @@ void get_item_node(hash_t h, uint64_t key, list_iterator_t* node_out, list_t* li
     *list_out = h->hash_chains[hash_index];
     list_iterator_t list_it = list_begin(h->hash_chains[hash_index]);
     hash_node_t node;
-    while (!list_is_end(list_it) && (node = list_get_value(list_it))) {
+    while (!list_is_end(list_it) && (node = (hash_node*)list_get_value(list_it))) {
         if (node->key == key) {
             *node_out = list_it;
             return;
@@ -88,7 +88,7 @@ int find_next_node(int chain_list_index, hash_iterator_t iterator) {
             // iterator->next may be a null pointer 
             // even though there is a next hash node
             iterator->next = list_next_iterator(it); 
-            iterator->hash_node = list_get_value(it);
+            iterator->hash_node = (hash_node_t)list_get_value(it);
             return 0;
         }
     }
@@ -107,7 +107,7 @@ hash_t hash_create(int size) {
 
     new_hash->elements = 0;
     new_hash->size = size;
-    new_hash->hash_chains = malloc(sizeof(list_t) * size);
+    new_hash->hash_chains = (list_t*)malloc(sizeof(list_t) * size);
     assert(new_hash->hash_chains);
 
     // clear chain ptrs
@@ -141,7 +141,7 @@ void hash_insert_item(hash_t h, uint64_t key, void* value) {
     //LOG(0, ("key hashed\n"));
     if (!h->hash_chains[hash_index]) {
         //LOG(0, ("creating chain list\n"));
-        h->hash_chains[hash_index] = list_create(false);
+        h->hash_chains[hash_index] = list_create();
         assert(h->hash_chains[hash_index]);
     }
     list_t list = h->hash_chains[hash_index];
@@ -165,7 +165,7 @@ void hash_delete_item(hash_t h, uint64_t key) {
     if (!node)
         return;
 
-    hash_node_t hash_node = list_get_value(node);
+    hash_node_t hash_node = (hash_node_t)list_get_value(node);
     free(hash_node);
 
     list_delete_node(node_list, node);
@@ -226,7 +226,7 @@ hash_iterator_t hash_begin(hash_t h) {
 void hash_next_iterator(hash_iterator_t iterator) {
     //LOG(0, ("next_h_it iterator->next: 0x%lx\n", iterator->next));
     if (iterator->next) { // there are more nodes in this chain list
-        iterator->hash_node = list_get_value(iterator->next);
+        iterator->hash_node = (hash_node_t)list_get_value(iterator->next);
         iterator->next = list_next_iterator(iterator->next);
     } else { // need to find next chain list
         find_next_node(iterator->chain_list_index + 1, iterator);
