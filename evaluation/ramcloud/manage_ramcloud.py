@@ -1,8 +1,5 @@
 #!/usr/bin/env python
 
-# Very simple dummy test / showcase of BLCR running
-# Currenly can only run in f1 (only node where BLCR is installed)
-
 import os
 import subprocess
 import shutil
