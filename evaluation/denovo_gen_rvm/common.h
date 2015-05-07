@@ -4,7 +4,7 @@
 #include <errno.h>
 #include <assert.h>
 #include <utils/error.h>
-#include <rvm_stub.h>
+#include <rvm.h>
 #include "contig_generation.h"
 
 extern rvm_cfg_t *cfg;
