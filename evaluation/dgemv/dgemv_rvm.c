@@ -34,7 +34,7 @@
     "\t-p NUMBER The port used by the server"                       \
     "\t-f PATH Optional output file\n"                              \
     "\t-r Are we recovering from a failure?\n"                      \
-    "\t-s Shall we simulate a failure?\n"
+    "\t-s NUM Shall we simulate a failure every NUM iterations?\n"
 
 typedef struct
 {
@@ -63,7 +63,7 @@ int main(int argc, char *argv[])
     char *port = NULL;
     char *out_filename = NULL;
     bool recover = false;
-    bool fail = false;
+    int fail_freq = 0;
 
     int c;
     while((c = getopt(argc, argv, "n:m:i:h:p:f:rs")) != -1)
@@ -91,7 +91,7 @@ int main(int argc, char *argv[])
             recover = true;
             break;
         case 's':
-            fail = true;
+            fail_freq = strtoll(optarg, NULL, 0);
             break;
 
         case '?':
@@ -182,12 +182,6 @@ int main(int argc, char *argv[])
         cblas_dgemv(CblasColMajor, CblasNoTrans,
                 nrow, ncol, 1.0, A, nrow, state->vec, 1, 0, state->vec, 1);
 
-        //Hard-coded failure
-        if(fail && state->iter == 3) {
-            printf("Simulating failure after 3rd iteration\n");
-            return EXIT_SUCCESS;
-        }
-
         state->iter++;
 
         res = rvm_txn_commit(cfg, txid);
@@ -195,6 +189,12 @@ int main(int argc, char *argv[])
             printf("Failed to commit transaction for iteration %d\n",
                     state->iter);
             return EXIT_FAILURE;
+        }
+
+        //Hard-coded failure
+        if(fail_freq != 0 && (state->iter % fail_freq) == 0) {
+            printf("Simulating failure after %ldth iteration\n", state->iter);
+            return EXIT_SUCCESS;
         }
     }
 

@@ -33,7 +33,7 @@
     "\t-n NUMBER The n dimension of the matrix\n"                   \
     "\t-i NUMBER The number of iterations\n"                        \
     "\t-f PATH Optional output file\n"                              \
-    "\t-s Shall we simulate a failure?\n"
+    "\t-s NUM Shall we simulate a failure every NUM iterations?\n"
 
 typedef struct
 {
@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
     int ncol = N_DEF, nrow = M_DEF;  /* Matrix dimensions */
     int64_t niter = NITER_DEF; /* Number of iterations */
     char *out_filename = NULL;
-    bool fail = false;
+    int fail_freq = 0;
 
     int c;
     while((c = getopt(argc, argv, "n:m:i:f:rs")) != -1)
@@ -81,7 +81,7 @@ int main(int argc, char *argv[])
             out_filename = optarg;
             break;
         case 's':
-            fail = true;
+            fail_freq = strtoll(optarg, NULL, 0);
             break;
 
         case '?':
@@ -145,17 +145,17 @@ int main(int argc, char *argv[])
         cblas_dgemv(CblasColMajor, CblasNoTrans,
                 nrow, ncol, 1.0, A, nrow, state->vec, 1, 0, state->vec, 1);
 
-        //Hard-coded failure
-        if(fail && state->iter == 3) {
-            printf("Simulating failure after 3rd iteration\n");
-            return EXIT_SUCCESS;
-        }
-
         state->iter++;
 
         if(!commit_state(state, state_sz)) {
             printf("Failed to commit iteration %d\n", state->iter);
             return EXIT_FAILURE;
+        }
+
+        //Hard-coded failure
+        if(fail_freq != 0 && (state->iter % fail_freq) == 0) {
+            printf("Simulating failure after %ldth iteration\n", state->iter);
+            return EXIT_SUCCESS;
         }
     }
 
