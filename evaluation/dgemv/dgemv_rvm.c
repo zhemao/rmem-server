@@ -6,7 +6,7 @@
 #include <errno.h>
 #include <string.h>
 #include "rvm.h"
-#include "rmem.h"
+#include "backends/rmem_backend.h"
 #include "buddy_malloc.h"
 
 /* Defaults for n, m and niter respectively */
@@ -34,7 +34,8 @@
     "\t-p NUMBER The port used by the server"                       \
     "\t-f PATH Optional output file\n"                              \
     "\t-r Are we recovering from a failure?\n"                      \
-    "\t-s NUM Shall we simulate a failure every NUM iterations?\n"
+    "\t-s NUM Shall we simulate a failure every NUM iterations?\n"  \
+    "\t-c NUM checkpoint frequency\n"
 
 typedef struct
 {
@@ -64,9 +65,10 @@ int main(int argc, char *argv[])
     char *out_filename = NULL;
     bool recover = false;
     int fail_freq = 0;
+    int cp_freq = 1;
 
     int c;
-    while((c = getopt(argc, argv, "n:m:i:h:p:f:rs")) != -1)
+    while((c = getopt(argc, argv, "n:m:i:h:p:f:rs:c:")) != -1)
     {
         switch(c) {
         case 'm':
@@ -92,6 +94,9 @@ int main(int argc, char *argv[])
             break;
         case 's':
             fail_freq = strtoll(optarg, NULL, 0);
+            break;
+        case 'c':
+            cp_freq = strtoll(optarg, NULL, 0);
             break;
 
         case '?':
@@ -172,6 +177,8 @@ int main(int argc, char *argv[])
 
     while(state->iter < niter)
     {
+        /* XXX I'm exploiting undefined behavior in txn_begin. You can call it
+           multiple times without committing. Fix this later */
         txid = rvm_txn_begin(cfg);
         if(txid == -1) {
             printf("Failed to begin transaction for iteration %d\n",
@@ -184,22 +191,27 @@ int main(int argc, char *argv[])
 
         state->iter++;
 
-        res = rvm_txn_commit(cfg, txid);
-        if(!res) {
-            printf("Failed to commit transaction for iteration %d\n",
-                    state->iter);
-            return EXIT_FAILURE;
+        /* Simulate a failure every cp_freq iterations */
+        if(state->iter % cp_freq == 0) {
+            res = rvm_txn_commit(cfg, txid);
+            if(!res) {
+                printf("Failed to commit transaction for iteration %d\n",
+                        state->iter);
+                return EXIT_FAILURE;
+            }
         }
 
         //Hard-coded failure
         if(fail_freq != 0 && (state->iter % fail_freq) == 0) {
-            printf("Simulating failure after %ldth iteration\n", state->iter);
-            return EXIT_SUCCESS;
+            printf("Simulating failure after %dth iteration\n", state->iter);
+            return EXIT_FAILURE;
         }
     }
 
+    txid = rvm_txn_begin(cfg);
     printf("Result:\n");
     print_vec(out, state->vec, nrow);
+    rvm_txn_commit(cfg, txid);
 
     return EXIT_SUCCESS;
 }
