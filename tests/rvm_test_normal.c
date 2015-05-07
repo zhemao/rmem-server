@@ -156,6 +156,10 @@ int main(int argc, char **argv)
         printf("rvm_txn_commit\n");
         CHECK_ERROR(!rvm_txn_commit(cfg, txid),
                 ("FAILURE: Failed to commit transaction - %s", strerror(errno)));
+        
+        fprintf(stderr, "Check txn commit after commit\n"); 
+        CHECK_ERROR(check_txn_commit(cfg, txid) == false,
+                ("FAILURE: commit did not get through - %s", strerror(errno)));
 
         printf("rvm_txn_begin\n");
         /* Start a new transaction */

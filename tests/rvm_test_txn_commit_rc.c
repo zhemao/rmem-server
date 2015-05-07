@@ -39,6 +39,7 @@ rvm_cfg_t* initialize_rvm(char* host, char* port)
     opt.recovery = false;
 
     LOG(8, ("rvm_cfg_create\n"));
+   fprintf(stderr, "rvm_cfg_create\n");
     rvm_cfg_t *cfg = rvm_cfg_create(&opt, create_ramcloud_layer);
     CHECK_ERROR(cfg == NULL, 
             ("FAILURE: Failed to initialize rvm configuration - %s\n", strerror(errno)));
@@ -54,16 +55,21 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }
 
+   fprintf(stderr, "initialize\n");
     rvm_cfg_t* cfg = initialize_rvm(argv[1], argv[2]);
 
+   fprintf(stderr, "rvm_alloc\n");
     int *safe_arr0 = (int*)rvm_alloc(cfg, ARR_SIZE*sizeof(int));
+   fprintf(stderr, "rvm_alloc done\n");
     CHECK_ERROR(safe_arr0 == NULL, 
             ("FAILURE: Failed to allocate array outside of a txn - %s\n", strerror(errno)));
 
+   fprintf(stderr, "rvm_txn_begin\n");
     rvm_txid_t txid = rvm_txn_begin(cfg);
     CHECK_ERROR(txid < 0,
             ("FAILURE: Could not start transaction - %s\n", strerror(errno)));
 
+   fprintf(stderr, "rvm_alloc\n");
     int *safe_arr1 = (int*)rvm_alloc(cfg, ARR_SIZE*sizeof(int));
     CHECK_ERROR(safe_arr1 == NULL,
             ("Failed to allocate array inside a txn - %s", strerror(errno)));

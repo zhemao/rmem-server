@@ -4,6 +4,7 @@
 #include <RamCloud.h>
 #include <OptionParser.h>
 #include <map>
+#include <algorithm>
 
 #define ONE_MB (1024*1024)
 #define EIGHT_MB (8*ONE_MB)
@@ -15,6 +16,7 @@
 #define MAIN_ENTRY_KEY "M"
 #define TAG_TO_MAIN_KEY(tag) int_to_str(tag)
 #define TAG_TO_SHADOW_KEY(tag) (TAG_TO_MAIN_KEY(tag)+"s")
+#define CHUNK_KEY(key, i) (key + "." + int_to_str(i))
 
 extern "C" {
 #include "ramcloud_backend.h"
@@ -22,18 +24,20 @@ extern "C" {
 
 using namespace RAMCloud;
 
-typedef std::map<int,std::string> tag_map;
+typedef std::map<uint32_t,std::string> tag_map;
 
 typedef struct ramcloud_data {
     uint64_t table_id;
     RamCloud* client;
     tag_map* tag_to_key;
-    std::map<int, bool>* tag_written;
+    std::map<uint32_t, bool>* tag_written;
+    std::map<uint32_t, size_t>* tag_to_size;
 } ramcloud_data_t;
 
 typedef struct tag_entry {
     uint32_t tag;
     char key[KEY_MAX_SIZE];
+    size_t size;
 } tag_entry_t;
 
 typedef struct rc_main_table_t {
@@ -78,12 +82,35 @@ void rmc_disconnect(rmem_layer_t *rmem_layer)
 uint64_t rc_malloc(rmem_layer_t *rmem_layer, size_t size, uint32_t tag)
 {
     ramcloud_data_t* data = (ramcloud_data_t*)rmem_layer->layer_data;
+    uint64_t table_id = data->table_id;
     tag_map* tag_to_key = data->tag_to_key;
-    std::map<int,std::string>::iterator it = tag_to_key->find(tag);
+
+    std::map<uint32_t, size_t>* tag_to_size = data->tag_to_size;
+    std::map<uint32_t,std::string>::iterator it = tag_to_key->find(tag);
 
     if (it == tag_to_key->end()) {
         tag_to_key->operator[](tag) = int_to_str(tag);
+        tag_to_size->operator[](tag) = size;
     }
+
+    // make sure this tag exists in ramcloud
+    int64_t size_left = size;
+    int i = 0;
+    char* dummy_data = new char[VALUE_MAX_SIZE];
+    memset(dummy_data, 0, VALUE_MAX_SIZE * sizeof(char));
+
+    while (size_left > 0) {
+        std::string write_chunk_key = CHUNK_KEY(int_to_str(tag), i);
+        int64_t size_to_write = std::min(size_left, (int64_t)VALUE_MAX_SIZE);
+    
+        fprintf(stderr, "writing key: %s size: %d\n", write_chunk_key.c_str(), size_to_write);
+        data->client->write(table_id, write_chunk_key.c_str(), 
+                write_chunk_key.size(), (char*)dummy_data, size_to_write);
+        ++i;
+        size_left -= VALUE_MAX_SIZE;
+    }
+
+    delete[] dummy_data;
 
     return 1;
 }
@@ -93,10 +120,11 @@ int rc_put(rmem_layer_t *rmem_layer, uint32_t tag,
 {
     ramcloud_data_t* data = (ramcloud_data_t*)rmem_layer->layer_data;
     tag_map* tag_to_key = data->tag_to_key;
-    std::map<int,std::string>::iterator it = tag_to_key->find(tag);
+    std::map<uint32_t,std::string>::iterator it = tag_to_key->find(tag);
 
     if (it == tag_to_key->end()) {
-        tag_to_key->insert(std::make_pair(tag, TAG_TO_MAIN_KEY(tag)));
+        assert(0); // we should have added this back in rc_malloc
+        //tag_to_key->insert(std::make_pair(tag, TAG_TO_MAIN_KEY(tag)));
     } else {
     }
 
@@ -106,10 +134,21 @@ int rc_put(rmem_layer_t *rmem_layer, uint32_t tag,
 
     uint64_t table_id = data->table_id;
 
-    assert(size < VALUE_MAX_SIZE);
     fprintf(stderr, "rc_put4 tag: %u key:%s table_id:%lu key_size:%lu size:%lu\n", tag, write_key.c_str(), table_id, write_key.size(), size);
 
-    data->client->write(table_id, write_key.c_str(), write_key.size(), src, size);
+    int64_t size_left = size;
+    int i = 0;
+    while (size_left > 0) {
+        std::string write_chunk_key = CHUNK_KEY(write_key, i);
+        int64_t size_to_write = std::min(size_left, (int64_t)VALUE_MAX_SIZE);
+    
+        fprintf(stderr, "writing key: %s size: %d\n", write_chunk_key.c_str(), size_to_write);
+        data->client->write(table_id, write_chunk_key.c_str(), 
+                write_chunk_key.size(), (char*)src + i * VALUE_MAX_SIZE, size_to_write);
+        ++i;
+        size_left -= VALUE_MAX_SIZE;
+    }
+
     data->tag_written->operator[](tag) = true;
 
     return 0;
@@ -120,44 +159,108 @@ int rc_get(rmem_layer_t *rmem_layer, void *dst, void *data_mr,
 {
     ramcloud_data_t* data = (ramcloud_data_t*)rmem_layer->layer_data;
     tag_map* tag_to_key = data->tag_to_key;
-    std::map<int,std::string>::iterator it = tag_to_key->find(tag);
+    std::map<uint32_t,std::string>::iterator it = tag_to_key->find(tag);
     CHECK_ERROR(it == tag_to_key->end(),
             ("Error: did not find tag %d in tag_to_key map\n", tag));
     
     std::string key = it->second;
     uint64_t table_id = data->table_id;
 
-    fprintf(stderr, "rc_get table id: %lu key: %s\n", table_id, key.c_str());
+    fprintf(stderr, "rc_get table id: %lu key: %s size: %u\n", table_id, key.c_str(), size);
 
-    Buffer buffer;
-    data->client->read(table_id, key.c_str(), key.size(), &buffer);
+    int64_t size_left = size;
+    int i = 0;
+    while (size_left > 0) {
+        std::string chunk_key = CHUNK_KEY(key, i);
+        Buffer buffer;
 
-    const char* bufferString = static_cast<const char*>(
-            buffer.getRange(0, buffer.size()));
-    
-    memcpy(dst, bufferString, size);
+        data->client->read(table_id, chunk_key.c_str(), 
+                chunk_key.size(), &buffer);
+        
+        fprintf(stderr, "rc_get client->read. table id: %lu chunk_key: %s size: %u\n", table_id, chunk_key.c_str(), buffer.size());
+
+        const char* bufferString = static_cast<const char*>(
+                buffer.getRange(0, buffer.size()));
+
+        memcpy((char*)dst + i * VALUE_MAX_SIZE, bufferString, buffer.size());
+
+        size_left -= VALUE_MAX_SIZE;
+        ++i;
+    }
 
     return 0;
 }
 
+/*
+ * Warning: free is not atomic
+ */ 
 int rc_free(rmem_layer_t *rmem_layer, uint32_t tag)
 {
     ramcloud_data_t* data = (ramcloud_data_t*)rmem_layer->layer_data;
     tag_map* tag_to_key = data->tag_to_key;
+    std::map<uint32_t, size_t>* tag_to_size = data->tag_to_size;
 
-    std::map<int,std::string>::iterator it = tag_to_key->find(tag);
+    std::map<uint32_t,std::string>::iterator it = tag_to_key->find(tag);
 
     if (it != tag_to_key->end()) {
 
         std::string key = it->second;
         uint64_t table_id = data->table_id;
 
-        data->client->remove(table_id, key.c_str(), key.size());
+        for (size_t i = 0; i * VALUE_MAX_SIZE < tag_to_size->operator[](tag); ++i) {
+            std::string chunk_key = CHUNK_KEY(key, i);
+            data->client->remove(table_id, chunk_key.c_str(), chunk_key.size());
+        }
 
         tag_to_key->erase(it);
     }
 
     return 0;
+}
+
+static
+void write_tag_to_tag(ramcloud_data_t* data, uint32_t tag_src, uint32_t tag_dst)
+{
+    tag_map* tag_to_key = data->tag_to_key;
+    std::map<uint32_t, size_t>* tag_to_size = data->tag_to_size;
+    uint64_t table_id = data->table_id;
+
+    std::map<uint32_t, std::string>::iterator src_key_it = tag_to_key->find(tag_src);
+    std::map<uint32_t, std::string>::iterator dst_key_it = tag_to_key->find(tag_dst);
+        
+    // both src and dest tags should exist
+    assert(src_key_it != tag_to_key->end());
+    assert(dst_key_it != tag_to_key->end());
+
+    size_t src_size = tag_to_size->operator[](tag_src);
+    size_t dst_size = tag_to_size->operator[](tag_dst);
+
+    assert(src_size > 0 && dst_size > 0);
+        
+    // this is the old key, because we are going to write this to a new place
+    std::string old_dst_key = dst_key_it->second;
+
+    // new kwy 
+    // add 's' or remove, alternating
+    std::string new_dst_key = shadow_key_from_main(old_dst_key); 
+
+    for (size_t i = 0; i * VALUE_MAX_SIZE < src_size; ++i) {
+        std::string src_chunk_key = CHUNK_KEY(src_key_it->second, i);
+        std::string dst_chunk_key = CHUNK_KEY(new_dst_key, i);
+
+        Buffer buffer;
+        data->client->read(table_id, src_chunk_key.c_str(), src_chunk_key.size(), &buffer);
+
+        assert(buffer.size() <= VALUE_MAX_SIZE);
+
+        const char* bufferString = static_cast<const char*>(
+                buffer.getRange(0, buffer.size()));
+
+        fprintf(stderr, "writing key: %s size: %d\n", dst_chunk_key.c_str(), buffer.size());
+
+        data->client->write(table_id, dst_chunk_key.c_str(),
+                dst_chunk_key.size(), bufferString, buffer.size());
+    }
 }
 
 /*
@@ -169,6 +272,7 @@ int rc_atomic_commit(rmem_layer_t* rmem_layer, uint32_t* tags_src,
 {
     ramcloud_data_t* data = (ramcloud_data_t*)rmem_layer->layer_data;
     tag_map* tag_to_key = data->tag_to_key;
+    std::map<uint32_t, size_t>* tag_to_size = data->tag_to_size;
     uint64_t table_id = data->table_id;
 
     std::vector<std::string> to_be_removed;
@@ -182,28 +286,36 @@ int rc_atomic_commit(rmem_layer_t* rmem_layer, uint32_t* tags_src,
         int tag_src = tags_src[i];
         int tag_dst = tags_dst[i];
 
-        std::map<int, std::string>::iterator src_key_it = tag_to_key->find(tag_src);
-        std::map<int, std::string>::iterator dst_key_it = tag_to_key->find(tag_dst);
+        std::map<uint32_t, std::string>::iterator src_key_it = tag_to_key->find(tag_src);
+        std::map<uint32_t, std::string>::iterator dst_key_it = tag_to_key->find(tag_dst);
 
         // both src and dest tags should exist
         assert(src_key_it != tag_to_key->end());
         assert(dst_key_it != tag_to_key->end());
+        
 
         // this is the old key, because we are going to write this to a new place
         std::string old_dst_key = dst_key_it->second;
-      
-        // new kwy 
+
+        // new key 
         // add 's' or remove, alternating
         std::string new_dst_key = shadow_key_from_main(old_dst_key); 
+        
+        fprintf(stderr, "commiting tag_src: %d to tag_dst: %d\n", tag_src, tag_dst);
+        write_tag_to_tag(data, tag_src, tag_dst);
+        /*
+        
 
         // get data from src (shadow)
+
         Buffer buffer;
         data->client->read(table_id, src_key_it->second.c_str(), src_key_it->second.size(), &buffer);
-            
+
         const char* bufferString = static_cast<const char*>(
                 buffer.getRange(0, buffer.size()));
         data->client->write(table_id, new_dst_key.c_str(), 
                 new_dst_key.size(), bufferString, buffer.size());
+                */
 
         // update the tag-to-key map
         tag_to_key->operator[](tag_dst) = new_dst_key;
@@ -220,11 +332,14 @@ int rc_atomic_commit(rmem_layer_t* rmem_layer, uint32_t* tags_src,
     // traverse all tags, not just those committed
     // all need to be saved in main table
     int i = 0;
-    for (std::map<int, std::string>::iterator it = tag_to_key->begin();
+    for (std::map<uint32_t, std::string>::iterator it = tag_to_key->begin();
             it != tag_to_key->end(); ++it, ++i) {
         int tag = it->first;
         std::string key = it->second;
+        size_t tag_size = tag_to_size->operator[](tag);
+
         main_table->tag_entries[i].tag = tag;
+        main_table->tag_entries[i].size = tag_size;
         strcpy(main_table->tag_entries[i].key, key.c_str());
     }
     data->client->write(table_id, MAIN_ENTRY_KEY,
@@ -265,7 +380,7 @@ void ramcloud_connect(rmem_layer_t *rmem_layer, char *host, char *port)
 
 
         std::string locator = optionParser->options.getCoordinatorLocator();
-        
+
         fprintf(stderr, "Connecting to %s locator: %s\n", arg.c_str(), locator.c_str());
 
         RamCloud* client = new RamCloud(context, locator.c_str(),
@@ -273,12 +388,15 @@ void ramcloud_connect(rmem_layer_t *rmem_layer, char *host, char *port)
 
         uint64_t table_id;
         ramcloud_data_t* data = new ramcloud_data_t;
-        tag_map* tag_to_key_map = new std::map<int, std::string>();
-        std::map<int,bool>* tag_written = new std::map<int, bool>();
+        tag_map* tag_to_key_map = new std::map<uint32_t, std::string>();
+        std::map<uint32_t, size_t>* tag_to_size = new std::map<uint32_t, size_t>();
+        std::map<uint32_t,bool>* tag_written = new std::map<uint32_t, bool>();
 
         rc_main_table_t* main_table = new rc_main_table_t;
         try {
             table_id = client->getTableId(TABLE_NAME);
+
+            fprintf(stderr, "Table exists\n");
 
             // table exists
             // we have to load our tag_to_key map from main table
@@ -292,8 +410,12 @@ void ramcloud_connect(rmem_layer_t *rmem_layer, char *host, char *port)
             for (unsigned int i = 0; i < main_table->num_tags; ++i) {
                 int tag = main_table->tag_entries[i].tag;
                 char* key = main_table->tag_entries[i].key;
+                size_t tag_size = main_table->tag_entries[i].size;
 
                 tag_to_key_map->operator[](tag) = std::string(key);
+                tag_to_size->operator[](tag) = tag_size;
+            
+                fprintf(stderr, "recovered tag: %d key: %s size: %d\n", tag, key, tag_size);
             }
         } catch (TableDoesntExistException& e) {
             // table does not exist
@@ -316,6 +438,7 @@ void ramcloud_connect(rmem_layer_t *rmem_layer, char *host, char *port)
         data->client = client;
         data->tag_written = tag_written;
         data->tag_to_key = tag_to_key_map;
+        data->tag_to_size = tag_to_size;
         data->table_id = table_id;
         rmem_layer->layer_data = data;
 
