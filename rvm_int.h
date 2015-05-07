@@ -7,9 +7,7 @@
 #define BLOCK_TBL_ID 0
 
 /** Number of block descriptors in the block table */
-//#define BLOCK_TBL_SIZE \
-//    ((sysconf(_SC_PAGESIZE) - sizeof(blk_tbl_t)) / sizeof(block_desc_t))
-#define BLOCK_TBL_NENT (1 << 14)
+#define BLOCK_TBL_NENT (1 << 10)
 
 /* Size (in bytes) of the block table struct
  * This is rounded up to the nearest multiple of 4096 */

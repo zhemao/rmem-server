@@ -42,7 +42,7 @@ static bool recover_blocks(rvm_cfg_t *cfg)
     /* Recover the block table */
     for(size_t i = 0; i < BLOCK_TBL_NPG; i++)
     {
-        err = rmem_layer->get(rmem_layer, (cfg->blk_tbl + cfg->blk_sz*i),
+        err = rmem_layer->get(rmem_layer, (((void*)cfg->blk_tbl) + cfg->blk_sz*i),
                 (struct ibv_mr*)cfg->blk_tbl_rec,
                 BLOCK_TBL_ID + i, cfg->blk_sz);
         if(err != 0) {
@@ -94,7 +94,7 @@ static bool recover_blocks(rvm_cfg_t *cfg)
         /* Protect the block to detect changes */
         rvm_protect(blk->local_addr, cfg->blk_sz);
 
-        LOG(9, ("Recovered block %d (shadow %d) - local addr: %p\n",
+        LOG(9, ("Recovered block %d (shadow %ld) - local addr: %p\n",
                     blk->bid, BLK_SHDW_TAG(bx), blk->local_addr));
     }
 
@@ -155,6 +155,8 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer
                 errno = EUNKNOWN;
                 return NULL;
             }
+            LOG(9, ("Allocated block %ld - local addr: %p\n",
+                    BLOCK_TBL_ID + i, cfg->blk_tbl + i*cfg->blk_sz));
         }
         cfg->blk_tbl->n_blocks = 0;
     }
@@ -301,10 +303,11 @@ bool rvm_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
     /* Copy the updated block table */
     /* TODO We shouldn't have to do this here, the block table should describe
      * itself and get updated the same way anything else is */
+    LOG(9, ("Commiting block table, (%ld blocks)\n", BLOCK_TBL_NPG));
     for(size_t i = 0; i < BLOCK_TBL_NPG; i++)
     {
         err = rmem_layer->put(rmem_layer, BLOCK_TBL_ID + i,
-                (cfg->blk_tbl + cfg->blk_sz*i),
+                (((void*)cfg->blk_tbl) + cfg->blk_sz*i),
                 cfg->blk_tbl_rec, cfg->blk_sz);
 
         if(err != 0) {
@@ -468,7 +471,7 @@ void *rvm_blk_alloc(rvm_cfg_t* cfg, size_t size)
             return NULL;
         }
 
-        LOG(9, ("Allocated block %d (shadow %d) - local addr: %p\n",
+        LOG(9, ("Allocated block %d (shadow %ld) - local addr: %p\n",
                     block->bid, BLK_SHDW_TAG(bx), block->local_addr));
     }
 
@@ -505,7 +508,7 @@ bool rvm_blk_free(rvm_cfg_t* cfg, void *buf)
         return false;
     }
 
-    LOG(9, ("rmem_free block: %d (%d) - local addr: %p\n",
+    LOG(9, ("rmem_free block: %ld (%ld) - local addr: %p\n",
                 BLK_REAL_TAG(bx), BLK_SHDW_TAG(bx), buf));
 
     /* Cleanup remote info */
