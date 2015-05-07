@@ -77,5 +77,5 @@ tests/rvm_test_free_rc: tests/rvm_test_free_rc.o $(STATIC_LIB) $(RAMC_OBJS)
 	$(LD) -o $@ $< $(RAMC_OBJS) $(RVM_LIB) $(LINCLUDES) $(RAMC_LIBS)
 
 clean:
-	rm -f data/*.o backends/*.o *.o $(TARGETS)
+	rm -f data/*.o backends/*.o *.o $(STATIC_LIB) $(TARGETS)
 
