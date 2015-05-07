@@ -145,17 +145,17 @@ int main(int argc, char *argv[])
         cblas_dgemv(CblasColMajor, CblasNoTrans,
                 nrow, ncol, 1.0, A, nrow, state->vec, 1, 0, state->vec, 1);
 
-        //Hard-coded failure
-        if(fail_freq != 0 && (state->iter % fail_freq) == 0) {
-            printf("Simulating failure after %ldth iteration\n", state->iter);
-            return EXIT_SUCCESS;
-        }
-
         state->iter++;
 
         if(!commit_state(state, state_sz)) {
             printf("Failed to commit iteration %d\n", state->iter);
             return EXIT_FAILURE;
+        }
+
+        //Hard-coded failure
+        if(fail_freq != 0 && (state->iter % fail_freq) == 0) {
+            printf("Simulating failure after %ldth iteration\n", state->iter);
+            return EXIT_SUCCESS;
         }
     }
 
