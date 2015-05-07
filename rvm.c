@@ -40,17 +40,21 @@ static bool recover_blocks(rvm_cfg_t *cfg)
     rmem_layer_t* rmem_layer = (rmem_layer_t*)cfg->rmem_layer;
 
     /* Recover the block table */
-    err = rmem_layer->get(rmem_layer, cfg->blk_tbl, (struct ibv_mr*)cfg->blk_tbl_rec,
-            BLOCK_TBL_ID, cfg->blk_sz);
-    if(err != 0) {
-        rvm_log("Failed to recover block table\n");
-        errno = EUNKNOWN;
-        return false;
+    for(size_t i = 0; i < BLOCK_TBL_NPG; i++)
+    {
+        err = rmem_layer->get(rmem_layer, (cfg->blk_tbl + cfg->blk_sz*i),
+                (struct ibv_mr*)cfg->blk_tbl_rec,
+                BLOCK_TBL_ID + i, cfg->blk_sz);
+        if(err != 0) {
+            rvm_log("Failed to recover block table\n");
+            errno = EUNKNOWN;
+            return false;
+        }
     }
 
     /* Recover every previously allocated block */
     int bx;
-    for(bx = 0; bx < BLOCK_TBL_SIZE; bx++)
+    for(bx = 0; bx < BLOCK_TBL_NENT; bx++)
     {
         block_desc_t *blk = &(cfg->blk_tbl->tbl[bx]);
         if(blk->local_addr == NULL)
@@ -113,7 +117,8 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer
     rmem_layer->connect(rmem_layer, opts->host, opts->port);
 
     /* Allocate and initialize the block table locally */
-    cfg->blk_tbl = (blk_tbl_t *)mmap(NULL, cfg->blk_sz, PROT_READ | PROT_WRITE | PROT_EXEC, 
+    cfg->blk_tbl = (blk_tbl_t *)mmap(NULL, BLOCK_TBL_SIZE,
+            PROT_READ | PROT_WRITE | PROT_EXEC,
             (MAP_ANONYMOUS | MAP_PRIVATE), -1, 0);
     assert((size_t)cfg->blk_tbl % sysconf(_SC_PAGESIZE) == 0);
 
@@ -125,11 +130,12 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer
     memset(cfg->blk_tbl, 0, cfg->blk_sz);
 
     /* Allocate and initialize the block change list */
-    blk_chlist = (bitmap_t*)malloc(BITNSLOTS(BLOCK_TBL_SIZE)*sizeof(int32_t));
-    memset(blk_chlist, 0, BITNSLOTS(BLOCK_TBL_SIZE)*sizeof(int32_t));
+    blk_chlist = (bitmap_t*)malloc(BITNSLOTS(BLOCK_TBL_NENT)*sizeof(int32_t));
+    memset(blk_chlist, 0, BITNSLOTS(BLOCK_TBL_NENT)*sizeof(int32_t));
 
     /* Register the local block table with IB */
-    cfg->blk_tbl_rec = rmem_layer->register_data(rmem_layer, cfg->blk_tbl, cfg->blk_sz);
+    cfg->blk_tbl_rec = rmem_layer->register_data(rmem_layer,
+            cfg->blk_tbl, BLOCK_TBL_SIZE);
     if(cfg->blk_tbl_rec == NULL) {
         rvm_log("Failed to register memory for block table\n");
         errno = EUNKNOWN;
@@ -140,12 +146,15 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer
         if(!recover_blocks(cfg))
             return NULL;
     } else {
-        /* Allocate and register the block table remotely */
-        uint64_t ret = rmem_layer->malloc(rmem_layer, cfg->blk_sz, BLOCK_TBL_ID);
-        if(ret == 0) {
-            rvm_log("Failed to register memory for block table\n");
-            errno = EUNKNOWN;
-            return NULL;
+        for(size_t i = 0; i < BLOCK_TBL_NPG; i++)
+        {
+            /* Allocate and register the block table remotely */
+            uint64_t ret = rmem_layer->malloc(rmem_layer, cfg->blk_sz, BLOCK_TBL_ID + i);
+            if(ret == 0) {
+                rvm_log("Failed to register memory for block table\n");
+                errno = EUNKNOWN;
+                return NULL;
+            }
         }
         cfg->blk_tbl->n_blocks = 0;
     }
@@ -177,7 +186,7 @@ bool rvm_cfg_destroy(rvm_cfg_t *cfg)
 
     /* Free all remote blocks (leave local blocks)*/
     int bx;
-    for(bx = 0; bx < BLOCK_TBL_SIZE; bx+=2) 
+    for(bx = 0; bx < BLOCK_TBL_NENT; bx+=2)
     {
         block_desc_t *blk = &(cfg->blk_tbl->tbl[bx]);
         if(blk->local_addr == NULL)
@@ -248,7 +257,7 @@ bool check_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
 
     //check data blocks
     int bx;
-    for(bx = 0; bx < BLOCK_TBL_SIZE; bx++) {
+    for(bx = 0; bx < BLOCK_TBL_NENT; bx++) {
         block_desc_t *blk = &(cfg->blk_tbl->tbl[bx]);
         if(blk->local_addr == NULL) // ?
             continue;
@@ -290,23 +299,29 @@ bool rvm_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
     rmem_layer_t* rmem_layer = cfg->rmem_layer;
 
     /* Copy the updated block table */
-    err = rmem_layer->put(rmem_layer, BLOCK_TBL_ID, cfg->blk_tbl,
-            cfg->blk_tbl_rec, cfg->blk_sz);
-    
-    if(err != 0) {
-        rvm_log("Failed to write block table\n");
-        errno = err;
-        return false;
-    }
+    /* TODO We shouldn't have to do this here, the block table should describe
+     * itself and get updated the same way anything else is */
+    for(size_t i = 0; i < BLOCK_TBL_NPG; i++)
+    {
+        err = rmem_layer->put(rmem_layer, BLOCK_TBL_ID + i,
+                (cfg->blk_tbl + cfg->blk_sz*i),
+                cfg->blk_tbl_rec, cfg->blk_sz);
 
-    uint32_t tags_src[BLOCK_TBL_SIZE];
-    uint32_t tags_dst[BLOCK_TBL_SIZE];
-    uint32_t tags_size[BLOCK_TBL_SIZE];
+        if(err != 0) {
+            rvm_log("Failed to write block table\n");
+            errno = err;
+            return false;
+        }
+    }
+    
+    uint32_t tags_src[BLOCK_TBL_NENT];
+    uint32_t tags_dst[BLOCK_TBL_NENT];
+    uint32_t tags_size[BLOCK_TBL_NENT];
     int count = 0;
 
     /* Walk the block table and commit everything */
     int bx;
-    for(bx = 0; bx < BLOCK_TBL_SIZE; bx++)
+    for(bx = 0; bx < BLOCK_TBL_NENT; bx++)
     {
         /* If the block has been freed or if it hasn't changed, skip it */
         block_desc_t *blk = &(cfg->blk_tbl->tbl[bx]);
@@ -373,7 +388,7 @@ void *rvm_blk_alloc(rvm_cfg_t* cfg, size_t size)
     }
 
     /* Allocate and initialize the block locally */
-    if(cfg->blk_tbl->n_blocks == BLOCK_TBL_SIZE) {
+    if(cfg->blk_tbl->n_blocks == BLOCK_TBL_NENT) {
         //Out of room in the block table
         rvm_log("Block table out of space\n");
         errno = ENOMEM;
@@ -387,7 +402,7 @@ void *rvm_blk_alloc(rvm_cfg_t* cfg, size_t size)
     int bx;
     size_t cur_run = 0; //Number of contiguous free blocks seen
     size_t b_start = 0; //Starting block of the current run
-    for(bx = 0; bx < BLOCK_TBL_SIZE; bx++) 
+    for(bx = 0; bx < BLOCK_TBL_NENT; bx++)
     {
         block_desc_t *blk = &(cfg->blk_tbl->tbl[bx]);
         if(blk->local_addr == NULL) {
@@ -399,9 +414,8 @@ void *rvm_blk_alloc(rvm_cfg_t* cfg, size_t size)
             b_start = bx + 1;
         }
     }
-    CHECK_ERROR(bx >= BLOCK_TBL_SIZE,
+    CHECK_ERROR(bx >= BLOCK_TBL_NENT,
             ("Failure: Block table is full and we should have caught this earlier\n"));
-
 
     /* Allocate local memory for this region.
      * Note: It's important to allocate an integer number of blocks instead of
@@ -478,14 +492,14 @@ bool rvm_blk_free(rvm_cfg_t* cfg, void *buf)
 
     block_desc_t *blk;
     int bx;
-    for(bx = 0; bx < BLOCK_TBL_SIZE; bx++)
+    for(bx = 0; bx < BLOCK_TBL_NENT; bx++)
     {
         blk = &(cfg->blk_tbl->tbl[bx]);
         if(blk->local_addr == buf)
             break;
     }
 
-    if(bx == BLOCK_TBL_SIZE) {
+    if(bx == BLOCK_TBL_NENT) {
         rvm_log("Couldn't find buf in rvm block table\n");
         errno = EINVAL;
         return false;
@@ -522,13 +536,13 @@ void *rvm_rec(rvm_cfg_t *cfg)
     LOG(8,
         ("WARNING: Use of rvm_rec is now deprecated, use at your own risk!\n"));
 
-    for(; bx < BLOCK_TBL_SIZE; bx+=2) {
+    for(; bx < BLOCK_TBL_NENT; bx+=2) {
         block_desc_t* blk = &(cfg->blk_tbl->tbl[bx]);
         if(blk->local_addr != NULL)
             break;
     }
     
-    if(bx == BLOCK_TBL_SIZE)
+    if(bx == BLOCK_TBL_NENT)
         return NULL;
 
     void *res = cfg->blk_tbl->tbl[bx].local_addr;
@@ -583,14 +597,14 @@ void block_write_sighdl(int signum, siginfo_t *siginfo, void *uctx)
      */
     block_desc_t *blk;
     int bx;
-    for(bx = 0; bx < BLOCK_TBL_SIZE; bx++)
+    for(bx = 0; bx < BLOCK_TBL_NENT; bx++)
     {
         blk = &(cfg_glob->blk_tbl->tbl[bx]);
         if(blk->local_addr == page_addr)    
             break;
     }
 
-    if(bx == BLOCK_TBL_SIZE) {
+    if(bx == BLOCK_TBL_NENT) {
         /* Address not in block table, this must be a real segfault */
         fprintf(stderr, "can't find block: %p\n", page_addr);
             signal(SIGSEGV, SIG_DFL);

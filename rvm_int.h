@@ -7,16 +7,24 @@
 #define BLOCK_TBL_ID 0
 
 /** Number of block descriptors in the block table */
-#define BLOCK_TBL_SIZE \
-    ((sysconf(_SC_PAGESIZE) - sizeof(blk_tbl_t)) / sizeof(block_desc_t))
+//#define BLOCK_TBL_SIZE \
+//    ((sysconf(_SC_PAGESIZE) - sizeof(blk_tbl_t)) / sizeof(block_desc_t))
+#define BLOCK_TBL_NENT (1 << 14)
+
+/* Size (in bytes) of the block table struct
+ * This is rounded up to the nearest multiple of 4096 */
+#define BLOCK_TBL_SIZE ((((sizeof(blk_tbl_t) + sizeof(block_desc_t)*BLOCK_TBL_NENT) / 4096) + 1) * 4096)
+
+/* Number of pages needed to contain block table */
+#define BLOCK_TBL_NPG (BLOCK_TBL_SIZE / 4096)
 
 /* Get the tag for a real block 
  int BX - index of the block in the block table */
-#define BLK_REAL_TAG(BX) (BLOCK_TBL_ID + BX*2 + 1)
+#define BLK_REAL_TAG(BX) (BLOCK_TBL_NPG + BX*2 + 1)
 
 /* Get the tag for a shadow-block
    int BX - the index of the block in the block table */
-#define BLK_SHDW_TAG(BX) (BLOCK_TBL_ID + BX*2 + 2)
+#define BLK_SHDW_TAG(BX) (BLOCK_TBL_NPG + BX*2 + 2)
 
 /** Describes a block (these are the entries in the block table)
  * For now blocks are fixed-sized (page size) */
