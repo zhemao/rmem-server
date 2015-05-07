@@ -8,7 +8,7 @@ CFLAGS 	= -g -std=gnu11
 INCLUDE = -I$(RVM_DIR)
 DEFINE 	= -DKMER_LENGTH=$(KMER_LENGTH) -DKMER_PACKED_LENGTH=$(KMER_PACKED_LENGTH)
 HEADERS	= contig_generation.h kmer_hash.h packingDNAseq.h build.h
-LIBS	= -lm
+LIBS	= -L$(RVM_DIR) -lm -lrvm -lrdmacm -libverbs -lpthread
 PGEN_OBJS = build.o probe.o packingDNAseq.o contig_generation.o kmer_hash.o
 TARGETS	= gen_assemble
 

@@ -5,7 +5,9 @@
 #include <sys/time.h>
 #include <math.h>
 #include <time.h>
-//#include <buddy_malloc.h>
+#include <buddy_malloc.h>
+#include <backends/rmem_generic_interface.h>
+#include <backends/rmem_backend.h>
 #include "common.h"
 #include "build.h"
 #include "probe.h"
@@ -27,7 +29,6 @@ rvm_cfg_t *cfg;
 
 void initialize_rvm(char*host, char* port, bool rec)
 {
-    /*
     rvm_opt_t opt;
     opt.host = host;
     opt.port = port;
@@ -36,8 +37,7 @@ void initialize_rvm(char*host, char* port, bool rec)
     opt.alloc_fp = buddy_malloc;
     opt.free_fp = buddy_free;
 
-    cfg = rvm_cfg_create(&opt);
-    */
+    cfg = rvm_cfg_create(&opt, create_rmem_layer);
 }
 
 int main(int argc, char *argv[]) {
@@ -84,7 +84,9 @@ int main(int argc, char *argv[]) {
             ("Please provide an input file\n" USAGE));
 
 	/* RVM Setup */
+    printf("connecting to \"%s %s\"\n", hostname, port);
     initialize_rvm(hostname, port, rec);
+    CHECK_ERROR(cfg == NULL, ("Failed to initialize rvm\n"));
 
     /* Check if there is an initial state to recover from */
     gen_state_t *state = rvm_get_usr_data(cfg);
@@ -103,6 +105,7 @@ int main(int argc, char *argv[]) {
         state->phase = BUILD; /* First phase */
 
         TX_COMMIT(txid);
+        printf("Initialized State, starting build phase\n");
     }
 
     switch(state->phase) {
