@@ -22,4 +22,8 @@
     } \
 } while(0);
 
+#define UNIMPLEMENTED \
+    printf("%-20s | %3d |  Function unimplemented\n",__FUNCTION__,__LINE__)
+
+
 #endif // _DEBUG_H_

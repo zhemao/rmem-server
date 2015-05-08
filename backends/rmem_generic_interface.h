@@ -1,8 +1,6 @@
 #ifndef _BACKUP_INTERFACE_H_
 #define _BACKUP_INTERFACE_H_
 
-#include <rdma/rdma_cma.h>
-
 typedef struct rmem_layer rmem_layer_t;
 
 /* Connect to the RMEM backend.
@@ -12,7 +10,7 @@ typedef struct rmem_layer rmem_layer_t;
  * \param[in] host Hostname
  * \param[in] port Port number
  */
-typedef void (*rmem_connect_f)(rmem_layer_t* rcfg, char*, char*);
+typedef void (*rmem_connect_f)(rmem_layer_t* rcfg, char* host, char* port);
 
 /* Disconnect from RMEM backend
  *
@@ -69,7 +67,7 @@ typedef int (*rmem_get_f)(rmem_layer_t* rcfg, void *dest,
  * \returns 0 on success, Non-0 on failure
  */
 typedef int (*rmem_atomic_commit_f)(rmem_layer_t* rcfg,
-        uint32_t*, uint32_t*, uint32_t*, uint32_t);
+        uint32_t* tags_src, uint32_t* tags_dst, uint32_t* sizes, uint32_t ntag);
 
 /* Register a local block with the rmem layer
  * \param[in] rcfg RMEM layer config info
