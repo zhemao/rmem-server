@@ -12,7 +12,7 @@
 
 static inline int rvm_protect(void *addr, size_t size)
 {
-    return mprotect(addr, size, PROT_READ);
+    return mprotect(addr, size, PROT_READ | PROT_EXEC);
 }
 
 static inline int rvm_unprotect(void *addr, size_t size)
@@ -292,6 +292,8 @@ bool check_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
 
 bool rvm_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
 {
+    LOG(5, ("TXN Commit\n"));
+
     /* TODO This is a brain-dead initial implementation. We simply copy over
      * everything in the block table, even if it wasn't modified. The long-term
      * solution is to use protection bits on the page table to automatically
@@ -384,6 +386,8 @@ void *rvm_alloc(rvm_cfg_t *cfg, size_t size)
  * of allocations. */
 void *rvm_blk_alloc(rvm_cfg_t* cfg, size_t size)
 {
+    LOG(6, ("Block Alloc of size %ld\n", size));
+
     rmem_layer_t* rmem_layer = cfg->rmem_layer;
 
     if (size == 0) {

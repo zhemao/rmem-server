@@ -5,6 +5,7 @@
 
 typedef struct
 {
+    int64_t nkmer_proc; /* Number of kmers processed so far */
     int64_t skmerx;
     char cur_contig[MAXIMUM_CONTIG_SIZE];
     start_kmer_t *curStartNode;

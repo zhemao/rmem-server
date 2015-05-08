@@ -150,7 +150,7 @@ int main(int argc, char *argv[])
     while(state->iter < niter)
     {
         cblas_dgemv(CblasColMajor, CblasNoTrans,
-                nrow, ncol, 1.0, A, nrow, state->vec, 1, 0, state->vec, 1);
+                nrow, ncol, 2.0, A, nrow, state->vec, 1, 0, state->vec, 1);
 
         state->iter++;
 

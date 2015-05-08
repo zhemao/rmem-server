@@ -66,7 +66,7 @@ static void send_message(struct rdma_cm_id *id)
     sge.length = sizeof(*ctx->send_msg);
     sge.lkey = ctx->send_msg_mr->lkey;
 
-    LOG(1, ("posting sending WR\n"));
+    LOG(8, ("posting sending WR\n"));
 
     TEST_NZ(ibv_post_send(id->qp, &wr, &bad_wr));
     
@@ -92,7 +92,7 @@ static void post_msg_receive(struct rdma_cm_id *id)
     sge.length = sizeof(*ctx->recv_msg);
     sge.lkey = ctx->recv_msg_mr->lkey;
 
-    LOG(1, ("posting receive WR\n"));
+    LOG(8, ("posting receive WR\n"));
 
     TEST_NZ(ibv_post_recv(id->qp, &wr, &bad_wr));
     
@@ -212,7 +212,7 @@ static void on_completion(struct ibv_wc *wc)
     if (wc->opcode == IBV_WC_RECV) {
         struct message *msg = ctx->recv_msg;
         void *ptr;
-        LOG(1, ("on_completion: IBV_WC_RECV\n"));
+        LOG(5, ("on_completion: IBV_WC_RECV\n"));
 
         switch (msg->id) {
             case MSG_ALLOC:
@@ -226,7 +226,7 @@ static void on_completion(struct ibv_wc *wc)
 
                 insert_tag_to_addr(&rmem, msg->data.alloc.tag, (uintptr_t)ptr);
                 
-                LOG(1, ("MSG_ALLOC size: %ld ptr: %ld\n", 
+                LOG(5, ("MSG_ALLOC size: %ld ptr: %ld\n", 
                             msg->data.alloc.size, (uintptr_t)ptr));
 
 #ifdef DEBUG
@@ -238,7 +238,7 @@ static void on_completion(struct ibv_wc *wc)
                 send_message(id);
                 break;
             case MSG_LOOKUP:
-                LOG(1, ("MSG_LOOKUP\n"));
+                LOG(5, ("MSG_LOOKUP\n"));
                 ptr = rmem_table_lookup(&rmem, msg->data.lookup.tag);
                 ctx->send_msg->id = MSG_MEMRESP;
                 ctx->send_msg->data.memresp.addr = (uintptr_t) ptr;
@@ -246,14 +246,14 @@ static void on_completion(struct ibv_wc *wc)
                 send_message(id);
                 break;
             case MSG_TXN_FREE:
-                LOG(1, ("MSG_TXN_FREE\n"));
+                LOG(5, ("MSG_TXN_FREE\n"));
 		txn_list_add_free(&ctx->txn_list,
 			(void *) msg->data.free.addr);
                 ctx->send_msg->id = MSG_TXN_ACK;
                 send_message(id);
                 break;
             case MSG_TXN_CP:
-                LOG(1, ("MSG_TXN_CP\n"));
+                LOG(5, ("MSG_TXN_CP\n"));
                 txn_list_add_cp(&ctx->txn_list,
                         (void *) msg->data.cp.dst,
                         (void *) msg->data.cp.src,
@@ -262,13 +262,13 @@ static void on_completion(struct ibv_wc *wc)
                 send_message(id);
                 break;
             case MSG_TXN_GO:
-                LOG(1, ("MSG_TXN_GO\n"));
+                LOG(5, ("MSG_TXN_GO\n"));
 		txn_commit(&rmem, &ctx->txn_list);
                 ctx->send_msg->id = MSG_TXN_ACK;
                 send_message(id);
                 break;
             case MSG_TXN_ABORT:
-                LOG(1, ("MSG_TXN_ABORT\n"));
+                LOG(5, ("MSG_TXN_ABORT\n"));
 		txn_list_clear(&ctx->txn_list);
                 ctx->send_msg->id = MSG_TXN_ACK;
                 send_message(id);
@@ -283,7 +283,7 @@ static void on_completion(struct ibv_wc *wc)
 
         post_msg_receive(id);
     } else {
-        LOG(1, ("on_completion: else\n"));
+        LOG(5, ("on_completion: else\n"));
     }
     
     //stats_end(KSTATS_ON_COMPL);
@@ -293,7 +293,7 @@ static void on_disconnect(struct rdma_cm_id *id)
 {
     struct conn_context *ctx = (struct conn_context *)id->context;
 
-    LOG(1, ("on_disconnect\n"));
+    LOG(5, ("on_disconnect\n"));
 
     txn_list_clear(&ctx->txn_list);
 

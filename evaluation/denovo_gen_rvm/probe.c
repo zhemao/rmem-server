@@ -20,7 +20,10 @@ int probe(gen_state_t *state, FILE *out)
         pstate->curStartNode = state->start_list;
         pstate->posInContig = 0;
         pstate->floc = 0;
+        pstate->nkmer_proc = 0;
         TX_COMMIT(txid);
+
+        printf("Allocated probe state\n");
     } else {
         /* Seek to the correct output location in file */
         fseek(out, pstate->floc, SEEK_SET);
@@ -43,7 +46,16 @@ int probe(gen_state_t *state, FILE *out)
             memcpy(pstate->cur_contig, unpackedKmer, KMER_LENGTH * sizeof(char));
             pstate->posInContig = KMER_LENGTH;
 
-            TX_COMMIT(txid);
+            pstate->nkmer_proc++;
+
+            if(pstate->nkmer_proc % state->cp_freq == 0) {
+                TX_COMMIT(txid);
+            }
+
+            if(pstate->nkmer_proc % state->fa_freq == 0) {
+                printf("Simulating probe failure after %ldth kmer\n", pstate->nkmer_proc);
+                return EXIT_FAILURE;
+            }
         }
 
        /* Keep adding bases while not finding a terminal node */
@@ -63,7 +75,19 @@ int probe(gen_state_t *state, FILE *out)
 
            right_ext = cur_kmer_ptr->r_ext;
 
-           TX_COMMIT(txid);
+           pstate->nkmer_proc++;
+
+           if(pstate->nkmer_proc % PRINT_FREQ == 0) 
+               printf("Probe kmer %ld\n", pstate->nkmer_proc);
+
+           if(pstate->nkmer_proc % state->cp_freq == 0) {
+               TX_COMMIT(txid);
+           }
+
+           if(pstate->nkmer_proc % state->fa_freq == 0) {
+               printf("Simulating probe failure after %ldth kmer\n", pstate->nkmer_proc);
+               return EXIT_FAILURE;
+           }
        }
 
        /* Move on to the next contig */
@@ -75,7 +99,9 @@ int probe(gen_state_t *state, FILE *out)
        /* Move to the next start node in the list */
        pstate->curStartNode = pstate->curStartNode->next;
        pstate->posInContig = 0;
-       TX_COMMIT(txid);
+       if(pstate->nkmer_proc % state->cp_freq == 0) {
+           TX_COMMIT(txid);
+       }
     }
 
     return 1;

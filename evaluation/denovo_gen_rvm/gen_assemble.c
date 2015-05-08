@@ -5,6 +5,7 @@
 #include <sys/time.h>
 #include <math.h>
 #include <time.h>
+#include <limits.h>
 #include <buddy_malloc.h>
 #include <backends/rmem_generic_interface.h>
 #include <backends/rmem_backend.h>
@@ -15,13 +16,14 @@
 #include "kmer_hash.h"
 
 #define USAGE                                                       \
-    "Usage: ./gen_assemble [-ihpfrs]\n"                               \
+    "Usage: ./gen_assemble [-ihpfrs]\n"                              \
     "\t-i PATH Path to input file.\n"                               \
     "\t-h NAME The hostname of the server\n"                        \
     "\t-p NUMBER The port used by the server"                       \
     "\t-f PATH Optional output file\n"                              \
     "\t-r Are we recovering from a failure?\n"                      \
-    "\t-s Shall we simulate a failure?\n"
+    "\t-s NUM Shall we simulate a failure every NUM kmers?\n"       \
+    "\t-c NUM Commit Frequency\n"
 
 const char DEF_OUT_NAME[8] = "gen.out";
 
@@ -49,10 +51,12 @@ int main(int argc, char *argv[]) {
 	char *port = NULL;
 	const char *out_filename = DEF_OUT_NAME;
 	bool rec = false;
+    int fa_freq  = INT_MAX;
+    int cp_freq = 1;
 
 	/* Parse Args */
     int c;
-    while((c = getopt(argc, argv, "n:m:i:h:p:f:rs")) != -1)
+    while((c = getopt(argc, argv, "n:m:i:h:p:f:rs:c:")) != -1)
     {
         switch(c) {
         case 'i':
@@ -69,6 +73,12 @@ int main(int argc, char *argv[]) {
             break;
         case 'r':
             rec = true;
+            break;
+        case 's':
+            fa_freq = strtoll(optarg, NULL, 0);
+            break;
+        case 'c':
+            cp_freq = strtoll(optarg, NULL, 0);
             break;
 
         case '?':
@@ -96,6 +106,8 @@ int main(int argc, char *argv[]) {
         CHECK_ERROR(state == NULL, ("Failed to allocate initial state\n"));
 
         /* initialize state */
+        state->cp_freq = cp_freq;
+        state->fa_freq = fa_freq;
         state->memheap = rvm_alloc(cfg, sizeof(memory_heap_t));
         CHECK_ERROR(state->memheap == NULL, ("Failed to allocate mem heap\n"));
         state->tbl = NULL;
@@ -150,9 +162,9 @@ int main(int argc, char *argv[]) {
     }
 
 	/* Clean up */
-    TX_START(txid);
-    dealloc_heap(state->memheap);
-    TX_COMMIT(txid);
+    //TX_START(txid);
+    //dealloc_heap(state->memheap);
+    //TX_COMMIT(txid);
 
 	/** Print timing and output info **/
 	/***** DO NOT CHANGE THIS PART ****/
