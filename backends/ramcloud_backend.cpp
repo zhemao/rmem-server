@@ -76,7 +76,14 @@ std::string shadow_key_from_main(const std::string& key)
 
 void rmc_disconnect(rmem_layer_t *rmem_layer)
 {
-    // TBD
+    ramcloud_data_t* data = (ramcloud_data_t*)rmem_layer->layer_data;
+    //data->client->dropTable(TABLE_NAME);
+    
+    tag_map* tag_to_key = data->tag_to_key;
+    std::map<uint32_t, size_t>* tag_to_size = data->tag_to_size;
+
+    tag_to_size->clear();
+    tag_to_key->clear();
 }
 
 uint64_t rc_malloc(rmem_layer_t *rmem_layer, size_t size, uint32_t tag)
@@ -103,7 +110,7 @@ uint64_t rc_malloc(rmem_layer_t *rmem_layer, size_t size, uint32_t tag)
         std::string write_chunk_key = CHUNK_KEY(int_to_str(tag), i);
         int64_t size_to_write = std::min(size_left, (int64_t)VALUE_MAX_SIZE);
     
-        fprintf(stderr, "writing key: %s size: %d\n", write_chunk_key.c_str(), size_to_write);
+        fprintf(stderr, "rc_malloc: writing table_id: %ld key: %s size: %d\n", table_id, write_chunk_key.c_str(), size_to_write);
         data->client->write(table_id, write_chunk_key.c_str(), 
                 write_chunk_key.size(), (char*)dummy_data, size_to_write);
         ++i;
@@ -142,7 +149,7 @@ int rc_put(rmem_layer_t *rmem_layer, uint32_t tag,
         std::string write_chunk_key = CHUNK_KEY(write_key, i);
         int64_t size_to_write = std::min(size_left, (int64_t)VALUE_MAX_SIZE);
     
-        fprintf(stderr, "writing key: %s size: %d\n", write_chunk_key.c_str(), size_to_write);
+        fprintf(stderr, "rc_put writing key: %s size: %d\n", write_chunk_key.c_str(), size_to_write);
         data->client->write(table_id, write_chunk_key.c_str(), 
                 write_chunk_key.size(), (char*)src + i * VALUE_MAX_SIZE, size_to_write);
         ++i;
@@ -158,13 +165,13 @@ int rc_get(rmem_layer_t *rmem_layer, void *dst, void *data_mr,
         uint32_t tag, size_t size)
 {
     ramcloud_data_t* data = (ramcloud_data_t*)rmem_layer->layer_data;
+    uint64_t table_id = data->table_id;
     tag_map* tag_to_key = data->tag_to_key;
     std::map<uint32_t,std::string>::iterator it = tag_to_key->find(tag);
     CHECK_ERROR(it == tag_to_key->end(),
             ("Error: did not find tag %d in tag_to_key map\n", tag));
     
     std::string key = it->second;
-    uint64_t table_id = data->table_id;
 
     fprintf(stderr, "rc_get table id: %lu key: %s size: %u\n", table_id, key.c_str(), size);
 
@@ -201,19 +208,9 @@ int rc_free(rmem_layer_t *rmem_layer, uint32_t tag)
     std::map<uint32_t, size_t>* tag_to_size = data->tag_to_size;
 
     std::map<uint32_t,std::string>::iterator it = tag_to_key->find(tag);
-
-    if (it != tag_to_key->end()) {
-
-        std::string key = it->second;
-        uint64_t table_id = data->table_id;
-
-        for (size_t i = 0; i * VALUE_MAX_SIZE < tag_to_size->operator[](tag); ++i) {
-            std::string chunk_key = CHUNK_KEY(key, i);
-            data->client->remove(table_id, chunk_key.c_str(), chunk_key.size());
-        }
-
-        tag_to_key->erase(it);
-    }
+        
+    tag_to_key->erase(it);
+    tag_to_size->erase(tag_to_size->find(tag));
 
     return 0;
 }
@@ -256,7 +253,7 @@ void write_tag_to_tag(ramcloud_data_t* data, uint32_t tag_src, uint32_t tag_dst)
         const char* bufferString = static_cast<const char*>(
                 buffer.getRange(0, buffer.size()));
 
-        fprintf(stderr, "writing key: %s size: %d\n", dst_chunk_key.c_str(), buffer.size());
+        fprintf(stderr, "write_tag writing key: %s size: %d\n", dst_chunk_key.c_str(), buffer.size());
 
         data->client->write(table_id, dst_chunk_key.c_str(),
                 dst_chunk_key.size(), bufferString, buffer.size());
