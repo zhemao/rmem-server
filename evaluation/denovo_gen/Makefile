@@ -2,8 +2,8 @@ CC = gcc
 KMER_LENGTH 		= 19
 KMER_PACKED_LENGTH 	= $(shell echo $$((($(KMER_LENGTH)+3)/4)))
 
-#CFLAGS 	= -O3 -std=gnu11
-CFLAGS 	= -g -std=gnu11
+CFLAGS 	= -O3 -std=gnu11
+#CFLAGS 	= -g -std=gnu11
 DEFINE 	= -DKMER_LENGTH=$(KMER_LENGTH) -DKMER_PACKED_LENGTH=$(KMER_PACKED_LENGTH)
 HEADERS	= contig_generation.h kmer_hash.h packingDNAseq.h build.h
 LIBS	= -lm

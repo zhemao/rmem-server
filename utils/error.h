@@ -1,6 +1,8 @@
 #ifndef _DEBUG_H_
 #define _DEBUG_H_
 
+#include <stdio.h>
+
 /* errno doesn't define EUNKNOWN, so we do it here.
    This is a dubious hack because errno may not be an int or even an enum.
    In practice it seems to work. */
@@ -23,7 +25,7 @@
 } while(0);
 
 #define UNIMPLEMENTED \
-    printf("%-20s | %3d |  Function unimplemented\n",__FUNCTION__,__LINE__)
+    printf("%-20s | %3d |  Function unimplemented\n", __FUNCTION__, __LINE__)
 
 
 #endif // _DEBUG_H_

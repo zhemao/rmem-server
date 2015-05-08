@@ -10,7 +10,7 @@
 extern rvm_cfg_t *cfg;
 
 /* How frequently to print progress updates (in #kmers) */
-#define PRINT_FREQ 100000
+#define PRINT_FREQ 1000000
 
 typedef enum
 {

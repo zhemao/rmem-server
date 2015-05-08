@@ -574,6 +574,26 @@ void *rvm_get_usr_data(rvm_cfg_t *cfg)
     return cfg->blk_tbl->usr_data;
 }
 
+/* TODO Were just doing a linear search right now, I'm sure we could do
+ * something better.
+ */
+int blk_tbl_lookup(blk_tbl_t *btbl, void *target)
+{
+    block_desc_t *blk;
+    int bx;
+    for(bx = 0; bx < BLOCK_TBL_NENT; bx++)
+    {
+        blk = &(btbl->tbl[bx]);
+        if(blk->local_addr == target)
+            break;
+    }
+
+    if(bx == BLOCK_TBL_NENT)
+        return -1;
+    else
+        return bx;
+}
+
 void block_write_sighdl(int signum, siginfo_t *siginfo, void *uctx)
 {
     if(in_sighdl == true) {
@@ -600,19 +620,9 @@ void block_write_sighdl(int signum, siginfo_t *siginfo, void *uctx)
         cfg_glob->blk_sz);
 
     /* Check if the attempted read was for a recoverable page */
-    /* TODO Were just doing a linear search right now, I'm sure we could do
-     * something better.
-     */
-    block_desc_t *blk;
-    int bx;
-    for(bx = 0; bx < BLOCK_TBL_NENT; bx++)
-    {
-        blk = &(cfg_glob->blk_tbl->tbl[bx]);
-        if(blk->local_addr == page_addr)    
-            break;
-    }
+    int bx = blk_tbl_lookup(cfg_glob->blk_tbl, page_addr);
 
-    if(bx == BLOCK_TBL_NENT) {
+    if(bx == -1) {
         /* Address not in block table, this must be a real segfault */
         fprintf(stderr, "can't find block: %p\n", page_addr);
             signal(SIGSEGV, SIG_DFL);
