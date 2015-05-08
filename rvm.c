@@ -61,6 +61,7 @@ static bool recover_blocks(rvm_cfg_t *cfg)
             continue; //Freed memory
 
         /* Allocate local storage for recovered block */
+        LOG(8, ("mmap in addr: %lx\n", blk->local_addr));
         void *new_addr = mmap(blk->local_addr, cfg->blk_sz,
                 (PROT_READ | PROT_WRITE | PROT_EXEC),
                 MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED,

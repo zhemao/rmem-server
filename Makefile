@@ -8,7 +8,7 @@ INCLUDES := -I. -Idata -Iutils -Ibackends
 RAMC_INCLUDES = -I/nscratch/joao/ramcloud/src/ -I/nscratch/joao/ramcloud/ -I/nscratch/joao/ramcloud/obj.master 
 LINCLUDES = -L/nscratch/joao/ramcloud/obj.master
 RAMC_LIBS = -lramcloud -lboost_system -lboost_program_options
-CFLAGS  := -Wall -O3 -fPIC -std=gnu11 $(INCLUDES)
+CFLAGS  := -Wall -O3 -fPIC -std=gnu11 $(INCLUDES) 
 CXXFLAGS := -Wall -O3 -fPIC -std=gnu++0x $(RAMC_INCLUDES) $(INCLUDES)
 RAMC_OBJS := /nscratch/joao/ramcloud/obj.master/OptionParser.o
 
@@ -77,5 +77,5 @@ tests/rvm_test_free_rc: tests/rvm_test_free_rc.o $(STATIC_LIB) $(RAMC_OBJS)
 	$(LD) -o $@ $< $(RAMC_OBJS) $(RVM_LIB) $(LINCLUDES) $(RAMC_LIBS)
 
 clean:
-	rm -f data/*.o backends/*.o *.o $(STATIC_LIB) $(TARGETS)
+	rm -f data/*.o tests/*.o backends/*.o *.o $(STATIC_LIB) $(TARGETS)
 
