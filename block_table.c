@@ -39,7 +39,22 @@ bool btbl_init(blk_tbl_t *btbl, raw_blk_tbl_t *rbtbl)
     btbl->blk_chlist = (bitmap_t*)malloc(BITNSLOTS(BLOCK_TBL_NENT)*sizeof(int32_t));
     memset(btbl->blk_chlist, 0, BITNSLOTS(BLOCK_TBL_NENT)*sizeof(int32_t));
 
-    // Will eventually insert each allocated bdesc into an index
+    /* Initialize the block index */
+    btbl->blk_idx = hash_create(BLOCK_TBL_NENT);
+
+    /* Insert every allocated block from rbtbl into the index */
+    size_t nalloc = 0; //Number of allocated blocks found so far
+    for(int bx = 1; bx < BLOCK_TBL_NENT; bx++)
+    {
+        blk_desc_t *blk = &(rbtbl->tbl[bx]);
+        if(blk->bid >= 0) {
+            hash_insert_item(btbl->blk_idx, (uint64_t)blk->local_addr, blk);
+            nalloc++;
+            if(nalloc == rbtbl->n_blocks) {
+                break;
+            }
+        }
+    }
 
     return true;
 }
@@ -49,6 +64,8 @@ bool btbl_init(blk_tbl_t *btbl, raw_blk_tbl_t *rbtbl)
  */
 blk_desc_t *btbl_lookup(blk_tbl_t *btbl, void *target)
 {
+//    return hash_get_item(btbl->blk_idx, (uint64_t)target);
+
     blk_desc_t *blk;
     int bx;
     for(bx = 1; bx < BLOCK_TBL_NENT; bx++)
@@ -66,6 +83,7 @@ blk_desc_t *btbl_lookup(blk_tbl_t *btbl, void *target)
 
 bool btbl_free(blk_tbl_t *tbl, blk_desc_t *desc)
 {
+    hash_delete_item(tbl->blk_idx, (uint64_t)desc->local_addr);
     desc->bid = -(desc->bid);
     desc->local_addr = tbl->rbtbl->free;
     tbl->rbtbl->free = desc;
@@ -84,6 +102,8 @@ blk_desc_t *btbl_alloc(blk_tbl_t *tbl)
         desc->bid = -(desc->bid);
         tbl->rbtbl->free = (blk_desc_t*)desc->local_addr;
         tbl->rbtbl->n_blocks++;
+        hash_insert_item(tbl->blk_idx, (uint64_t)desc->local_addr, desc);
+
         return desc;
     }
 }

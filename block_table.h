@@ -1,5 +1,6 @@
 /*
  * block_table.h
+
  *
  *  The block table is a data structure used to keep track of blocks that are
  *  managed by the rmem layer. The block table is not responsible for
@@ -17,6 +18,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include "common.h"
+#include "data/hash.h"
 
 /** Describes a block (these are the entries in the block table)
  * For now blocks are fixed-sized (page size) */
@@ -60,6 +62,11 @@ typedef struct
 
     /* Bit array of changed entries in the block table */
     bitmap_t *blk_chlist;
+
+    /* Index of every allocated block and it's local address.
+     * key = local addr (void*), val = block descriptor (blk_desc_t*) */
+    hash_t blk_idx;
+
 } blk_tbl_t;
 
 /* Block table always has this tag */
