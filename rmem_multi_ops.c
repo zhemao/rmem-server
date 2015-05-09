@@ -7,7 +7,7 @@ int rmem_multi_alloc(struct rmem_table *rmem, uint64_t *addrs, uint64_t *sizes,
 	void *ptr = rmem_table_alloc(rmem, sizes[i], tags[i]);
 	if (ptr == NULL)
 	    return 1;
-	addrs[i] = (intptr_t) ptr;
+	addrs[i] = (uint64_t) ptr;
     }
     return 0;
 }
@@ -15,6 +15,7 @@ int rmem_multi_alloc(struct rmem_table *rmem, uint64_t *addrs, uint64_t *sizes,
 int rmem_multi_lookup(struct rmem_table *rmem,
 	uint64_t *addrs, uint32_t *tags, int n)
 {
+
     for (int i = 0; i < n; i++) {
 	void *ptr = rmem_table_lookup(rmem, tags[i]);
 	if (ptr == NULL)
