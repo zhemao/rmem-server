@@ -172,7 +172,7 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer
         for (size_t i = 0; i < BLOCK_TBL_NPG; i++)
         {
             LOG(9, ("Allocated block %ld - local addr: %p - remote addr: %lx\n",
-                BLOCK_TBL_ID + i, cfg->blk_tbl + i*cfg->blk_sz, addrs[i]));
+                BLOCK_TBL_ID + i, cfg->blk_tbl.rbtbl + i*cfg->blk_sz, addrs[i]));
         }
 #endif
 
@@ -475,8 +475,9 @@ void *rvm_blk_alloc(rvm_cfg_t* cfg, size_t size)
         tags[tag_ind + 1] = BLK_SHDW_TAG(block->bid);
         tag_ind += 2;
 
-        LOG(9, ("Allocated block %d (shadow %ld) - local addr: %p\n",
-                    BLK_REAL_TAG(block->bid), BLK_SHDW_TAG(block->bid), block->local_addr));
+        LOG(9, ("Allocated block %ld (shadow %ld) - local addr: %p\n",
+                    BLK_REAL_TAG(block->bid), BLK_SHDW_TAG(block->bid),
+                    block->local_addr));
     }
 
     int ret = rmem_layer->multi_malloc(
