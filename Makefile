@@ -16,7 +16,7 @@ APPS    := rmem-server
 TESTS   := tests/rvm_test_normal_rc tests/rvm_test_normal tests/rvm_test_txn_commit tests/rvm_test_txn_commit_rc tests/rvm_test_recovery tests/rvm_test_recovery_rc tests/rvm_test_free tests/rvm_test_free_rc  tests/rvm_test_big_commit tests/rvm_test_size_alloc tests/rvm_test_full tests/rvm_test_full_rc
 
 COMMON_FILES := common.o data/hash.o data/list.o data/stack.o
-SERVER_FILES := rmem_table.o $(COMMON_FILES)
+SERVER_FILES := rmem_table.o rmem_multi_ops.o $(COMMON_FILES)
 CLIENT_FILES := rvm.o backends/rmem_backend.o backends/ramcloud_backend.o buddy_malloc.o $(COMMON_FILES)
 RVM_LIB := -L. -lrvm
 

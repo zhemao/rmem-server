@@ -35,6 +35,8 @@ struct rmem {
 //    struct ibv_mr *blk_tbl_mr;   /**< IB registration info for block table */
 };
 
+#define get_chunk_size(items_left) \
+    (((items_left) < MULTI_OP_MAX_ITEMS) ? items_left : MULTI_OP_MAX_ITEMS)
 
 rmem_layer_t* create_rmem_layer()
 {
@@ -138,6 +140,36 @@ int rmem_cp(struct rmem *rmem, uint32_t tag_dst, uint32_t tag_src, uint64_t size
     ctx->send_msg->data.cp.dst = dst;
     ctx->send_msg->data.cp.src = src;
     ctx->send_msg->data.cp.size = size;
+
+    if (send_message(rmem->id))
+	return -1;
+    if (post_receive(rmem->id))
+	return -2;
+    if (sem_wait(&ctx->send_sem))
+	return -3;
+    if (sem_wait(&ctx->recv_sem))
+	return -4;
+
+    if (ctx->recv_msg->id != MSG_TXN_ACK)
+	return -5;
+
+    return 0;
+}
+
+static int rmem_multi_cp(struct rmem *rmem,
+	uint32_t *tag_dst, uint32_t *tag_src, uint32_t *sizes, int n)
+{
+    struct client_context *ctx = &rmem->ctx;
+
+    for (int i = 0; i < n; i++) {
+	uint64_t dst = lookup_remote_addr(rmem->tag_to_addr, tag_dst[i]);
+	uint64_t src = lookup_remote_addr(rmem->tag_to_addr, tag_src[i]);
+	ctx->send_msg->data.multi_cp.dsts[i] = dst;
+	ctx->send_msg->data.multi_cp.srcs[i] = src;
+	ctx->send_msg->data.multi_cp.sizes[i] = sizes[i];
+    }
+    ctx->send_msg->data.multi_cp.nitems = n;
+    ctx->send_msg->id = MSG_MULTI_TXN_CP;
 
     if (send_message(rmem->id))
 	return -1;
@@ -498,9 +530,13 @@ int rmem_atomic_commit(rmem_layer_t* rmem_layer, uint32_t* tags_src,
      */
     struct rmem* rmem = (struct rmem*)rmem_layer->layer_data;
 
-    for (int i = 0; i < num_tags; ++i) {
-        int ret = rmem_cp(rmem, tags_dst[i], tags_src[i], tags_size[i]);
-        LOG(9, ("Commiting %d -> %d (size %d)\n", tags_src[i], tags_dst[i], tags_size[i]));
+    for (int i = 0; i < num_tags; i += MULTI_OP_MAX_ITEMS) {
+	int nitems = get_chunk_size(num_tags - i);
+	int ret = rmem_multi_cp(rmem, &tags_dst[i], &tags_src[i], &tags_size[i], nitems);
+	for (int j = i; j < i + nitems; j++) {
+	    LOG(9, ("Commiting %d -> %d (size %d)\n",
+			tags_src[j], tags_dst[j], tags_size[j]));
+	}
         CHECK_ERROR(ret != 0,
                 ("Failure: error adding tag to commit. ret: %d\n", ret));
     }

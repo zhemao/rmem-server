@@ -6,6 +6,7 @@
 #define TAG_ADDR_PAIR_SIZEOF sizeof(tag_addr_entry)
 #define TAG_ADDR_MAP_SIZE_MSG 20
 
+#define MULTI_OP_MAX_ITEMS 20
 
 enum message_id {
     MSG_INVALID = 0,
@@ -19,7 +20,12 @@ enum message_id {
     MSG_TXN_ABORT,
     MSG_TXN_ACK,
     MSG_TAG_ADDR_MAP,
-    MSG_STARTUP_ACK
+    MSG_STARTUP_ACK,
+    MSG_MULTI_ALLOC,
+    MSG_MULTI_LOOKUP,
+    MSG_MULTI_MEMRESP,
+    MSG_MULTI_TXN_FREE,
+    MSG_MULTI_TXN_CP
 };
 
 typedef struct tag_addr_entry {
@@ -58,6 +64,30 @@ struct message {
             int size;
 	    tag_addr_entry_t data[TAG_ADDR_MAP_SIZE_MSG];
 	} tag_addr_map;
+	struct {
+	    uint64_t sizes[MULTI_OP_MAX_ITEMS];
+	    uint32_t tags[MULTI_OP_MAX_ITEMS];
+	    uint8_t nitems;
+	} multi_alloc;
+	struct {
+	    uint32_t tags[MULTI_OP_MAX_ITEMS];
+	    uint8_t nitems;
+	} multi_lookup;
+	struct {
+	    uint64_t addrs[MULTI_OP_MAX_ITEMS];
+	    int8_t error;
+	    uint8_t nitems;
+	} multi_memresp;
+	struct {
+	    uint64_t addrs[MULTI_OP_MAX_ITEMS];
+	    uint8_t nitems;
+	} multi_free;
+	struct {
+	    uint64_t dsts[MULTI_OP_MAX_ITEMS];
+	    uint64_t srcs[MULTI_OP_MAX_ITEMS];
+	    uint64_t sizes[MULTI_OP_MAX_ITEMS];
+	    uint8_t nitems;
+	} multi_cp;
     } data;
 };
 

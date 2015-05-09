@@ -7,6 +7,7 @@
 #include "common.h"
 #include "messages.h"
 #include "rmem_table.h"
+#include "rmem_multi_ops.h"
 #include "backends/rmem_backend.h"
 #include "utils/log.h"
 #include "utils/error.h"
@@ -228,18 +229,18 @@ static void on_completion(struct ibv_wc *wc)
                 
                 LOG(5, ("MSG_ALLOC size: %ld ptr: %ld\n", 
                             msg->data.alloc.size, (uintptr_t)ptr));
-
 #ifdef DEBUG
                 if (ptr == NULL) {
                     printf("Error allocating\n");
                 }
 #endif
-
                 send_message(id);
                 break;
             case MSG_LOOKUP:
                 LOG(5, ("MSG_LOOKUP\n"));
+                TEST_NZ(pthread_mutex_lock(&alloc_mutex));
                 ptr = rmem_table_lookup(&rmem, msg->data.lookup.tag);
+                TEST_NZ(pthread_mutex_unlock(&alloc_mutex));
                 ctx->send_msg->id = MSG_MEMRESP;
                 ctx->send_msg->data.memresp.addr = (uintptr_t) ptr;
                 ctx->send_msg->data.memresp.error = (ptr == NULL);
@@ -275,6 +276,53 @@ static void on_completion(struct ibv_wc *wc)
                 break;
 	    case MSG_STARTUP_ACK:
 		TEST_NZ(sem_post(&ctx->ack_sem));
+		break;
+	    case MSG_MULTI_ALLOC:
+                LOG(5, ("MSG_MULTI_ALLOC\n"));
+		ctx->send_msg->id = MSG_MULTI_MEMRESP;
+		ctx->send_msg->data.multi_memresp.nitems =
+		    msg->data.multi_alloc.nitems;
+                TEST_NZ(pthread_mutex_lock(&alloc_mutex));
+		ctx->send_msg->data.multi_memresp.error =
+		    rmem_multi_alloc(&rmem,
+			    ctx->send_msg->data.multi_memresp.addrs,
+			    msg->data.multi_alloc.sizes,
+			    msg->data.multi_alloc.tags,
+			    msg->data.multi_alloc.nitems);
+                TEST_NZ(pthread_mutex_unlock(&alloc_mutex));
+		send_message(id);
+		break;
+	    case MSG_MULTI_LOOKUP:
+                LOG(5, ("MSG_MULTI_LOOKUP\n"));
+		ctx->send_msg->id = MSG_MULTI_MEMRESP;
+		ctx->send_msg->data.multi_memresp.nitems =
+		    msg->data.multi_alloc.nitems;
+		TEST_NZ(pthread_mutex_lock(&alloc_mutex));
+		ctx->send_msg->data.multi_memresp.error =
+		    rmem_multi_lookup(&rmem,
+			    ctx->send_msg->data.multi_memresp.addrs,
+			    msg->data.multi_alloc.tags,
+			    msg->data.multi_alloc.nitems);
+                TEST_NZ(pthread_mutex_unlock(&alloc_mutex));
+		send_message(id);
+		break;
+	    case MSG_MULTI_TXN_FREE:
+                LOG(5, ("MSG_MULTI_TXN_FREE\n"));
+		txn_multi_add_free(&ctx->txn_list,
+			msg->data.multi_free.addrs,
+			msg->data.multi_free.nitems);
+		ctx->send_msg->id = MSG_TXN_ACK;
+		send_message(id);
+		break;
+	    case MSG_MULTI_TXN_CP:
+                LOG(5, ("MSG_MULTI_TXN_CP\n"));
+		txn_multi_add_cp(&ctx->txn_list,
+			msg->data.multi_cp.dsts,
+			msg->data.multi_cp.srcs,
+			msg->data.multi_cp.sizes,
+			msg->data.multi_cp.nitems);
+		ctx->send_msg->id = MSG_TXN_ACK;
+		send_message(id);
 		break;
             default:
                 fprintf(stderr, "Invalid message type %d\n", msg->id);
