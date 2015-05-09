@@ -36,6 +36,23 @@ int stub_free(rmem_layer_t* rcfg, uint32_t tag)
     return 0;
 }
 
+int stub_multi_malloc(rmem_layer_t *rcfg,
+    uint64_t *addrs, uint64_t size, uint32_t *tags, uint32_t n)
+{
+    for(int i = 0; i < n; i++)
+    {
+        addrs[i] = STUB_BACKEND_MAGIC;
+    }
+
+    return 0;
+}
+
+int stub_multi_free(rmem_layer_t *rcfg,
+    uint32_t *tags, uint32_t n)
+{
+    return 0;
+}
+
 /* Of type rmem_put_f */
 int stub_put(rmem_layer_t* rcfg, uint32_t tag,
         void *src, void *src_reg, size_t size)

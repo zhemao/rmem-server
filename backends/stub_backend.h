@@ -29,6 +29,12 @@ uint64_t stub_malloc(rmem_layer_t* rcfg, size_t size, uint32_t tag);
 /* Of type rmem_free_f */
 int stub_free(rmem_layer_t* rcfg, uint32_t tag);
 
+int stub_multi_malloc(rmem_layer_t *rcfg,
+    uint64_t *addrs, uint64_t size, uint32_t *tags, uint32_t n);
+
+int stub_multi_free(rmem_layer_t *rcfg,
+    uint32_t *tags, uint32_t n);
+
 /* Of type rmem_put_f */
 int stub_put(rmem_layer_t* rcfg, uint32_t tag,
         void *src, void *src_reg, size_t size);
