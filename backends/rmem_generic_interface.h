@@ -1,6 +1,8 @@
 #ifndef _BACKUP_INTERFACE_H_
 #define _BACKUP_INTERFACE_H_
 
+#include <stdint.h>
+
 typedef struct rmem_layer rmem_layer_t;
 
 /* Connect to the RMEM backend.
