@@ -7,6 +7,7 @@
 #include "rvm.h"
 #include "rvm_int.h"
 #include "common.h"
+#include "block_table.h"
 #include "utils/log.h"
 #include "utils/error.h"
 
@@ -37,12 +38,14 @@ void block_write_sighdl(int signum, siginfo_t *siginfo, void *uctx);
 static bool recover_blocks(rvm_cfg_t *cfg)
 {
     int err;
+    bool res;
     rmem_layer_t* rmem_layer = (rmem_layer_t*)cfg->rmem_layer;
 
     /* Recover the block table */
     for(size_t i = 0; i < BLOCK_TBL_NPG; i++)
     {
-        err = rmem_layer->get(rmem_layer, (((void*)cfg->blk_tbl) + cfg->blk_sz*i),
+        err = rmem_layer->get(rmem_layer,
+                (((void*)cfg->blk_tbl->rbtbl) + cfg->blk_sz*i),
                 (struct ibv_mr*)cfg->blk_tbl_rec,
                 BLOCK_TBL_ID + i, cfg->blk_sz);
         if(err != 0) {
@@ -56,8 +59,8 @@ static bool recover_blocks(rvm_cfg_t *cfg)
     int bx;
     for(bx = 0; bx < BLOCK_TBL_NENT; bx++)
     {
-        block_desc_t *blk = &(cfg->blk_tbl->tbl[bx]);
-        if(blk->local_addr == NULL)
+        blk_desc_t *blk = &(cfg->blk_tbl->rbtbl->tbl[bx]);
+        if(blk->bid < 0)
             continue; //Freed memory
 
         /* Allocate local storage for recovered block */
@@ -99,11 +102,16 @@ static bool recover_blocks(rvm_cfg_t *cfg)
                     blk->bid, BLK_SHDW_TAG(bx), blk->local_addr));
     }
 
+    /* TODO Maybe this step should be integrated with the step above */
+    res = btbl_rec(&(cfg->blk_tbl), cfg->blk_tbl->rbtbl);
+    CHECK_ERROR(res == false, ("Failed to rebuild block table index\n"));
+
     return true;
 }
 
 rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer_function)
 {
+    bool res;
     rvm_cfg_t *cfg = (rvm_cfg_t*)malloc(sizeof(rvm_cfg_t));
     if(cfg == NULL)
         return NULL;
@@ -118,48 +126,56 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer
     rmem_layer->connect(rmem_layer, opts->host, opts->port);
 
     /* Allocate and initialize the block table locally */
-    cfg->blk_tbl = (blk_tbl_t *)mmap(NULL, BLOCK_TBL_SIZE,
+    cfg->blk_tbl.rbtbl = (blk_tbl_t *)mmap(NULL, BLOCK_TBL_SIZE,
             PROT_READ | PROT_WRITE | PROT_EXEC,
             (MAP_ANONYMOUS | MAP_PRIVATE), -1, 0);
     assert((size_t)cfg->blk_tbl % sysconf(_SC_PAGESIZE) == 0);
 
-    if(cfg->blk_tbl == NULL) {
+    if(cfg->blk_tbl.rbtbl == NULL) {
         errno = EUNKNOWN;
         return NULL;
     }
 
-    memset(cfg->blk_tbl, 0, cfg->blk_sz);
-
-    /* Allocate and initialize the block change list */
-    blk_chlist = (bitmap_t*)malloc(BITNSLOTS(BLOCK_TBL_NENT)*sizeof(int32_t));
-    memset(blk_chlist, 0, BITNSLOTS(BLOCK_TBL_NENT)*sizeof(int32_t));
-
     /* Register the local block table with IB */
     cfg->blk_tbl_rec = rmem_layer->register_data(rmem_layer,
-            cfg->blk_tbl, BLOCK_TBL_SIZE);
+            cfg->blk_tbl->rbtbl, BLOCK_TBL_SIZE);
     if(cfg->blk_tbl_rec == NULL) {
         rvm_log("Failed to register memory for block table\n");
         errno = EUNKNOWN;
         return NULL;
     }
 
+    /* Allocate and initialize the block change list */
+    blk_chlist = (bitmap_t*)malloc(BITNSLOTS(BLOCK_TBL_NENT)*sizeof(int32_t));
+    memset(blk_chlist, 0, BITNSLOTS(BLOCK_TBL_NENT)*sizeof(int32_t));
+
     if(opts->recovery) {
         if(!recover_blocks(cfg))
             return NULL;
     } else {
+
+        /* TODO rbtbl_init walks the whole table and so does the follow loop
+         * here. Maybe we can combine something */
+        res = rbtbl_init(cfg->blk_tbl->rbtbl);
+        CHECK_ERROR(res == false, ("Failed to initialize block table\n"));
+
+        /* TODO rmem should support arbitrarily sized allocations. I've avoided
+         * it because I think eventually we'll have a backend with fixed-sized
+         * allocations. */
         for(size_t i = 0; i < BLOCK_TBL_NPG; i++)
         {
             /* Allocate and register the block table remotely */
-            uint64_t ret = rmem_layer->malloc(rmem_layer, cfg->blk_sz, BLOCK_TBL_ID + i);
+            uint64_t ret = rmem_layer->malloc(rmem_layer, cfg->blk_sz,
+                    BLOCK_TBL_ID + i);
             if(ret == 0) {
                 rvm_log("Failed to register memory for block table\n");
                 errno = EUNKNOWN;
                 return NULL;
             }
             LOG(9, ("Allocated block %ld - local addr: %p\n",
-                    BLOCK_TBL_ID + i, cfg->blk_tbl + i*cfg->blk_sz));
+                    BLOCK_TBL_ID + i, (void*)cfg->blk_tbl.rbtbl + i*cfg->blk_sz));
         }
-        cfg->blk_tbl->n_blocks = 0;
+        cfg->blk_tbl->rbtbl->n_blocks = 0;
     }
 
     /* Install our special signal handler to track changed blocks */
@@ -191,7 +207,7 @@ bool rvm_cfg_destroy(rvm_cfg_t *cfg)
     int bx;
     for(bx = 0; bx < BLOCK_TBL_NENT; bx+=2)
     {
-        block_desc_t *blk = &(cfg->blk_tbl->tbl[bx]);
+        blk_desc_t *blk = &(cfg->blk_tbl->tbl[bx]);
         if(blk->local_addr == NULL)
             continue;
 
@@ -261,7 +277,7 @@ bool check_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
     //check data blocks
     int bx;
     for(bx = 0; bx < BLOCK_TBL_NENT; bx++) {
-        block_desc_t *blk = &(cfg->blk_tbl->tbl[bx]);
+        blk_desc_t *blk = &(cfg->blk_tbl->tbl[bx]);
         if(blk->local_addr == NULL) // ?
             continue;
 
@@ -329,22 +345,14 @@ bool rvm_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
     int bx;
     for(bx = 0; bx < BLOCK_TBL_NENT; bx++)
     {
-        /* If the block has been freed or if it hasn't changed, skip it */
-        block_desc_t *blk = &(cfg->blk_tbl->tbl[bx]);
-        if(blk->local_addr == NULL || !BITTEST(blk_chlist, bx))
+        /* If the block hasn't changed, skip it */
+        if(!BITTEST(blk_chlist, bx))
             continue;
 
-        /* TODO Eventually we may have to unpin blocks, this will catch that.
-         * Right now this should never trigger. */
-        //assert(blk->mr != NULL);
-
-        err = rmem_layer->put(rmem_layer, BLK_SHDW_TAG(bx), blk->local_addr, blk->blk_rec,
-                cfg->blk_sz);
-        if(err != 0) {
-            rvm_log("Failed to write block %d\n", bx);
-            errno = err;
-            return false;
-        }
+        blk_desc_t *blk = &(cfg->blk_tbl->rbtbl->tbl[bx]);
+        err = rmem_layer->put(rmem_layer, BLK_SHDW_TAG(bx),
+                blk->local_addr, blk->blk_rec, cfg->blk_sz);
+        CHECK_ERROR(err != 0, ("Failed to write block %d", bx));
 
         tags_src[count] = BLK_SHDW_TAG(bx);
         tags_dst[count] = BLK_REAL_TAG(bx);
@@ -356,21 +364,20 @@ bool rvm_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
 
     int ret = rmem_layer->atomic_commit(
             rmem_layer, tags_src, tags_dst, tags_size, count);
-    CHECK_ERROR(ret != 0,
-            ("Failure: atomic commit\n"));
+    CHECK_ERROR(ret != 0, ("Failure: atomic commit\n"));
 
     return true;
 }
 
 bool rvm_set_alloc_data(rvm_cfg_t *cfg, void *alloc_data)
 {
-    cfg->blk_tbl->alloc_data = alloc_data;
+    cfg->blk_tbl->rbtbl->alloc_data = alloc_data;
         return true;
 }
 
 void *rvm_get_alloc_data(rvm_cfg_t *cfg)
 {
-    return cfg->blk_tbl->alloc_data;
+    return cfg->blk_tbl->rbtbl->alloc_data;
 }
 
 void *rvm_alloc(rvm_cfg_t *cfg, size_t size)
@@ -406,30 +413,9 @@ void *rvm_blk_alloc(rvm_cfg_t* cfg, size_t size)
     /* Number of blocks is the ceiling of size / block_size */
     size_t nblocks = INT_DIV_CEIL(size, cfg->blk_sz);
 
-    // search for a run of free blocks big enough for this size
-    int bx;
-    size_t cur_run = 0; //Number of contiguous free blocks seen
-    size_t b_start = 0; //Starting block of the current run
-    for(bx = 0; bx < BLOCK_TBL_NENT; bx++)
-    {
-        block_desc_t *blk = &(cfg->blk_tbl->tbl[bx]);
-        if(blk->local_addr == NULL) {
-            cur_run++;
-            if(cur_run == nblocks)
-                break;
-        } else {
-            cur_run = 0;
-            b_start = bx + 1;
-        }
-    }
-    CHECK_ERROR(bx >= BLOCK_TBL_NENT,
-            ("Failure: Block table is full and we should have caught this earlier\n"));
-
     /* Allocate local memory for this region.
      * Note: It's important to allocate an integer number of blocks instead of
      * just using size. This is because we protect whole pages. */
-    /* TODO: I'm pretty sure that mmap called with a multiple of the page size
-       will return page-aligned memory, but it's not documented officially.*/
     void *start_addr;
     start_addr = mmap(NULL, nblocks*cfg->blk_sz, 
             (PROT_READ | PROT_WRITE | PROT_EXEC), 
@@ -442,18 +428,14 @@ void *rvm_blk_alloc(rvm_cfg_t* cfg, size_t size)
         return NULL;
     }
 
-    for(bx = b_start; bx < b_start + nblocks; bx++)
+    //for(bx = b_start; bx < b_start + nblocks; bx++)
+    for(int b = 0; b < nblocks; b++)
     {
-        block_desc_t *block = &(cfg->blk_tbl->tbl[bx]);
-
-        // ----- SHADOW PAGES ------ //
-        // final destination of a block has block_id = X (odd numbers, starts at 1)
-        // corresponding shadow block has block_id = X + 1
-        block->bid = BLK_REAL_TAG(bx);
-        cfg->blk_tbl->n_blocks++;
+        blk_desc_t *block = btbl_alloc(cfg->blk_tbl);
+        CHECK_ERROR(block == NULL, ("Couldn't find free block in table\n"));
 
         /* Calculate the start address of each block in the region */
-        block->local_addr = start_addr + (bx - b_start)*cfg->blk_sz;
+        block->local_addr = start_addr + b*cfg->blk_sz;
 
         /* Allocate and register the block remotely */
         /* TODO Right now we pin everything, all the time. Eventually we may want
@@ -465,11 +447,12 @@ void *rvm_blk_alloc(rvm_cfg_t* cfg, size_t size)
             errno = EUNKNOWN;
             return NULL;
         }
-        uintptr_t real_ptr = rmem_layer->malloc(rmem_layer, cfg->blk_sz, block->bid);
+        uintptr_t real_ptr = rmem_layer->malloc(rmem_layer, cfg->blk_sz,
+                BLK_REAL_TAG(block->bid));
 
         // allocate shadow block
         uintptr_t shadow_ptr = rmem_layer->malloc(rmem_layer, cfg->blk_sz,
-                BLK_SHDW_TAG(bx));
+                BLK_SHDW_TAG(block->bid));
         if(real_ptr == 0 || shadow_ptr == 0) {
             rvm_log("Failed to allocate remote memory for block\n");
             errno = EUNKNOWN;
@@ -477,7 +460,8 @@ void *rvm_blk_alloc(rvm_cfg_t* cfg, size_t size)
         }
 
         LOG(9, ("Allocated block %d (shadow %ld) - local addr: %p\n",
-                    block->bid, BLK_SHDW_TAG(bx), block->local_addr));
+                    BLK_REAL_TAG(block->bid), BLK_SHDW_TAG(block->bid),
+                    block->local_addr));
     }
 
     /* Protect the local blocks so that we can keep track of changes */
@@ -493,70 +477,32 @@ bool rvm_free(rvm_cfg_t *cfg, void *buf)
 
 bool rvm_blk_free(rvm_cfg_t* cfg, void *buf)
 {
-    /* TODO Were just doing a linear search right now, I'm sure we could do
-     * something better.
-     */
+    bool res;
     rmem_layer_t* rmem_layer = cfg->rmem_layer;
 
-    block_desc_t *blk;
-    int bx;
-    for(bx = 0; bx < BLOCK_TBL_NENT; bx++)
-    {
-        blk = &(cfg->blk_tbl->tbl[bx]);
-        if(blk->local_addr == buf)
-            break;
-    }
-
-    if(bx == BLOCK_TBL_NENT) {
-        rvm_log("Couldn't find buf in rvm block table\n");
-        errno = EINVAL;
-        return false;
-    }
+    blk_desc_t *blk = btbl_lookup(cfg->blk_tbl, buf);
 
     LOG(9, ("rmem_free block: %ld (%ld) - local addr: %p\n",
-                BLK_REAL_TAG(bx), BLK_SHDW_TAG(bx), buf));
+                BLK_REAL_TAG(blk->bid), BLK_SHDW_TAG(blk->bid), buf));
 
     /* Cleanup remote info */
-    rmem_layer->free(rmem_layer, BLK_REAL_TAG(bx)); 
-    rmem_layer->free(rmem_layer, BLK_SHDW_TAG(bx)); // free shadow block as well
+    rmem_layer->free(rmem_layer, BLK_REAL_TAG(blk->bid));
+    rmem_layer->free(rmem_layer, BLK_SHDW_TAG(blk->bid));
     rmem_layer->deregister_data(rmem_layer, blk->blk_rec);
 
-    /* Free local info */
-    /* TODO We don't really free the entry in the block table. I just don't
-     * want to deal with fragmentation yet.
-     */
-    rvm_unprotect(blk->local_addr, cfg->blk_sz);
-    //free(blk->local_addr);
-    munmap(blk->local_addr, cfg->blk_sz);
+    /* Unset the change bit for this block */
+    BITCLEAR(blk_chlist, blk->bid);
 
+    /* Free local info */
+    rvm_unprotect(blk->local_addr, cfg->blk_sz);
+    munmap(blk->local_addr, cfg->blk_sz);
     blk->local_addr = NULL;
 
-    cfg->blk_tbl->n_blocks--;
-    assert(cfg->blk_tbl->n_blocks >= 0);
+    /* free in the block table */
+    res = btbl_free(cfg->blk_tbl, blk);
+    CHECK_FAILURE(res == false, ("Failed to free block in block table\n"));
 
     return true;
-}
-
-void *rvm_rec(rvm_cfg_t *cfg)
-{
-    static int64_t bx = 0;
-
-    LOG(8,
-        ("WARNING: Use of rvm_rec is now deprecated, use at your own risk!\n"));
-
-    for(; bx < BLOCK_TBL_NENT; bx+=2) {
-        block_desc_t* blk = &(cfg->blk_tbl->tbl[bx]);
-        if(blk->local_addr != NULL)
-            break;
-    }
-    
-    if(bx == BLOCK_TBL_NENT)
-        return NULL;
-
-    void *res = cfg->blk_tbl->tbl[bx].local_addr;
-    bx += 2;
-
-    return res;
 }
 
 /** Set the user's private data. Pointer "data" will be available after
@@ -565,33 +511,13 @@ void *rvm_rec(rvm_cfg_t *cfg)
  */
 bool rvm_set_usr_data(rvm_cfg_t *cfg, void *data)
 {
-    cfg->blk_tbl->usr_data = data;
+    cfg->blk_tbl->rbtbl->usr_data = data;
     return true;
 }
 
 void *rvm_get_usr_data(rvm_cfg_t *cfg)
 {
-    return cfg->blk_tbl->usr_data;
-}
-
-/* TODO Were just doing a linear search right now, I'm sure we could do
- * something better.
- */
-int blk_tbl_lookup(blk_tbl_t *btbl, void *target)
-{
-    block_desc_t *blk;
-    int bx;
-    for(bx = 0; bx < BLOCK_TBL_NENT; bx++)
-    {
-        blk = &(btbl->tbl[bx]);
-        if(blk->local_addr == target)
-            break;
-    }
-
-    if(bx == BLOCK_TBL_NENT)
-        return -1;
-    else
-        return bx;
+    return cfg->blk_tbl->rbtbl->usr_data;
 }
 
 void block_write_sighdl(int signum, siginfo_t *siginfo, void *uctx)
@@ -620,7 +546,7 @@ void block_write_sighdl(int signum, siginfo_t *siginfo, void *uctx)
         cfg_glob->blk_sz);
 
     /* Check if the attempted read was for a recoverable page */
-    int bx = blk_tbl_lookup(cfg_glob->blk_tbl, page_addr);
+    int bx = btbl_lookup(cfg_glob->blk_tbl, page_addr);
 
     if(bx == -1) {
         /* Address not in block table, this must be a real segfault */
