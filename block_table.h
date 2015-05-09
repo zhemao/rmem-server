@@ -114,9 +114,10 @@ bool btbl_free(blk_tbl_t *tbl, blk_desc_t *desc);
 
 /* Allocate a slot in the block table.
  * \param[in] tbl Table to insert into
+ * \param[in] local_addr The desired local address for this block
  * \returns An unallocated block descriptor or NULL if the table is full
  */
-blk_desc_t *btbl_alloc(blk_tbl_t *tbl);
+blk_desc_t *btbl_alloc(blk_tbl_t *tbl, void *local_addr);
 
 /* Mark a block as modified. */
 static inline void btbl_mark_mod(blk_tbl_t *tbl, blk_desc_t *blk)

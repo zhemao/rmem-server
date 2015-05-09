@@ -59,26 +59,9 @@ bool btbl_init(blk_tbl_t *btbl, raw_blk_tbl_t *rbtbl)
     return true;
 }
 
-/* TODO Were just doing a linear search right now, I'm sure we could do
- * something better.
- */
 blk_desc_t *btbl_lookup(blk_tbl_t *btbl, void *target)
 {
-//    return hash_get_item(btbl->blk_idx, (uint64_t)target);
-
-    blk_desc_t *blk;
-    int bx;
-    for(bx = 1; bx < BLOCK_TBL_NENT; bx++)
-    {
-        blk = &(btbl->rbtbl->tbl[bx]);
-        if(blk->local_addr == target)
-            break;
-    }
-
-    if(bx == BLOCK_TBL_NENT)
-        return NULL;
-    else
-        return blk;
+    return hash_get_item(btbl->blk_idx, (uint64_t)target);
 }
 
 bool btbl_free(blk_tbl_t *tbl, blk_desc_t *desc)
@@ -92,16 +75,20 @@ bool btbl_free(blk_tbl_t *tbl, blk_desc_t *desc)
     return true;
 }
 
-blk_desc_t *btbl_alloc(blk_tbl_t *tbl)
+blk_desc_t *btbl_alloc(blk_tbl_t *tbl, void *local_addr)
 {
     /* Pop a descriptor off the free list */
     blk_desc_t *desc = tbl->rbtbl->free;
     if(desc == NULL) {
         return NULL;
     } else {
+        /* Remove from free list */
         desc->bid = -(desc->bid);
         tbl->rbtbl->free = (blk_desc_t*)desc->local_addr;
+
+        /* Initialize and add to allocated list */
         tbl->rbtbl->n_blocks++;
+        desc->local_addr = local_addr;
         hash_insert_item(tbl->blk_idx, (uint64_t)desc->local_addr, desc);
 
         return desc;

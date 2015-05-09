@@ -439,11 +439,9 @@ void *rvm_blk_alloc(rvm_cfg_t* cfg, size_t size)
     //for(bx = b_start; bx < b_start + nblocks; bx++)
     for(int b = 0; b < nblocks; b++)
     {
-        blk_desc_t *block = btbl_alloc(&(cfg->blk_tbl));
+        blk_desc_t *block = btbl_alloc(&(cfg->blk_tbl), 
+                start_addr + b*cfg->blk_sz);
         CHECK_ERROR(block == NULL, ("Couldn't find free block in table\n"));
-
-        /* Calculate the start address of each block in the region */
-        block->local_addr = start_addr + b*cfg->blk_sz;
 
         /* Allocate and register the block remotely */
         /* TODO Right now we pin everything, all the time. Eventually we may want
