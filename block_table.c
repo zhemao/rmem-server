@@ -33,10 +33,14 @@ bool rbtbl_init(raw_blk_tbl_t *rbtbl)
     return true;
 }
 
-bool btbl_rec(blk_tbl_t *btbl, raw_blk_tbl_t *rbtbl)
+bool btbl_init(blk_tbl_t *btbl, raw_blk_tbl_t *rbtbl)
 {
-    // Nothing to do yet, will eventually insert each
-    // allocated bdesc into an index
+    /* Allocate and initialize the block change list */
+    btbl->blk_chlist = (bitmap_t*)malloc(BITNSLOTS(BLOCK_TBL_NENT)*sizeof(int32_t));
+    memset(btbl->blk_chlist, 0, BITNSLOTS(BLOCK_TBL_NENT)*sizeof(int32_t));
+
+    // Will eventually insert each allocated bdesc into an index
+
     return true;
 }
 

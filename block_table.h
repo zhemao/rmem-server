@@ -16,6 +16,7 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include "common.h"
 
 /** Describes a block (these are the entries in the block table)
  * For now blocks are fixed-sized (page size) */
@@ -56,6 +57,9 @@ typedef struct
 {
     /* The raw block table being indexed */
     raw_blk_tbl_t *rbtbl;
+
+    /* Bit array of changed entries in the block table */
+    bitmap_t *blk_chlist;
 } blk_tbl_t;
 
 /* Block table always has this tag */
@@ -86,8 +90,8 @@ typedef struct
 /* Initialize a freshly allocated raw block table */
 bool rbtbl_init(raw_blk_tbl_t *rbtbl);
 
-/* Recover a block table index from a raw block table */
-bool btbl_rec(blk_tbl_t *btbl, raw_blk_tbl_t *rbtbl);
+/* Initialize a block table index from a raw block table */
+bool btbl_init(blk_tbl_t *btbl, raw_blk_tbl_t *rbtbl);
 
 /* Find an existing address in the block table
  * \param[in] tbl Table to look in
@@ -106,5 +110,32 @@ bool btbl_free(blk_tbl_t *tbl, blk_desc_t *desc);
  * \returns An unallocated block descriptor or NULL if the table is full
  */
 blk_desc_t *btbl_alloc(blk_tbl_t *tbl);
+
+/* Mark a block as modified. */
+static inline void btbl_mark_mod(blk_tbl_t *tbl, blk_desc_t *blk)
+{
+    if(blk->bid < 0)
+        return;
+
+    BITSET(tbl->blk_chlist, blk->bid);
+}
+
+static inline void btbl_clear_mod(blk_tbl_t *tbl, blk_desc_t *blk)
+{
+    if(blk->bid < 0)
+        return;
+
+    BITCLEAR(tbl->blk_chlist, blk->bid);
+}
+
+/* Test if a block has been modified
+ * \returns True if block has been modified, false otherwise */
+static inline bool btbl_test_mod(blk_tbl_t *tbl, blk_desc_t *blk)
+{
+    if(blk->bid < 0)
+        return false;
+
+    return BITTEST(tbl->blk_chlist, blk->bid);
+}
 
 #endif /* BLOCK_TABLE_H_ */

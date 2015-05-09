@@ -22,9 +22,6 @@ static inline int rvm_unprotect(void *addr, size_t size)
     return mprotect(addr, size, PROT_READ | PROT_WRITE | PROT_EXEC);
 }
 
-/* Global bit-mask of every changed block */
-bitmap_t *blk_chlist;
-
 /* Flag to indicate whether we are currently handling a fault */
 volatile bool in_sighdl;
 
@@ -39,7 +36,6 @@ void block_write_sighdl(int signum, siginfo_t *siginfo, void *uctx);
 static bool recover_blocks(rvm_cfg_t *cfg)
 {
     int err;
-    bool res;
     rmem_layer_t* rmem_layer = (rmem_layer_t*)cfg->rmem_layer;
 
     /* Recover the block table */
@@ -108,10 +104,6 @@ static bool recover_blocks(rvm_cfg_t *cfg)
                     blk->bid, BLK_SHDW_TAG(bx), blk->local_addr));
     }
 
-    /* TODO Maybe this step should be integrated with the step above */
-    res = btbl_rec(&(cfg->blk_tbl), cfg->blk_tbl.rbtbl);
-    CHECK_ERROR(res == false, ("Failed to rebuild block table index\n"));
-
     return true;
 }
 
@@ -151,15 +143,10 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer
         return NULL;
     }
 
-    /* Allocate and initialize the block change list */
-    blk_chlist = (bitmap_t*)malloc(BITNSLOTS(BLOCK_TBL_NENT)*sizeof(int32_t));
-    memset(blk_chlist, 0, BITNSLOTS(BLOCK_TBL_NENT)*sizeof(int32_t));
-
     if(opts->recovery) {
         if(!recover_blocks(cfg))
             return NULL;
     } else {
-
         res = rbtbl_init(cfg->blk_tbl.rbtbl);
         CHECK_ERROR(res == false, ("Failed to initialize block table\n"));
 
@@ -181,12 +168,24 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer
         }
         cfg->blk_tbl.rbtbl->n_blocks = 0;
 
-        /* Do an initial commit of the block table */
-        /*TODO this may not work if we make txids do something of of we start
-         * treating the block table like any other block...*/
-        LOG(9, ("Commiting initial block table\n"));
-        rvm_txn_commit(cfg, 0);
+        /* Make an initial write of the block table */
+        LOG(9, ("Commiting initial block table, (%ld blocks)\n", BLOCK_TBL_NPG));
+        for(size_t i = 0; i < BLOCK_TBL_NPG; i++)
+        {
+            res = rmem_layer->put(rmem_layer, BLOCK_TBL_ID + i,
+                    (((void*)cfg->blk_tbl.rbtbl) + cfg->blk_sz*i),
+                    cfg->blk_tbl_rec, cfg->blk_sz);
+
+            if(res != 0) {
+                rvm_log("Failed to write block table\n");
+                return false;
+            }
+        }
     }
+
+    /* Rebuild the local block table information */
+    res = btbl_init(&(cfg->blk_tbl), cfg->blk_tbl.rbtbl);
+    CHECK_ERROR(res == false, ("Failed to rebuild block table index\n"));
 
     /* Install our special signal handler to track changed blocks */
     in_sighdl = false;
@@ -239,7 +238,6 @@ bool rvm_cfg_destroy(rvm_cfg_t *cfg)
     rmem_layer->disconnect(rmem_layer);
 
     /* Free local memory */
-    free(blk_chlist);
     munmap(cfg->blk_tbl.rbtbl, cfg->blk_sz);
     free(cfg);
 
@@ -354,11 +352,12 @@ bool rvm_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
     int bx;
     for(bx = 0; bx < BLOCK_TBL_NENT; bx++)
     {
+        blk_desc_t *blk = &(cfg->blk_tbl.rbtbl->tbl[bx]);
+
         /* If the block hasn't changed, skip it */
-        if(!BITTEST(blk_chlist, bx))
+        if(!btbl_test_mod(&(cfg->blk_tbl), blk))
             continue;
 
-        blk_desc_t *blk = &(cfg->blk_tbl.rbtbl->tbl[bx]);
         err = rmem_layer->put(rmem_layer, BLK_SHDW_TAG(bx),
                 blk->local_addr, blk->blk_rec, cfg->blk_sz);
         CHECK_ERROR(err != 0, ("Failed to write block %d", bx));
@@ -500,7 +499,7 @@ bool rvm_blk_free(rvm_cfg_t* cfg, void *buf)
     rmem_layer->deregister_data(rmem_layer, blk->blk_rec);
 
     /* Unset the change bit for this block */
-    BITCLEAR(blk_chlist, blk->bid);
+    btbl_clear_mod(&(cfg->blk_tbl), blk);
 
     /* Free local info */
     rvm_unprotect(blk->local_addr, cfg->blk_sz);
@@ -567,7 +566,7 @@ void block_write_sighdl(int signum, siginfo_t *siginfo, void *uctx)
     /* Found a valid block, mark it in the change list and unprotect. */
     /* Strictly speaking, this isn't legal because mprotect may not be reentrant
      * but in practice it should be fine. */
-    BITSET(blk_chlist, blk->bid);
+    btbl_mark_mod(&(cfg_glob->blk_tbl), blk);
     rvm_unprotect(page_addr, cfg_glob->blk_sz);
 
     in_sighdl = false;
