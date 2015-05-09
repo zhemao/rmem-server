@@ -6,7 +6,7 @@
 
 #include "util.h"
 
-void setup_pages(char *host, char *port, int **pages, int npages)
+int *setup_pages(char *host, char *port, int npages)
 {
     rvm_cfg_t *rvm;
     rvm_opt_t opt;
@@ -17,6 +17,8 @@ void setup_pages(char *host, char *port, int **pages, int npages)
     opt.alloc_fp = buddy_malloc;
     opt.free_fp = buddy_free;
     opt.recovery = false;
+
+    int *pages;
 
     rvm = rvm_cfg_create(&opt, backend_layer);
     if (rvm == NULL) {
@@ -30,13 +32,11 @@ void setup_pages(char *host, char *port, int **pages, int npages)
 	exit(EXIT_FAILURE);
     }
 
-    for (int i = 0; i < npages; i++) {
-	pages[i] = rvm_alloc(rvm, PAGE_SIZE);
-	if (pages[i] == NULL) {
-	    perror("rvm_alloc");
-	    exit(EXIT_FAILURE);
-	}
-	touch_page(pages[i]);
+    pages = rvm_alloc(rvm, PAGE_SIZE * npages);
+
+    if (pages == NULL) {
+	fprintf(stderr, "Failed to allocate pages\n");
+	exit(EXIT_FAILURE);
     }
 
     if (!rvm_txn_commit(rvm, txid)) {
@@ -45,9 +45,11 @@ void setup_pages(char *host, char *port, int **pages, int npages)
     }
 
     rvm_cfg_destroy(rvm);
+
+    return pages;
 }
 
-double recover_pages(char *host, char *port, int **pages, int npages)
+double recover_pages(char *host, char *port, int *pages, int npages)
 {
     double starttime, endtime;
 
@@ -73,8 +75,9 @@ double recover_pages(char *host, char *port, int **pages, int npages)
 	perror("rvm_txn_begin");
 	exit(EXIT_FAILURE);
     }
-    for (int i = 0; i < npages; i++)
-	rvm_free(rvm, pages[i]);
+
+    rvm_free(rvm, pages);
+
     if (!rvm_txn_commit(rvm, txid)) {
 	perror("rvm_txn_commit");
 	exit(EXIT_FAILURE);
@@ -87,7 +90,7 @@ double recover_pages(char *host, char *port, int **pages, int npages)
 
 int main(int argc, char *argv[])
 {
-    int **pages, npages;
+    int *pages, npages;
     char *host, *port;
     double rectime;
 
@@ -99,12 +102,9 @@ int main(int argc, char *argv[])
     host = argv[1];
     port = argv[2];
     npages = atoi(argv[3]);
-    pages = calloc(npages, sizeof(*pages));
 
-    setup_pages(host, port, pages, npages);
+    pages = setup_pages(host, port, npages);
     rectime = recover_pages(host, port, pages, npages);
-
-    free(pages);
 
     printf("%f\n", rectime);
 
