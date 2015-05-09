@@ -528,12 +528,12 @@ static int rmem_multi_cp_group(struct rmem *rmem,
 }
 
 static int rmem_multi_malloc_group(struct rmem *rmem, uint64_t *addrs,
-	uint64_t *sizes, uint32_t *tags, int n)
+	uint64_t size, uint32_t *tags, int n)
 {
     struct client_context *ctx = &rmem->ctx;
 
-    memcpy(ctx->send_msg->data.multi_alloc.sizes, sizes, n * sizeof(uint64_t));
     memcpy(ctx->send_msg->data.multi_alloc.tags, tags, n * sizeof(uint32_t));
+    ctx->send_msg->data.multi_alloc.size = size;
     ctx->send_msg->data.multi_alloc.nitems = n;
     ctx->send_msg->id = MSG_MULTI_ALLOC;
 
@@ -559,14 +559,14 @@ static int rmem_multi_malloc_group(struct rmem *rmem, uint64_t *addrs,
 }
 
 int rmem_multi_malloc(rmem_layer_t* rmem_layer, uint64_t *addrs,
-	uint64_t *sizes, uint32_t *tags, uint32_t n)
+	uint64_t size, uint32_t *tags, uint32_t n)
 {
     struct rmem *rmem = (struct rmem *) rmem_layer->layer_data;
 
     for (unsigned int i = 0; i < n; i += MULTI_OP_MAX_ITEMS) {
 	int nitems = get_chunk_size(n - i);
 	int ret = rmem_multi_malloc_group(
-		rmem, &addrs[i], &sizes[i], &tags[i], nitems);
+		rmem, &addrs[i], size, &tags[i], nitems);
 	LOG(9, ("Allocating %d blocks\n", nitems));
         CHECK_ERROR(ret != 0,
                 ("Failure: error allocating memory: %d\n", ret));

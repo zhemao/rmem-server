@@ -58,7 +58,7 @@ struct message {
 	    tag_addr_entry_t data[TAG_ADDR_MAP_SIZE_MSG];
 	} tag_addr_map;
 	struct {
-	    uint64_t sizes[MULTI_OP_MAX_ITEMS];
+	    uint64_t size;
 	    uint32_t tags[MULTI_OP_MAX_ITEMS];
 	    uint8_t nitems;
 	} multi_alloc;

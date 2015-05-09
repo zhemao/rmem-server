@@ -1,10 +1,10 @@
 #include "rmem_multi_ops.h"
 
-int rmem_multi_alloc(struct rmem_table *rmem, uint64_t *addrs, uint64_t *sizes,
+int rmem_multi_alloc(struct rmem_table *rmem, uint64_t *addrs, uint64_t size,
 	uint32_t *tags, int n)
 {
     for (int i = 0; i < n; i++) {
-	void *ptr = rmem_table_alloc(rmem, sizes[i], tags[i]);
+	void *ptr = rmem_table_alloc(rmem, size, tags[i]);
 	if (ptr == NULL)
 	    return 1;
 	addrs[i] = (uint64_t) ptr;

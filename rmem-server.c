@@ -258,7 +258,7 @@ static void on_completion(struct ibv_wc *wc)
 		ctx->send_msg->data.multi_memresp.error =
 		    rmem_multi_alloc(&rmem,
 			    ctx->send_msg->data.multi_memresp.addrs,
-			    msg->data.multi_alloc.sizes,
+			    msg->data.multi_alloc.size,
 			    msg->data.multi_alloc.tags,
 			    msg->data.multi_alloc.nitems);
                 TEST_NZ(pthread_mutex_unlock(&alloc_mutex));

@@ -12,5 +12,5 @@ static void *rmem_register_data(rmem_layer_t*, void *data, size_t size);
 static void rmem_deregister_data(rmem_layer_t*, void *data);
 
 int rmem_multi_malloc(rmem_layer_t *rmem_layer, uint64_t *addrs,
-	uint64_t *sizes, uint32_t *tags, uint32_t n);
+	uint64_t size, uint32_t *tags, uint32_t n);
 int rmem_multi_free(rmem_layer_t *rmem_layer, uint32_t *tags, uint32_t n);

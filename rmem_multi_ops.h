@@ -3,7 +3,7 @@
 
 #include "rmem_table.h"
 
-int rmem_multi_alloc(struct rmem_table *rmem, uint64_t *addrs, uint64_t *sizes,
+int rmem_multi_alloc(struct rmem_table *rmem, uint64_t *addrs, uint64_t size,
 	uint32_t *tags, int n);
 int rmem_multi_lookup(struct rmem_table *rmem, uint64_t *addrs,
 	uint32_t *tags, int n);

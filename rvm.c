@@ -147,18 +147,15 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer
         if(!recover_blocks(cfg))
             return NULL;
     } else {
-	uint64_t sizes[BLOCK_TBL_NPG];
 	uint32_t tags[BLOCK_TBL_NPG];
 	uint64_t addrs[BLOCK_TBL_NPG];
 
         for(size_t i = 0; i < BLOCK_TBL_NPG; i++)
-        {
-	    sizes[i] = cfg->blk_sz;
 	    tags[i] = BLOCK_TBL_ID + i;
-        }
+
 	/* Allocate and register the block table remotely */
 	int ret = rmem_layer->multi_malloc(
-		rmem_layer, addrs, sizes, tags, BLOCK_TBL_NPG);
+		rmem_layer, addrs, cfg->blk_sz, tags, BLOCK_TBL_NPG);
 	if (ret != 0) {
 	    rvm_log("Failed to allocate memory for block table\n");
 	    errno = EUNKNOWN;

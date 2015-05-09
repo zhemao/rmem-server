@@ -94,7 +94,7 @@ typedef void (*rmem_deregister_data_f)(rmem_layer_t* rcfg, void* buf);
  * \returns 0 on success
  */
 typedef int (*rmem_multi_malloc_f)(rmem_layer_t *rcfg,
-	uint64_t *addrs, uint64_t *sizes, uint32_t *tags, uint32_t n);
+	uint64_t *addrs, uint64_t size, uint32_t *tags, uint32_t n);
 
 typedef int (*rmem_multi_free_f)(rmem_layer_t *rcfg,
 	uint32_t *tags, uint32_t n);
