@@ -13,8 +13,6 @@
 #include "utils/error.h"
 #include "utils/stats.h"
 
-#define MIN(a,b) ((a)<(b)?(a):(b))
-
 static const char *DEFAULT_PORT = "12345";
 static const size_t BUFFER_SIZE = 10 * 1024 * 1024;
 
@@ -36,15 +34,6 @@ struct conn_context
 
     sem_t ack_sem;
 };
-
-static
-void insert_tag_to_addr(struct rmem_table* rmem, uint32_t tag, uintptr_t addr) {
-    uintptr_t* value = (uintptr_t*)malloc(sizeof(uintptr_t));
-    CHECK_ERROR(value == 0,
-            ("Failure: error allocating value"));
-    *value = addr;
-    hash_insert_item(rmem->tag_to_addr, tag, value);
-}
 
 static void send_message(struct rdma_cm_id *id)
 {
@@ -138,44 +127,27 @@ static void on_pre_conn(struct rdma_cm_id *id)
 static void send_tag_to_addr_info(struct rdma_cm_id *id) 
 {
     struct conn_context *ctx = (struct conn_context *)id->context;
-
-    int hash_n = hash_num_elements(rmem.tag_to_addr);
-    int map_size_left = hash_n;
-
-    hash_iterator_t it = hash_begin(rmem.tag_to_addr);
-
-    assert( (map_size_left == 0) == (hash_is_iterator_null(it)) );
+    struct rmem_iterator iter;
 
     ctx->send_msg->id = MSG_TAG_ADDR_MAP;
 
-    if (map_size_left == 0) {
+    if (rmem.nblocks == 0) {
 	ctx->send_msg->data.tag_addr_map.size = 0;
 	send_message(id);
 	return;
     }
 
-    while (map_size_left > 0) {
-	int to_send = MIN(map_size_left, TAG_ADDR_MAP_SIZE_MSG);
+    init_rmem_iterator(&iter, &rmem);
+
+    while (!rmem_iter_finished(&iter)) {
+	int to_send = rmem_iter_next_set(&iter,
+		ctx->send_msg->data.tag_addr_map.data);
 	ctx->send_msg->data.tag_addr_map.size = to_send;
 
 	LOG(5, ("Sending %d mappings\n", to_send));
 
-	int i = 0;
-	for (; i < to_send; ++i) {
-	    assert(!hash_is_iterator_null(it));
-
-	    ctx->send_msg->data.tag_addr_map.data[i].tag = 
-		(uint32_t)hash_iterator_key(it);
-
-	    uintptr_t addr = *(uintptr_t*)hash_iterator_value(it);
-	    ctx->send_msg->data.tag_addr_map.data[i].addr = addr;
-
-	    hash_next_iterator(it);
-	}
-
 	send_message(id);
 	TEST_NZ(sem_wait(&ctx->ack_sem));
-	map_size_left -= to_send;
     }
 }
 
@@ -225,8 +197,6 @@ static void on_completion(struct ibv_wc *wc)
                 ctx->send_msg->data.memresp.addr = (uintptr_t) ptr;
                 ctx->send_msg->data.memresp.error = (ptr == NULL);
 
-                insert_tag_to_addr(&rmem, msg->data.alloc.tag, (uintptr_t)ptr);
-                
                 LOG(5, ("MSG_ALLOC size: %ld ptr: %ld\n", 
                             msg->data.alloc.size, (uintptr_t)ptr));
 #ifdef DEBUG
@@ -264,7 +234,9 @@ static void on_completion(struct ibv_wc *wc)
                 break;
             case MSG_TXN_GO:
                 LOG(5, ("MSG_TXN_GO\n"));
+                TEST_NZ(pthread_mutex_lock(&alloc_mutex));
 		txn_commit(&rmem, &ctx->txn_list);
+                TEST_NZ(pthread_mutex_unlock(&alloc_mutex));
                 ctx->send_msg->id = MSG_TXN_ACK;
                 send_message(id);
                 break;

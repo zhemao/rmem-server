@@ -2,9 +2,7 @@
 #define RDMA_MESSAGES_H
 
 #include <stdint.h>
-
-#define TAG_ADDR_PAIR_SIZEOF sizeof(tag_addr_entry)
-#define TAG_ADDR_MAP_SIZE_MSG 20
+#include "tag_addr_map.h"
 
 #define MULTI_OP_MAX_ITEMS 20
 
@@ -27,11 +25,6 @@ enum message_id {
     MSG_MULTI_TXN_FREE,
     MSG_MULTI_TXN_CP
 };
-
-typedef struct tag_addr_entry {
-    uint32_t tag;
-    uintptr_t addr;
-} tag_addr_entry_t;
 
 struct message {
     enum message_id id;
