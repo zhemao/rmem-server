@@ -87,7 +87,7 @@ static bool recover_blocks(rvm_cfg_t *cfg)
 
         /* Actual fetch from server */
         err = rmem_layer->get(rmem_layer, blk->local_addr,
-                (struct ibv_mr*)blk->blk_rec, BLK_REAL_TAG(bx), cfg->blk_sz);
+                (struct ibv_mr*)blk->blk_rec, BLK_REAL_TAG(blk->bid), cfg->blk_sz);
         if(err != 0) {
             rvm_log("Failed to recover block %d\n", bx);
             errno = EUNKNOWN;
@@ -98,7 +98,7 @@ static bool recover_blocks(rvm_cfg_t *cfg)
         rvm_protect(blk->local_addr, cfg->blk_sz);
 
         LOG(9, ("Recovered block %d (shadow %ld) - local addr: %p\n",
-                    blk->bid, BLK_SHDW_TAG(bx), blk->local_addr));
+                    blk->bid, BLK_SHDW_TAG(blk->bid), blk->local_addr));
     }
 
     return true;
@@ -228,8 +228,8 @@ bool rvm_cfg_destroy(rvm_cfg_t *cfg)
             continue;
 
         /* Free the remote blocks */
-        rmem_layer->free(rmem_layer, BLK_REAL_TAG(bx)); // free 'real' block
-        rmem_layer->free(rmem_layer, BLK_SHDW_TAG(bx)); // free 'shadow' block
+        rmem_layer->free(rmem_layer, BLK_REAL_TAG(blk->bid));
+        rmem_layer->free(rmem_layer, BLK_SHDW_TAG(blk->bid));
         
         rmem_layer->deregister_data(rmem_layer, blk->blk_rec);
 
@@ -381,12 +381,12 @@ bool rvm_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
         if(!btbl_test_mod(&(cfg->blk_tbl), blk))
             continue;
 
-        err = rmem_layer->put(rmem_layer, BLK_SHDW_TAG(bx),
+        err = rmem_layer->put(rmem_layer, BLK_SHDW_TAG(blk->bid),
                 blk->local_addr, blk->blk_rec, cfg->blk_sz);
         CHECK_ERROR(err != 0, ("Failed to write block %d", bx));
 
-        tags_src[count] = BLK_SHDW_TAG(bx);
-        tags_dst[count] = BLK_REAL_TAG(bx);
+        tags_src[count] = BLK_SHDW_TAG(blk->bid);
+        tags_dst[count] = BLK_REAL_TAG(blk->bid);
         tags_size[count++] = cfg->blk_sz;
 
         /* Re-protect the block for the next txn */
