@@ -2,6 +2,7 @@
 #define __UBM_UTIL_H__
 
 #include <unistd.h>
+#include <time.h>
 
 #define PAGE_SIZE sysconf(_SC_PAGESIZE)
 #define NS_PER_SEC (1000.0 * 1000.0 * 1000.0)
@@ -29,9 +30,9 @@ static inline double gettime(void)
 static inline void touch_page(int *page)
 {
     int page_len = PAGE_SIZE / sizeof(int);
+    int ind = random() % page_len;
 
-    for (int i = 0; i < page_len; i++)
-	page[i] = random();
+    page[ind] = random();
 }
 
 #endif

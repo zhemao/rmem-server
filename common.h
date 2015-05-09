@@ -36,6 +36,7 @@ typedef int32_t bitmap_t;
 /* How man slots of type bitmap_t you must alloc
  * (bitmap_t map[BITNSLOTS(number_of_bits)]) */
 #define BITNSLOTS(nb) ((nb + 32 - 1) / 32)
+#define MIN(a,b) ((a)<(b)?(a):(b))
 
 typedef void (*pre_conn_cb_fn)(struct rdma_cm_id *id);
 typedef void (*connect_cb_fn)(struct rdma_cm_id *id);

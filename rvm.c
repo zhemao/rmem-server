@@ -147,6 +147,9 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer
         if(!recover_blocks(cfg))
             return NULL;
     } else {
+	    uint32_t tags[BLOCK_TBL_NPG];
+	    uint64_t addrs[BLOCK_TBL_NPG];
+
         res = rbtbl_init(cfg->blk_tbl.rbtbl);
         CHECK_ERROR(res == false, ("Failed to initialize block table\n"));
 
@@ -154,18 +157,25 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer
          * it because I think eventually we'll have a backend with fixed-sized
          * allocations. */
         for(size_t i = 0; i < BLOCK_TBL_NPG; i++)
-        {
-            /* Allocate and register the block table remotely */
-            uint64_t ret = rmem_layer->malloc(rmem_layer, cfg->blk_sz,
-                    BLOCK_TBL_ID + i);
-            if(ret == 0) {
-                rvm_log("Failed to register memory for block table\n");
-                errno = EUNKNOWN;
-                return NULL;
-            }
-            LOG(9, ("Allocated block %ld - local addr: %p\n",
-                    BLOCK_TBL_ID + i, (void*)cfg->blk_tbl.rbtbl + i*cfg->blk_sz));
+	        tags[i] = BLOCK_TBL_ID + i;
+
+        /* Allocate and register the block table remotely */
+        int ret = rmem_layer->multi_malloc(
+            rmem_layer, addrs, cfg->blk_sz, tags, BLOCK_TBL_NPG);
+        if (ret != 0) {
+            rvm_log("Failed to allocate memory for block table\n");
+            errno = EUNKNOWN;
+            return NULL;
         }
+
+#if (LOG_LEVEL > 9)
+        for (size_t i = 0; i < BLOCK_TBL_NPG; i++)
+        {
+            LOG(9, ("Allocated block %ld - local addr: %p - remote addr: %lx\n",
+                BLOCK_TBL_ID + i, cfg->blk_tbl + i*cfg->blk_sz, addrs[i]));
+        }
+#endif
+
         cfg->blk_tbl.rbtbl->n_blocks = 0;
 
         /* Make an initial write of the block table */
@@ -436,7 +446,12 @@ void *rvm_blk_alloc(rvm_cfg_t* cfg, size_t size)
         return NULL;
     }
 
-    //for(bx = b_start; bx < b_start + nblocks; bx++)
+    uint32_t *tags = malloc(2 * nblocks * sizeof(uint32_t));
+    uint64_t *addrs = malloc(2 * nblocks * sizeof(uint64_t));
+    int tag_ind = 0;
+
+    CHECK_ERROR(tags == NULL, ("Failure: alloc tag and addr buffers\n"));
+
     for(int b = 0; b < nblocks; b++)
     {
         blk_desc_t *block = btbl_alloc(&(cfg->blk_tbl), 
@@ -447,28 +462,33 @@ void *rvm_blk_alloc(rvm_cfg_t* cfg, size_t size)
         /* TODO Right now we pin everything, all the time. Eventually we may want
          * to have some caching thing where we only pin hot pages or something.
          */
-        block->blk_rec = rmem_layer->register_data(rmem_layer, block->local_addr, cfg->blk_sz);
+        block->blk_rec = rmem_layer->register_data(
+		rmem_layer, block->local_addr, cfg->blk_sz);
+
         if(block->blk_rec == NULL) {
             rvm_log("Failed to register memory for block\n");
             errno = EUNKNOWN;
             return NULL;
         }
-        uintptr_t real_ptr = rmem_layer->malloc(rmem_layer, cfg->blk_sz,
-                BLK_REAL_TAG(block->bid));
 
-        // allocate shadow block
-        uintptr_t shadow_ptr = rmem_layer->malloc(rmem_layer, cfg->blk_sz,
-                BLK_SHDW_TAG(block->bid));
-        if(real_ptr == 0 || shadow_ptr == 0) {
-            rvm_log("Failed to allocate remote memory for block\n");
-            errno = EUNKNOWN;
-            return NULL;
-        }
+        tags[tag_ind] = BLK_REAL_TAG(block->bid);
+        tags[tag_ind + 1] = BLK_SHDW_TAG(block->bid);
+        tag_ind += 2;
 
-        LOG(9, ("Allocated block %ld (shadow %ld) - local addr: %p\n",
-                    BLK_REAL_TAG(block->bid), BLK_SHDW_TAG(block->bid),
-                    block->local_addr));
+        LOG(9, ("Allocated block %d (shadow %ld) - local addr: %p\n",
+                    BLK_REAL_TAG(block->bid), BLK_SHDW_TAG(block->bid), block->local_addr));
     }
+
+    int ret = rmem_layer->multi_malloc(
+	    rmem_layer, addrs, cfg->blk_sz, tags, 2 * nblocks);
+    if (ret != 0) {
+	rvm_log("Failed to allocate remote memory for blocks\n");
+	errno = EUNKNOWN;
+	return NULL;
+    }
+
+    free(tags);
+    free(addrs);
 
     /* Protect the local blocks so that we can keep track of changes */
     rvm_protect(start_addr, nblocks*cfg->blk_sz);
@@ -485,6 +505,7 @@ bool rvm_blk_free(rvm_cfg_t* cfg, void *buf)
 {
     bool res;
     rmem_layer_t* rmem_layer = cfg->rmem_layer;
+    uint32_t tags[2];
 
     blk_desc_t *blk = btbl_lookup(&(cfg->blk_tbl), buf);
 
@@ -492,8 +513,9 @@ bool rvm_blk_free(rvm_cfg_t* cfg, void *buf)
                 BLK_REAL_TAG(blk->bid), BLK_SHDW_TAG(blk->bid), buf));
 
     /* Cleanup remote info */
-    rmem_layer->free(rmem_layer, BLK_REAL_TAG(blk->bid));
-    rmem_layer->free(rmem_layer, BLK_SHDW_TAG(blk->bid));
+    tags[0] = BLK_REAL_TAG(blk->bid);
+    tags[1] = BLK_SHDW_TAG(blk->bid);
+    rmem_layer->multi_free(rmem_layer, tags, 2);
     rmem_layer->deregister_data(rmem_layer, blk->blk_rec);
 
     /* Unset the change bit for this block */

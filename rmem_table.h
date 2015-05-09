@@ -3,7 +3,8 @@
 
 #include <stdlib.h>
 #include <stdint.h>
-#include "data/hash.h"
+
+#include "tag_addr_map.h"
 
 //#define RMEM_SIZE (1 << 15)
 #define RMEM_SIZE (1 << 30)
@@ -32,8 +33,8 @@ struct rmem_table {
     struct list_head list;
     struct list_head free_list;
     size_t alloc_size;
+    size_t nblocks;
     struct list_head *htable;
-    hash_t tag_to_addr;
 };
 
 enum rmem_txn_type {
@@ -53,6 +54,12 @@ struct rmem_txn_list {
     struct list_head head;
 };
 
+struct rmem_iterator {
+    struct rmem_table *rmem;
+    struct list_head *cur_node;
+    size_t block_ind;
+};
+
 void init_rmem_table(struct rmem_table *rmem);
 void *rmem_table_alloc(struct rmem_table *rmem, size_t size, tag_t tag);
 void rmem_table_free(struct rmem_table *rmem, void *ptr);
@@ -67,5 +74,9 @@ int txn_list_add_cp(struct rmem_txn_list *list,
 //int txn_list_add_alloc(struct rmem_txn_list *list, size_t size);
 int txn_list_add_free(struct rmem_txn_list *list, void *addr);
 void txn_commit(struct rmem_table *rmem, struct rmem_txn_list *list);
+
+void init_rmem_iterator(struct rmem_iterator *iter, struct rmem_table *rmem);
+int rmem_iter_finished(struct rmem_iterator *iter);
+int rmem_iter_next_set(struct rmem_iterator *iter, tag_addr_entry_t *tag_addr);
 
 #endif

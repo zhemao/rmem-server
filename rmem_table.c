@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <sys/mman.h>
+#include <assert.h>
 #include "utils/log.h"
 
 #define HASH_SIZE 10000
@@ -92,7 +93,7 @@ void init_rmem_table(struct rmem_table *rmem)
     for (i = 0; i < NUM_BUCKETS; i++)
 	list_init(&rmem->htable[i]);
 
-    rmem->tag_to_addr = hash_create(HASH_SIZE);
+    rmem->nblocks = 0;
 }
 
 void free_rmem_table(struct rmem_table *rmem)
@@ -219,7 +220,7 @@ void *rmem_table_alloc(struct rmem_table *rmem, size_t size, tag_t tag)
        allocated something. */
     entry = find_entry(rmem, tag);
     if (entry != NULL) {
-        LOG(5, ("Requested tag is not unique\n"));
+        LOG(5, ("Requested tag %d is not unique\n", tag));
     	return entry->start + DATA_OFFSET;
     }
 
@@ -256,6 +257,7 @@ void *rmem_table_alloc(struct rmem_table *rmem, size_t size, tag_t tag)
         reserve_entry(rmem, entry, req_size);
     }
 
+    rmem->nblocks++;
     bucket = tag % NUM_BUCKETS;
     list_append(&rmem->htable[bucket], &entry->htable);
 
@@ -349,6 +351,8 @@ void rmem_table_free(struct rmem_table *rmem, void *ptr)
 	fprintf(stderr, "This block has already been freed.\n");
 	abort();
     }
+
+    rmem->nblocks--;
 
     entry->free = 1;
     entry->tag = 0;
@@ -482,4 +486,42 @@ void txn_commit(struct rmem_table *rmem, struct rmem_txn_list *list)
 	}
         node = node->next;
     }
+}
+
+void init_rmem_iterator(struct rmem_iterator *iter, struct rmem_table *rmem)
+{
+    iter->rmem = rmem;
+    iter->cur_node = rmem->list.next;
+    iter->block_ind = 0;
+}
+
+int rmem_iter_next_set(struct rmem_iterator *iter, tag_addr_entry_t *tag_addr)
+{
+    int entries_left = iter->rmem->nblocks - iter->block_ind;
+    int nentries = MIN(entries_left, TAG_ADDR_MAP_SIZE_MSG);
+    int ind = 0;
+    struct alloc_entry *entry;
+
+    while (ind < nentries) {
+	assert(iter->cur_node != &iter->rmem->list);
+
+	entry = entry_of_list(iter->cur_node);
+	iter->cur_node = iter->cur_node->next;
+
+	if (entry->free)
+	    continue;
+
+	tag_addr[ind].tag = entry->tag;
+	tag_addr[ind].addr = (uintptr_t) (entry->start + DATA_OFFSET);
+	ind++;
+    }
+
+    iter->block_ind += nentries;
+
+    return nentries;
+}
+
+int rmem_iter_finished(struct rmem_iterator *iter)
+{
+    return iter->block_ind == iter->rmem->nblocks;
 }

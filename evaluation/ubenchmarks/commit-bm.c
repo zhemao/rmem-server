@@ -8,13 +8,16 @@
 
 #include "util.h"
 
-double rvm_test(int **pages, int npages, char *host, char *port)
+double rvm_test(int npages, char *host, char *port)
 {
     double starttime, endtime;
 
     rvm_cfg_t *rvm;
     rvm_opt_t opt;
     rvm_txid_t txid;
+
+    int *pages;
+    int ints_per_page = PAGE_SIZE / sizeof(int);
 
     opt.host = host;
     opt.port = port;
@@ -34,12 +37,10 @@ double rvm_test(int **pages, int npages, char *host, char *port)
 	exit(EXIT_FAILURE);
     }
 
-    for (int i = 0; i < npages; i++) {
-	pages[i] = rvm_alloc(rvm, PAGE_SIZE);
-	if (pages[i] == NULL) {
-	    perror("rvm_alloc");
-	    exit(EXIT_FAILURE);
-	}
+    pages = rvm_alloc(rvm, PAGE_SIZE * npages);
+    if (pages == NULL) {
+	perror("rvm_alloc");
+	exit(EXIT_FAILURE);
     }
 
     if (!rvm_txn_commit(rvm, txid)) {
@@ -54,7 +55,7 @@ double rvm_test(int **pages, int npages, char *host, char *port)
     }
 
     for (int i = 0; i < npages; i++)
-	touch_page(pages[i]);
+	touch_page(pages + i * ints_per_page);
 
     starttime = gettime();
     if (!rvm_txn_commit(rvm, txid)) {
@@ -69,8 +70,7 @@ double rvm_test(int **pages, int npages, char *host, char *port)
 	exit(EXIT_FAILURE);
     }
 
-    for (int i = 0; i < npages; i++)
-	rvm_free(rvm, pages[i]);
+    rvm_free(rvm, pages);
 
     if (!rvm_txn_commit(rvm, txid)) {
 	perror("rvm_txn_commit");
@@ -84,7 +84,7 @@ double rvm_test(int **pages, int npages, char *host, char *port)
 
 int main(int argc, char *argv[])
 {
-    int **pages, npages;
+    int npages;
     double txn_time;
 
     if (argc < 4) {
@@ -93,12 +93,10 @@ int main(int argc, char *argv[])
     }
 
     npages = atoi(argv[3]);
-    pages = calloc(npages, sizeof(*pages));
 
-    txn_time = rvm_test(pages, npages, argv[1], argv[2]);
+    txn_time = rvm_test(npages, argv[1], argv[2]);
 
     printf("%f\n", txn_time);
-    free(pages);
 
     return 0;
 }
