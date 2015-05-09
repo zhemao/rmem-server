@@ -147,18 +147,28 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer
         if(!recover_blocks(cfg))
             return NULL;
     } else {
+	uint64_t sizes[BLOCK_TBL_NPG];
+	uint32_t tags[BLOCK_TBL_NPG];
+	uint64_t addrs[BLOCK_TBL_NPG];
+
         for(size_t i = 0; i < BLOCK_TBL_NPG; i++)
         {
-            /* Allocate and register the block table remotely */
-            uint64_t ret = rmem_layer->malloc(rmem_layer, cfg->blk_sz, BLOCK_TBL_ID + i);
-            if(ret == 0) {
-                rvm_log("Failed to register memory for block table\n");
-                errno = EUNKNOWN;
-                return NULL;
-            }
-            LOG(9, ("Allocated block %ld - local addr: %p\n",
-                    BLOCK_TBL_ID + i, cfg->blk_tbl + i*cfg->blk_sz));
+	    sizes[i] = cfg->blk_sz;
+	    tags[i] = BLOCK_TBL_ID + i;
         }
+	/* Allocate and register the block table remotely */
+	int ret = rmem_layer->multi_malloc(
+		rmem_layer, addrs, sizes, tags, BLOCK_TBL_NPG);
+	if (ret != 0) {
+	    rvm_log("Failed to allocate memory for block table\n");
+	    errno = EUNKNOWN;
+	    return NULL;
+	}
+	for (size_t i = 0; i < BLOCK_TBL_NPG; i++)
+	{
+            LOG(9, ("Allocated block %ld - local addr: %p - remote addr: %lx\n",
+                    BLOCK_TBL_ID + i, cfg->blk_tbl + i*cfg->blk_sz, addrs[i]));
+	}
         cfg->blk_tbl->n_blocks = 0;
     }
 
@@ -497,6 +507,7 @@ bool rvm_blk_free(rvm_cfg_t* cfg, void *buf)
      * something better.
      */
     rmem_layer_t* rmem_layer = cfg->rmem_layer;
+    uint32_t tags[2];
 
     block_desc_t *blk;
     int bx;
@@ -517,8 +528,9 @@ bool rvm_blk_free(rvm_cfg_t* cfg, void *buf)
                 BLK_REAL_TAG(bx), BLK_SHDW_TAG(bx), buf));
 
     /* Cleanup remote info */
-    rmem_layer->free(rmem_layer, BLK_REAL_TAG(bx)); 
-    rmem_layer->free(rmem_layer, BLK_SHDW_TAG(bx)); // free shadow block as well
+    tags[0] = BLK_REAL_TAG(bx);
+    tags[1] = BLK_SHDW_TAG(bx);
+    rmem_layer->multi_free(rmem_layer, tags, 2);
     rmem_layer->deregister_data(rmem_layer, blk->blk_rec);
 
     /* Free local info */

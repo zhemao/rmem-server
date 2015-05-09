@@ -54,6 +54,8 @@ rmem_layer_t* create_rmem_layer()
     layer->atomic_commit = rmem_atomic_commit;
     layer->register_data = rmem_register_data;
     layer->deregister_data = rmem_deregister_data;
+    layer->multi_malloc = rmem_multi_malloc;
+    layer->multi_free = rmem_multi_free;
 
     layer->layer_data = (struct rmem*)malloc(sizeof(struct rmem));
     CHECK_ERROR(layer->layer_data == 0,
@@ -140,36 +142,6 @@ int rmem_cp(struct rmem *rmem, uint32_t tag_dst, uint32_t tag_src, uint64_t size
     ctx->send_msg->data.cp.dst = dst;
     ctx->send_msg->data.cp.src = src;
     ctx->send_msg->data.cp.size = size;
-
-    if (send_message(rmem->id))
-	return -1;
-    if (post_receive(rmem->id))
-	return -2;
-    if (sem_wait(&ctx->send_sem))
-	return -3;
-    if (sem_wait(&ctx->recv_sem))
-	return -4;
-
-    if (ctx->recv_msg->id != MSG_TXN_ACK)
-	return -5;
-
-    return 0;
-}
-
-static int rmem_multi_cp(struct rmem *rmem,
-	uint32_t *tag_dst, uint32_t *tag_src, uint32_t *sizes, int n)
-{
-    struct client_context *ctx = &rmem->ctx;
-
-    for (int i = 0; i < n; i++) {
-	uint64_t dst = lookup_remote_addr(rmem->tag_to_addr, tag_dst[i]);
-	uint64_t src = lookup_remote_addr(rmem->tag_to_addr, tag_src[i]);
-	ctx->send_msg->data.multi_cp.dsts[i] = dst;
-	ctx->send_msg->data.multi_cp.srcs[i] = src;
-	ctx->send_msg->data.multi_cp.sizes[i] = sizes[i];
-    }
-    ctx->send_msg->data.multi_cp.nitems = n;
-    ctx->send_msg->id = MSG_MULTI_TXN_CP;
 
     if (send_message(rmem->id))
 	return -1;
@@ -431,9 +403,9 @@ int rmem_put(rmem_layer_t *rmem_layer, uint32_t tag,
 
     uintptr_t dst = lookup_remote_addr(rmem->tag_to_addr, tag);
     CHECK_ERROR(dst == 0,
-            ("Failure: tag not found in tag_to_addr\n"));
+            ("Failure: tag %d not found\n", tag));
     
-    LOG(8, ("rmem_put size: %ld tag: %d dst:%ld\n", size, tag, dst));
+    LOG(8, ("rmem_put size: %ld tag: %d dst:%lx\n", size, tag, dst));
 
     wr.wr.rdma.remote_addr = dst;
     wr.wr.rdma.rkey = ctx->peer_rkey;
@@ -470,9 +442,9 @@ int rmem_get(rmem_layer_t *rmem_layer, void *dst, void *data_mr,
 
     uintptr_t src = lookup_remote_addr(rmem->tag_to_addr, tag);
     CHECK_ERROR(src == 0,
-            ("Failure: tag not found in tag_to_addr\n"));
+            ("Failure: tag %d not found\n", tag));
 
-    LOG(8, ("rmem_get size: %ld tag: %d src: %ld\n", size, tag, src));
+    LOG(8, ("rmem_get size: %ld tag: %d src: %lx\n", size, tag, src));
 
     wr.wr.rdma.remote_addr = src;
     wr.wr.rdma.rkey = ctx->peer_rkey;
@@ -500,7 +472,7 @@ int rmem_free(rmem_layer_t *rmem_layer, uint32_t tag)
 
     uintptr_t addr = lookup_remote_addr(rmem->tag_to_addr, tag);
     CHECK_ERROR(addr == 0,
-            ("Failure: tag not found in tag_to_addr\n"));
+            ("Failure: tag %d not found\n", tag));
 
     LOG(8, ("rmem_free addr: %ld tag: %d\n", addr, tag));
 
@@ -521,6 +493,139 @@ int rmem_free(rmem_layer_t *rmem_layer, uint32_t tag)
     return 0;
 }
 
+static int rmem_multi_cp_group(struct rmem *rmem,
+	uint32_t *tag_dst, uint32_t *tag_src, uint32_t *sizes, int n)
+{
+    struct client_context *ctx = &rmem->ctx;
+
+    for (int i = 0; i < n; i++) {
+	uint64_t dst = lookup_remote_addr(rmem->tag_to_addr, tag_dst[i]);
+	uint64_t src = lookup_remote_addr(rmem->tag_to_addr, tag_src[i]);
+	CHECK_ERROR(dst == 0,
+		("Failure: tag %d not found\n", tag_dst[i]));
+	CHECK_ERROR(src == 0,
+		("Failure: tag %d not found\n", tag_src[i]));
+	ctx->send_msg->data.multi_cp.dsts[i] = dst;
+	ctx->send_msg->data.multi_cp.srcs[i] = src;
+	ctx->send_msg->data.multi_cp.sizes[i] = sizes[i];
+    }
+    ctx->send_msg->data.multi_cp.nitems = n;
+    ctx->send_msg->id = MSG_MULTI_TXN_CP;
+
+    if (send_message(rmem->id))
+	return -1;
+    if (post_receive(rmem->id))
+	return -2;
+    if (sem_wait(&ctx->send_sem))
+	return -3;
+    if (sem_wait(&ctx->recv_sem))
+	return -4;
+
+    if (ctx->recv_msg->id != MSG_TXN_ACK)
+	return -5;
+
+    return 0;
+}
+
+static int rmem_multi_malloc_group(struct rmem *rmem, uint64_t *addrs,
+	uint64_t *sizes, uint32_t *tags, int n)
+{
+    struct client_context *ctx = &rmem->ctx;
+
+    memcpy(ctx->send_msg->data.multi_alloc.sizes, sizes, n * sizeof(uint64_t));
+    memcpy(ctx->send_msg->data.multi_alloc.tags, tags, n * sizeof(uint32_t));
+    ctx->send_msg->data.multi_alloc.nitems = n;
+    ctx->send_msg->id = MSG_MULTI_ALLOC;
+
+    if (post_receive(rmem->id))
+        return -1;
+    if (send_message(rmem->id))
+        return -1;
+
+    if (sem_wait(&ctx->send_sem))
+        return -1;
+    if (sem_wait(&ctx->recv_sem))
+        return -1;
+
+    if (ctx->recv_msg->id != MSG_MULTI_MEMRESP)
+	return -1;
+    if (ctx->recv_msg->data.multi_memresp.error)
+        return -1;
+
+    memcpy(addrs, ctx->recv_msg->data.multi_memresp.addrs,
+	    n * sizeof(uint64_t));
+
+    return 0;
+}
+
+int rmem_multi_malloc(rmem_layer_t* rmem_layer, uint64_t *addrs,
+	uint64_t *sizes, uint32_t *tags, uint32_t n)
+{
+    struct rmem *rmem = (struct rmem *) rmem_layer->layer_data;
+
+    for (unsigned int i = 0; i < n; i += MULTI_OP_MAX_ITEMS) {
+	int nitems = get_chunk_size(n - i);
+	int ret = rmem_multi_malloc_group(
+		rmem, &addrs[i], &sizes[i], &tags[i], nitems);
+	LOG(9, ("Allocating %d blocks\n", nitems));
+        CHECK_ERROR(ret != 0,
+                ("Failure: error allocating memory: %d\n", ret));
+    }
+
+    for (unsigned int i = 0; i < n; i++) {
+	uint32_t tag = tags[i];
+	uintptr_t addr = addrs[i];
+	insert_tag_to_addr(rmem, tag, addr);
+    }
+
+    return 0;
+}
+
+static int rmem_multi_free_group(struct rmem *rmem, uint32_t *tags, int n)
+{
+    struct client_context *ctx = &rmem->ctx;
+
+    for (int i = 0; i < n; i++) {
+	uint32_t tag = tags[i];
+	uint64_t addr = lookup_remote_addr(rmem->tag_to_addr, tag);
+	CHECK_ERROR(addr == 0,
+		("Failure: tag %d not found\n", tag));
+	LOG(8, ("rmem_free addr: %ld tag: %d\n", addr, tag));
+	ctx->send_msg->data.multi_free.addrs[i] = addr;
+	hash_delete_item(rmem->tag_to_addr, tag);
+    }
+
+    ctx->send_msg->data.multi_free.nitems = n;
+    ctx->send_msg->id = MSG_MULTI_TXN_FREE;
+
+    if (send_message(rmem->id))
+        return -1;
+    if (post_receive(rmem->id))
+	return -1;
+
+    if (sem_wait(&ctx->send_sem))
+        return -1;
+    if (sem_wait(&ctx->recv_sem))
+	return -1;
+
+    return 0;
+}
+
+int rmem_multi_free(rmem_layer_t *rmem_layer, uint32_t *tags, uint32_t n)
+{
+    struct rmem *rmem = (struct rmem *) rmem_layer->layer_data;
+
+    for (unsigned int i = 0; i < n; i += MULTI_OP_MAX_ITEMS) {
+	int nitems = get_chunk_size(n - i);
+	int ret = rmem_multi_free_group(rmem, &tags[i], nitems);
+        CHECK_ERROR(ret != 0,
+                ("Failure: error freeing memory: %d\n", ret));
+    }
+
+    return 0;
+}
+
+
 int rmem_atomic_commit(rmem_layer_t* rmem_layer, uint32_t* tags_src,
         uint32_t* tags_dst, uint32_t* tags_size,
         uint32_t num_tags)
@@ -532,7 +637,8 @@ int rmem_atomic_commit(rmem_layer_t* rmem_layer, uint32_t* tags_src,
 
     for (int i = 0; i < num_tags; i += MULTI_OP_MAX_ITEMS) {
 	int nitems = get_chunk_size(num_tags - i);
-	int ret = rmem_multi_cp(rmem, &tags_dst[i], &tags_src[i], &tags_size[i], nitems);
+	int ret = rmem_multi_cp_group(
+		rmem, &tags_dst[i], &tags_src[i], &tags_size[i], nitems);
 	for (int j = i; j < i + nitems; j++) {
 	    LOG(9, ("Commiting %d -> %d (size %d)\n",
 			tags_src[j], tags_dst[j], tags_size[j]));

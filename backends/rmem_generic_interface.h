@@ -85,6 +85,20 @@ typedef void* (*rmem_register_data_f)(rmem_layer_t* rcfg,
  */
 typedef void (*rmem_deregister_data_f)(rmem_layer_t* rcfg, void* buf);
 
+/* Allocate n memory regions and write their addresses to addrs
+ * \param[in] rcfg RMEM layer config info
+ * \param[in] addrs pointer to where the results should be placed
+ * \param[in] sizes sizes of allocated regions
+ * \param[in] tags tags of allocated regions
+ * \param[in] n number of regions to allocate
+ * \returns 0 on success
+ */
+typedef int (*rmem_multi_malloc_f)(rmem_layer_t *rcfg,
+	uint64_t *addrs, uint64_t *sizes, uint32_t *tags, uint32_t n);
+
+typedef int (*rmem_multi_free_f)(rmem_layer_t *rcfg,
+	uint32_t *tags, uint32_t n);
+
 /* Set up the rmem layer
  * \returns A struct containing configuration info for the rmem backend.
  */
@@ -103,6 +117,8 @@ typedef struct rmem_layer {
     rmem_atomic_commit_f atomic_commit;
     rmem_register_data_f register_data;
     rmem_deregister_data_f deregister_data;
+    rmem_multi_malloc_f multi_malloc;
+    rmem_multi_free_f multi_free;
 
     void* layer_data; // layer-specific data
 } rmem_layer_t;
