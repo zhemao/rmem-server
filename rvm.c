@@ -449,6 +449,12 @@ void *rvm_blk_alloc(rvm_cfg_t* cfg, size_t size)
         return NULL;
     }
 
+    uint32_t *tags = malloc(2 * nblocks * sizeof(uint32_t));
+    uint64_t *addrs = malloc(2 * nblocks * sizeof(uint64_t));
+    int tag_ind = 0;
+
+    CHECK_ERROR(tags == NULL, ("Failure: alloc tag and addr buffers\n"));
+
     for(bx = b_start; bx < b_start + nblocks; bx++)
     {
         block_desc_t *block = &(cfg->blk_tbl->tbl[bx]);
@@ -466,26 +472,33 @@ void *rvm_blk_alloc(rvm_cfg_t* cfg, size_t size)
         /* TODO Right now we pin everything, all the time. Eventually we may want
          * to have some caching thing where we only pin hot pages or something.
          */
-        block->blk_rec = rmem_layer->register_data(rmem_layer, block->local_addr, cfg->blk_sz);
+        block->blk_rec = rmem_layer->register_data(
+		rmem_layer, block->local_addr, cfg->blk_sz);
+
         if(block->blk_rec == NULL) {
             rvm_log("Failed to register memory for block\n");
             errno = EUNKNOWN;
             return NULL;
         }
-        uintptr_t real_ptr = rmem_layer->malloc(rmem_layer, cfg->blk_sz, block->bid);
 
-        // allocate shadow block
-        uintptr_t shadow_ptr = rmem_layer->malloc(rmem_layer, cfg->blk_sz,
-                BLK_SHDW_TAG(bx));
-        if(real_ptr == 0 || shadow_ptr == 0) {
-            rvm_log("Failed to allocate remote memory for block\n");
-            errno = EUNKNOWN;
-            return NULL;
-        }
+	tags[tag_ind] = block->bid;
+	tags[tag_ind + 1] = block->bid + 1;
+	tag_ind += 2;
 
         LOG(9, ("Allocated block %d (shadow %ld) - local addr: %p\n",
-                    block->bid, BLK_SHDW_TAG(bx), block->local_addr));
+                    block->bid, block->bid + 1, block->local_addr));
     }
+
+    int ret = rmem_layer->multi_malloc(
+	    rmem_layer, addrs, cfg->blk_sz, tags, 2 * nblocks);
+    if (ret != 0) {
+	rvm_log("Failed to allocate remote memory for blocks\n");
+	errno = EUNKNOWN;
+	return NULL;
+    }
+
+    free(tags);
+    free(addrs);
 
     /* Protect the local blocks so that we can keep track of changes */
     rvm_protect(start_addr, nblocks*cfg->blk_sz);
