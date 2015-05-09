@@ -12,7 +12,10 @@
 #ifndef BLOCK_TABLE_H_
 #define BLOCK_TABLE_H_
 
-#include "rvm_int.h"
+#include <stdint.h>
+#include <stdbool.h>
+#include <unistd.h>
+#include <stdlib.h>
 
 /** Describes a block (these are the entries in the block table)
  * For now blocks are fixed-sized (page size) */
@@ -62,7 +65,8 @@ typedef struct
 #define BID_INVAL UINT32_MAX
 
 /** Number of block descriptors in the block table */
-#define BLOCK_TBL_NENT (1 << 16)
+//#define BLOCK_TBL_NENT (1 << 16)
+#define BLOCK_TBL_NENT (1 << 10)
 
 /* Size (in bytes) of the block table struct
  * This is rounded up to the nearest multiple of 4096 */
@@ -80,10 +84,10 @@ typedef struct
 #define BLK_SHDW_TAG(BX) (BLOCK_TBL_NPG + BX*2 + 2)
 
 /* Initialize a freshly allocated raw block table */
-bool rbtl_init(raw_blk_tbl_t *rbtbl);
+bool rbtbl_init(raw_blk_tbl_t *rbtbl);
 
 /* Recover a block table index from a raw block table */
-blk_tbl_t *btbl_rec(raw_blk_tbl_t *rbtbl);
+bool btbl_rec(blk_tbl_t *btbl, raw_blk_tbl_t *rbtbl);
 
 /* Find an existing address in the block table
  * \param[in] tbl Table to look in

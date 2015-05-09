@@ -5,11 +5,19 @@
  *      Author: violet
  */
 
+#include <limits.h>
 #include "block_table.h"
 
-bool rbtl_init(raw_blk_tbl_t *rbtbl)
+bool rbtbl_init(raw_blk_tbl_t *rbtbl)
 {
     rbtbl->free = NULL;
+
+    /*TODO Hack due to lazyness: block 0 is reserved because -0 is still
+     * 0 so we can't tell if it's free or not. We just don't put it on the
+     * free list */
+    rbtbl->tbl[0].bid = INT_MIN;
+    rbtbl->tbl[0].blk_rec = NULL;
+    rbtbl->tbl[0].local_addr = NULL;
 
     /* Initialize all blocks to free. */
     for(int bx = 1; bx < BLOCK_TBL_NENT; bx++)
@@ -21,6 +29,8 @@ bool rbtl_init(raw_blk_tbl_t *rbtbl)
         rbtbl->tbl[bx].local_addr = rbtbl->free;
         rbtbl->free = &(rbtbl->tbl[bx]);
     }
+    
+    return true;
 }
 
 bool btbl_rec(blk_tbl_t *btbl, raw_blk_tbl_t *rbtbl)
@@ -33,11 +43,11 @@ bool btbl_rec(blk_tbl_t *btbl, raw_blk_tbl_t *rbtbl)
 /* TODO Were just doing a linear search right now, I'm sure we could do
  * something better.
  */
-int blk_tbl_lookup(blk_tbl_t *btbl, void *target)
+blk_desc_t *btbl_lookup(blk_tbl_t *btbl, void *target)
 {
     blk_desc_t *blk;
     int bx;
-    for(bx = 0; bx < BLOCK_TBL_NENT; bx++)
+    for(bx = 1; bx < BLOCK_TBL_NENT; bx++)
     {
         blk = &(btbl->rbtbl->tbl[bx]);
         if(blk->local_addr == target)
@@ -45,9 +55,9 @@ int blk_tbl_lookup(blk_tbl_t *btbl, void *target)
     }
 
     if(bx == BLOCK_TBL_NENT)
-        return -1;
+        return NULL;
     else
-        return bx;
+        return blk;
 }
 
 bool btbl_free(blk_tbl_t *tbl, blk_desc_t *desc)
@@ -63,7 +73,7 @@ bool btbl_free(blk_tbl_t *tbl, blk_desc_t *desc)
 blk_desc_t *btbl_alloc(blk_tbl_t *tbl)
 {
     /* Pop a descriptor off the free list */
-    blk_desc_t *desc = tbl->rbtbl.free;
+    blk_desc_t *desc = tbl->rbtbl->free;
     if(desc == NULL) {
         return NULL;
     } else {

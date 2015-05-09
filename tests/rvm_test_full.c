@@ -128,7 +128,7 @@ rvm_cfg_t* initialize_rvm(char* host, char* port, bool rec) {
     /* Non-recovery case */
     opt.recovery = rec;
 
-    LOG(8, ("rvm_cfg_create\n"));
+    LOG(1, ("rvm_cfg_create\n"));
     rvm_cfg_t *cfg = rvm_cfg_create(&opt, create_rmem_layer);
     CHECK_ERROR(cfg == NULL, 
             ("FAILURE: Failed to initialize rvm configuration - %s\n", strerror(errno)));
@@ -170,7 +170,7 @@ int main(int argc, char **argv)
     /* If state is NULL then we are starting from scratch or recovering from
        an early error */
     if(state == NULL) {
-        LOG(8,("Phase 0:\n"));
+        LOG(1,("Phase 0:\n"));
         TX_START;
 
         /* Allocate a "state" structure to test pointers */
@@ -182,7 +182,7 @@ int main(int argc, char **argv)
         CHECK_ERROR(!res, ("FAILURE: Phase 0 Failure\n"));
 
         if(start_phase == -1) {
-            LOG(8, ("SUCCESS: Phase 0, simulating failure\n"));
+            LOG(1, ("SUCCESS: Phase 0, simulating failure\n"));
             return EXIT_SUCCESS;
         }
 
@@ -196,7 +196,7 @@ int main(int argc, char **argv)
         /*====================================================================
          * TX 1 Increment arrays, don't mess with LL
          *===================================================================*/
-        LOG(8, ("Phase 1:\n"));
+        LOG(1, ("Phase 1:\n"));
         TX_START;
         
         res = phase1(cfg, state);
@@ -204,7 +204,7 @@ int main(int argc, char **argv)
 
         /* Simulate Failure */
         if(start_phase == 0) {
-            LOG(8, ("SUCCESS: Phase 1, simulating failure\n"));
+            LOG(1, ("SUCCESS: Phase 1, simulating failure\n"));
             return EXIT_SUCCESS;
         }
 
@@ -215,7 +215,7 @@ int main(int argc, char **argv)
         /*====================================================================
          * TX 2 Free Arrays
          *===================================================================*/
-        LOG(8, ("Phase 2:\n"));
+        LOG(1, ("Phase 2:\n"));
         TX_START;
 
         res = phase2(cfg, state);
@@ -223,7 +223,7 @@ int main(int argc, char **argv)
 
         /* Simulate Failure */
         if(start_phase == 1) {
-            LOG(8, ("SUCCESS: Phase 2, simulating failure\n"));
+            LOG(1, ("SUCCESS: Phase 2, simulating failure\n"));
             return EXIT_SUCCESS;
         }
 
@@ -234,7 +234,7 @@ int main(int argc, char **argv)
         /*====================================================================
          * TX 3 Fill in Linked list
          *===================================================================*/
-        LOG(8, ("Phase 3:\n"));
+        LOG(1, ("Phase 3:\n"));
         TX_START;
 
         res = phase3(cfg, state);
@@ -242,7 +242,7 @@ int main(int argc, char **argv)
 
         /* Simulate Failure */
         if(start_phase == 2) {
-            LOG(8, ("SUCCESS: Phase 3, simulating failure\n"));
+            LOG(1, ("SUCCESS: Phase 3, simulating failure\n"));
             return EXIT_SUCCESS;
         }
 
@@ -253,7 +253,7 @@ int main(int argc, char **argv)
         /*====================================================================
          * TX 4 Free Half the linked list
          *===================================================================*/
-        LOG(8, ("Phase 4:\n"));
+        LOG(1, ("Phase 4:\n"));
         TX_START;
 
         res = phase4(cfg, state);
@@ -261,7 +261,7 @@ int main(int argc, char **argv)
 
          /* Simulate Failure */
         if(start_phase == 3) {
-            LOG(8, ("SUCCESS: Phase 4, simulating failure\n"));
+            LOG(1, ("SUCCESS: Phase 4, simulating failure\n"));
             return EXIT_SUCCESS;
         }
 
@@ -272,7 +272,7 @@ int main(int argc, char **argv)
         /*====================================================================
          * TX 5 Re-allocate half of the linked list
          *===================================================================*/
-        LOG(8, ("Phase 5:\n"));
+        LOG(1, ("Phase 5:\n"));
         TX_START;
 
         res = phase5(cfg, state);
@@ -280,7 +280,7 @@ int main(int argc, char **argv)
 
          /* Simulate Failure */
         if(start_phase == 4) {
-            LOG(8, ("SUCCESS: Phase5, simulating failure\n"));
+            LOG(1, ("SUCCESS: Phase5, simulating failure\n"));
             return EXIT_SUCCESS;
         }
 
@@ -291,7 +291,7 @@ int main(int argc, char **argv)
         /*====================================================================
          * TX 6 Free whole linked list
          *===================================================================*/
-        LOG(8, ("Phase 6:\n"));
+        LOG(1, ("Phase 6:\n"));
         TX_START;
 
         res = phase6(cfg, state);
@@ -299,7 +299,7 @@ int main(int argc, char **argv)
 
         /* Simulate Failure */
         if(start_phase == 5) {
-            LOG(8, ("SUCCESS: Phase 6, simulating failure\n"));
+            LOG(1, ("SUCCESS: Phase 6, simulating failure\n"));
             return EXIT_SUCCESS;
         }
 
@@ -307,7 +307,7 @@ int main(int argc, char **argv)
         TX_COMMIT;
 
     case DONE:
-        LOG(8, ("SUCCESS: Got through all phases\n"));
+        LOG(1, ("SUCCESS: Got through all phases\n"));
         break;
 
     default:
@@ -328,13 +328,13 @@ bool phase0(rvm_cfg_t *cfg, test_state_t *state)
     LIST_INIT(&state->list);
 
     /* Allocating big array */
-    LOG(8,("Allocating array 0. It's a bigun\n"));
+    LOG(1,("Allocating array 0. It's a bigun\n"));
     state->arr0 = (int*)rvm_alloc(cfg, ARR0_SIZE*sizeof(int));
     RETURN_ERROR(state->arr0 == NULL, false,
             ("FAILURE: Failed to allocate array0 - %s\n", strerror(errno)));
 
     /* Allocating smaller array */
-    LOG(8, ("Allocating array 1, smaller arraay\n"));
+    LOG(1, ("Allocating array 1, smaller arraay\n"));
     state->arr1 = (int*)rvm_alloc(cfg, ARR1_SIZE*sizeof(int));
     RETURN_ERROR(state->arr1 == NULL, false,
             ("Failed to allocate array1 - %s", strerror(errno)));

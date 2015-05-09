@@ -6,7 +6,7 @@
 #include <stdio.h>
 
 #ifndef LOG_LEVEL
-#define LOG_LEVEL 1
+#define LOG_LEVEL 10
 #endif
 
 #define LOG(LEVEL, STR) do {\
