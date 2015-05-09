@@ -60,9 +60,6 @@ static bool recover_blocks(rvm_cfg_t *cfg)
         if(blk->bid < 0)
             continue; //Freed memory
 
-        //XXX
-        if(blk->local_addr == NULL)
-            printf("NULL: bx %d. bid %d\n", bx, blk->bid);
         assert(blk->local_addr != NULL);
 
         /* Allocate local storage for recovered block */
@@ -269,57 +266,73 @@ rvm_txid_t rvm_txn_begin(rvm_cfg_t* cfg)
 
 bool check_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
 {
-    rmem_layer_t* rmem_layer = cfg->rmem_layer;
-    LOG(8, ("Checking txn commit\n"));
+    int err;
+    rmem_layer_t *rmem_layer = cfg->rmem_layer;
 
-    // check block table
-    char* block = (char*)malloc(sizeof(char) * cfg->blk_sz);
-    RETURN_ERROR(block == 0, false,
-            ("Failure: Error allocating table\n"));
+    char *btbl_cpy = malloc(BLOCK_TBL_SIZE);
+    RETURN_ERROR(btbl_cpy == NULL, false,
+            ("Couldn't allocate a copy of the block table\n"));
 
-    struct ibv_mr* block_mr = (struct ibv_mr*)rmem_layer->register_data(rmem_layer, block, sizeof(char) * cfg->blk_sz);
+    struct ibv_mr* block_mr = (struct ibv_mr*)rmem_layer->register_data(
+            rmem_layer, btbl_cpy, BLOCK_TBL_SIZE);
+    assert(block_mr != NULL);
 
-    LOG(8, ("Getting block table\n"));
-    int err = rmem_layer->get(rmem_layer, block, block_mr, BLOCK_TBL_ID, cfg->blk_sz);
-    LOG(8, ("Block table fetched\n"));
-
-    RETURN_ERROR(err != 0, false,
-            ("Failure: Error doing RDMA read of block table\n"));
-
-    err = memcmp(block, cfg->blk_tbl.rbtbl, sizeof(char) * cfg->blk_sz);
-
-    RETURN_ERROR(err != 0, false,
-            ("Block table does not match replica\n"));
-
-    //check data blocks
-    int bx;
-    for(bx = 0; bx < BLOCK_TBL_NENT; bx++) {
-        blk_desc_t *blk = &(cfg->blk_tbl.rbtbl->tbl[bx]);
-        if(blk->local_addr == NULL) // ?
-            continue;
-
-        char* block = (char*)malloc(sizeof(char) * cfg->blk_sz);
-        struct ibv_mr* block_mr = (struct ibv_mr*)rmem_layer->register_data(
-                rmem_layer, block, sizeof(char) * cfg->blk_sz);
-
-        int err = rmem_layer->get(rmem_layer, block, block_mr,
-                BLK_REAL_TAG(bx), cfg->blk_sz);
-        RETURN_ERROR(err != 0, false,
-            ("Failure: Error doing RDMA read of block\n"));
-        
-
-        err = memcmp(block, blk->local_addr, sizeof(char) * cfg->blk_sz);
-        RETURN_ERROR(err != 0, false,
-                ("Block %d does not match replica\n", bx));
-
-        free(block);
-
+    /* Recover the block table */
+    for(size_t i = 0; i < BLOCK_TBL_NPG; i++)
+    {
+        err = rmem_layer->get(rmem_layer,
+                (btbl_cpy + cfg->blk_sz*i),
+                block_mr,
+                BLOCK_TBL_ID + i, cfg->blk_sz);
+        if(err != 0) {
+            rvm_log("Failed to recover block table\n");
+            errno = EUNKNOWN;
+            return false;
+        }
     }
 
-    free(block);
-    rmem_layer->deregister_data(rmem_layer, block_mr);
+    /* Check if block table looks right */
+    err = memcmp(btbl_cpy, cfg->blk_tbl.rbtbl, BLOCK_TBL_SIZE);
+    RETURN_ERROR(err != 0, false, ("Block table doesn't match replica\n"));
 
-    cfg->in_txn = false;
+    /* Clean up block table copy */
+    rmem_layer->deregister_data(rmem_layer, block_mr);
+    free(btbl_cpy);
+    
+    /* Storage for copies of each block */
+    char *blk_cpy = malloc(cfg->blk_sz);
+    assert(blk_cpy != NULL);
+    block_mr = rmem_layer->register_data(rmem_layer, blk_cpy, cfg->blk_sz);
+    assert(block_mr != NULL);
+
+    /* Recover every previously allocated block */
+    int bx;
+    for(bx = 0; bx < BLOCK_TBL_NENT; bx++)
+    {
+        blk_desc_t *blk = &(cfg->blk_tbl.rbtbl->tbl[bx]);
+        if(blk->bid < 0)
+            continue; //Freed memory
+
+        assert(blk->local_addr != NULL);
+
+        /* Actual fetch from server */
+        err = rmem_layer->get(rmem_layer, blk_cpy,
+                block_mr, BLK_REAL_TAG(blk->bid),
+                cfg->blk_sz);
+        if(err != 0) {
+            rvm_log("Failed to recover block %d\n", bx);
+            errno = EUNKNOWN;
+            return false;
+        }
+
+        /* Check if server has the same version */
+        err = memcmp(blk_cpy, blk->local_addr, cfg->blk_sz);
+        RETURN_ERROR(err != 0, false, ("Block %d doesn't match replica\n", bx));
+    }
+
+    /* Clean up block copy storage */
+    rmem_layer->deregister_data(rmem_layer, block_mr);
+    free(blk_cpy);
 
     return true;
 }
