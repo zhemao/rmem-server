@@ -307,6 +307,9 @@ int main(int argc, char **argv)
         TX_COMMIT;
 
     case DONE:
+        res = rvm_cfg_destroy(cfg);
+        CHECK_ERROR(!res, ("FAILURE: Failed to destroy rvm state\n"));
+
         LOG(1, ("SUCCESS: Got through all phases\n"));
         break;
 

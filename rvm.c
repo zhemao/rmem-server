@@ -230,7 +230,6 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer
 bool rvm_cfg_destroy(rvm_cfg_t *cfg)
 {
     rmem_layer_t* rmem_layer = cfg->rmem_layer;
-    uint32_t block_tbl_tags[BLOCK_TBL_NPG];
 
     if(cfg == NULL) {
         rvm_log("Received Null configuration\n");
@@ -242,7 +241,7 @@ bool rvm_cfg_destroy(rvm_cfg_t *cfg)
 
     /* Free all remote blocks (leave local blocks)*/
     int bx;
-    for(bx = 0; bx < BLOCK_TBL_NENT; bx+=2)
+    for(bx = 0; bx < BLOCK_TBL_NENT; bx++)
     {
         blk_desc_t *blk = &(cfg->blk_tbl.rbtbl->tbl[bx]);
         if(blk->bid < 0)
@@ -258,19 +257,12 @@ bool rvm_cfg_destroy(rvm_cfg_t *cfg)
         rvm_unprotect(blk->local_addr, cfg->blk_sz);
     }
 
-    /* Clean up config info on server */
-    for (size_t i = 0; i < BLOCK_TBL_NPG; i++)
-	block_tbl_tags[i] = BLOCK_TBL_ID + i;
-
-    rmem_layer->multi_free(rmem_layer, block_tbl_tags, BLOCK_TBL_NPG);
-
     /* We need to commit in order for the frees to actually happen */
     rmem_layer->atomic_commit(rmem_layer, NULL, NULL, NULL, 0);
-    rmem_layer->deregister_data(rmem_layer, cfg->blk_tbl_rec);
     rmem_layer->disconnect(rmem_layer);
 
     /* Free local memory */
-    munmap(cfg->blk_tbl.rbtbl, cfg->blk_sz);
+    munmap(cfg->blk_tbl.rbtbl, BLOCK_TBL_SIZE);
     free(cfg);
 
     return true;
@@ -293,41 +285,11 @@ bool check_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
 {
     int err;
     rmem_layer_t *rmem_layer = cfg->rmem_layer;
-
-    char *btbl_cpy = malloc(BLOCK_TBL_SIZE);
-    RETURN_ERROR(btbl_cpy == NULL, false,
-            ("Couldn't allocate a copy of the block table\n"));
-
-    struct ibv_mr* block_mr = (struct ibv_mr*)rmem_layer->register_data(
-            rmem_layer, btbl_cpy, BLOCK_TBL_SIZE);
-    assert(block_mr != NULL);
-
-    /* Recover the block table */
-    for(size_t i = 0; i < BLOCK_TBL_NPG; i++)
-    {
-        err = rmem_layer->get(rmem_layer,
-                (btbl_cpy + cfg->blk_sz*i),
-                block_mr,
-                BLOCK_TBL_ID + i, cfg->blk_sz);
-        if(err != 0) {
-            rvm_log("Failed to recover block table\n");
-            errno = EUNKNOWN;
-            return false;
-        }
-    }
-
-    /* Check if block table looks right */
-    err = memcmp(btbl_cpy, cfg->blk_tbl.rbtbl, BLOCK_TBL_SIZE);
-    RETURN_ERROR(err != 0, false, ("Block table doesn't match replica\n"));
-
-    /* Clean up block table copy */
-    rmem_layer->deregister_data(rmem_layer, block_mr);
-    free(btbl_cpy);
-    
+ 
     /* Storage for copies of each block */
     char *blk_cpy = malloc(cfg->blk_sz);
     assert(blk_cpy != NULL);
-    block_mr = rmem_layer->register_data(rmem_layer, blk_cpy, cfg->blk_sz);
+    void *block_mr = rmem_layer->register_data(rmem_layer, blk_cpy, cfg->blk_sz);
     assert(block_mr != NULL);
 
     /* Recover every previously allocated block */
