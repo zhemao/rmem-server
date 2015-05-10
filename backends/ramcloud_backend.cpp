@@ -45,6 +45,10 @@ typedef struct rc_main_table_t {
     struct tag_entry tag_entries[TAG_ENTRIES_SIZE];
 } rc_main_table_t;
 
+
+// array of 0's
+char* zero_data = 0;
+
 /*
  * PRIVATE /STATIC METHODS
  */ 
@@ -103,21 +107,16 @@ uint64_t rc_malloc(rmem_layer_t *rmem_layer, size_t size, uint32_t tag)
     // make sure this tag exists in ramcloud
     int64_t size_left = size;
     int i = 0;
-    char* dummy_data = new char[VALUE_MAX_SIZE];
-    memset(dummy_data, 0, VALUE_MAX_SIZE * sizeof(char));
-
     while (size_left > 0) {
         std::string write_chunk_key = CHUNK_KEY(int_to_str(tag), i);
         int64_t size_to_write = std::min(size_left, (int64_t)VALUE_MAX_SIZE);
     
         fprintf(stderr, "rc_malloc: writing table_id: %ld key: %s size: %d\n", table_id, write_chunk_key.c_str(), size_to_write);
         data->client->write(table_id, write_chunk_key.c_str(), 
-                write_chunk_key.size(), (char*)dummy_data, size_to_write);
+                write_chunk_key.size(), (char*)zero_data, size_to_write);
         ++i;
         size_left -= VALUE_MAX_SIZE;
     }
-
-    delete[] dummy_data;
 
     return 1;
 }
@@ -141,7 +140,8 @@ int rc_put(rmem_layer_t *rmem_layer, uint32_t tag,
 
     uint64_t table_id = data->table_id;
 
-    fprintf(stderr, "rc_put4 tag: %u key:%s table_id:%lu key_size:%lu size:%lu\n", tag, write_key.c_str(), table_id, write_key.size(), size);
+    fprintf(stderr, "rc_put4 tag: %u key:%s table_id:%lu key_size:%lu size:%lu\n", 
+            tag, write_key.c_str(), table_id, write_key.size(), size);
 
     int64_t size_left = size;
     int i = 0;
@@ -492,6 +492,10 @@ extern "C" {
         layer->multi_free = rc_multi_free;
         layer->register_data = rc_register_data;
         layer->deregister_data = rc_deregister_data;
+   
+        // initialize  
+        char* zero_data = new char[VALUE_MAX_SIZE];
+        memset(zero_data, 0, VALUE_MAX_SIZE * sizeof(char));
 
         return layer;
     }
