@@ -18,5 +18,8 @@ all: $(TARGETS)
 ramfs: ramfs.h ramfs.c opt.c buddy.c $(RAMC_OBJS)
 	$(CC) $^ -o $@ $(CFLAGS) $(FUSE_LIB) $(LIBS) $(LFLAGS) $(INCLUDES) $(RAMC_LIBS) $(RAMC_INCLUDES) $(LINCLUDES)
 
+kill:
+	kill -9 `ps aux | grep ./ramfs | cut -b10-15 | head -n1`
+
 clean:
 	rm -f $(TARGETS) *.o

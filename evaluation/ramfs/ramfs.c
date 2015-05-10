@@ -1,12 +1,9 @@
 #include "ramfs.h"
 
-extern "C" {
-#include <rvm.h>
-}
 #include <assert.h>
-//#include <malloc_simple.h>
 
 extern "C" {
+#include <rvm.h>
 #include <rmem_backend.h>
 #include <ramcloud_backend.h>
 }
@@ -46,6 +43,9 @@ rvm_cfg_t *cfg;
 reg_t reg_s;
 
 #endif
+
+void* mem_pool;
+extern dentry_t* droot;
 
 // single threaded code, there is only one transaction
 rvm_txid_t main_tx;
@@ -100,8 +100,7 @@ static int ramfs_fsync(const char *path, int only_data, struct fuse_file_info *f
 {
    LOG(8, ("ramfs_fsync: path: %s only_data: %d\n", path, only_data)); 
 
-   rvm_txn_commit(cfg, main_tx);
-   main_tx = rvm_txn_begin(cfg);
+   TX_COMMIT;
 
    return 0;
 }
@@ -109,6 +108,7 @@ static int ramfs_fsync(const char *path, int only_data, struct fuse_file_info *f
 static int ramfs_fsyncdir(const char *path, int only_data, struct fuse_file_info *fi)
 {
    LOG(8, ("ramfs_fsyncdir: path: %s only_data: %d\n", path, only_data)); 
+   TX_COMMIT;
    return 0;
 }
 
@@ -124,7 +124,7 @@ static int ramfs_flush(const char *path, struct fuse_file_info *fi)
 static int ramfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
       off_t offset, struct fuse_file_info *fi)
 {
-   LOG(8, ("readdir\n"));
+   LOG(8, ("readdir path: %s\n", path));
 
    dentry_t* d;
 
@@ -136,8 +136,10 @@ static int ramfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
    filler(buf, ".", NULL, 0);
    filler(buf, "..", NULL, 0);
 
-   for (d = d->dchild; d; d = d->dnext)
+   for (d = d->dchild; d; d = d->dnext) {
+       LOG(8, ("readdir child name: %s\n", d->name));
       filler(buf, d->name, NULL, 0);
+   }
 
    LOG(8, ("readdir return 0\n"));
    return 0;
@@ -246,6 +248,8 @@ static int ramfs_write(const char* path, const char* buf, size_t size, off_t off
    }
 
    memcpy(in->data + offset, buf, size);
+   
+   TX_COMMIT;
 
    return size;
 }
@@ -291,7 +295,9 @@ static int ramfs_mknod(const char * path, mode_t mode, dev_t dev)
 {
    LOG(8, ("ramfs_mknod\n"));
    // new file
-   return __ramfs_mkentry(path, mode);
+   int ret = __ramfs_mkentry(path, mode);
+   TX_COMMIT;
+   return ret;
 }
 
 static int ramfs_mkdir(const char * path, mode_t mode)
@@ -318,7 +324,10 @@ static int ramfs_unlink(const char* path)
 
    /* linux calls rmdir if target is a directory */
 
-   return iunlink(d, d->in);
+   int ret = iunlink(d, d->in);
+   TX_COMMIT;
+   
+   return ret;
 }
 
 static int ramfs_rmdir(const char* path)
@@ -332,7 +341,10 @@ static int ramfs_rmdir(const char* path)
       return -ENOENT;
 
    // removes dentry reference to inode object
-   return iunlink(d, d->in);
+   int ret =  iunlink(d, d->in);
+   TX_COMMIT;
+
+   return ret;
 }
 
 static void* ramfs_init(struct fuse_conn_info *conn)
@@ -354,39 +366,45 @@ static void* ramfs_init(struct fuse_conn_info *conn)
       LOG(8, ("Not Recovering data.."));
    }
 
-   opt.recovery = false;
+   opt.recovery = in_recovery;
 #ifdef USE_RAMCLOUD
    cfg = rvm_cfg_create(&opt, create_ramcloud_layer);
 #else
+   LOG(8, ("rvm_cfg_create.."));
    cfg = rvm_cfg_create(&opt, create_rmem_layer);
+   LOG(8, ("rvm_cfg_create done.."));
 #endif
    assert(cfg);
 
+   LOG(8, ("rvm_txn_begin.."));
    main_tx = rvm_txn_begin(cfg);
 #endif
 
 #ifdef USE_CUSTOM_ALLOC
 #ifdef USE_RVM
-   void *mem = NULL;
    if (in_recovery) {
-      mem = rvm_get_usr_data(cfg);
-      assert(mem);
+       LOG(8, ("rvm_get_usr_data.."));
+      mem_pool = rvm_get_usr_data(cfg);
+      assert(mem_pool);
    } else {
-      mem = rvm_alloc(cfg, POOL_SIZE);
-      assert(mem);
-      rvm_set_usr_data(cfg, mem);
+      mem_pool = rvm_alloc(cfg, POOL_SIZE + sizeof(uintptr_t));
+      assert(mem_pool);
+      rvm_set_usr_data(cfg, mem_pool);
+      TX_COMMIT; 
    }
-   LOG(8, ("rvm_alloc mem: %lx\n", (uintptr_t)mem));
+   LOG(8, ("rvm_alloc mem_pool: %lx\n", (uintptr_t)mem_pool));
 #else
-   void* mem = malloc(POOL_SIZE);
-   assert(mem);
+   mem_pool = malloc(POOL_SIZE + sizeof(uintptr_t));
+   assert(mem_pool);
 #endif
    reg_s.sz = POOL_SIZE;
-   assert( buddy_meminit(&reg_s, PAGE_ORDER, mem) != -1);
+   assert( buddy_meminit(&reg_s, PAGE_ORDER, mem_pool + sizeof(uintptr_t)) != -1);
    assert(reg_s.buf);
 #endif
 
-   ramfs_opt_init();
+   ramfs_opt_init(in_recovery);
+   if (!in_recovery)
+       TX_COMMIT; // commit position of droot
 
    return NULL;
 }
@@ -396,7 +414,8 @@ static void ramfs_destroy(void* v)
    LOG(8, ("ramfs_destroy in_recovery: %d\n", in_recovery));
    ramfs_opt_destroy();
 #ifdef USE_RVM
-   rvm_cfg_destroy(cfg);
+   LOG(8, ("ramfs_destroy rvm_cfg_destroy cfg: %lx\n", (uintptr_t)cfg));
+  // rvm_cfg_destroy(cfg);
 #endif
 }
 
@@ -430,13 +449,23 @@ static struct fuse_operations ramfs_oper = {
 
 static struct fuse_operations ramfs_oper;
 
-void check_recovery(int argc, char* argv[])
+void check_recovery(int* argc, char* argv[])
 {
-   for (int i = 0; i < argc; ++i) {
-      if (strcmp(argv[i], "-r") == 0) {
-         in_recovery = true;
-      }
-   }
+    int nargs = *argc;
+    for (int i = 0; i < nargs; ++i) {
+        if (strcmp(argv[i], "-recovery") == 0) {
+            in_recovery = true;
+            (*argc)--;
+            for (int j = i + 1; j < nargs; ++j) {
+                strcpy(argv[j-1], argv[j]);
+            }
+        }
+    }
+
+    LOG(8, ("argc: %d nargs: %d\n", *argc, nargs));
+    for (int i = 0; i < *argc; ++i) {
+        LOG(8, ("argv[%d] = %s\n", i, argv[i]));
+    }
 }
 
 int main(int argc, char *argv[])
@@ -462,7 +491,7 @@ int main(int argc, char *argv[])
    assert(dup2(fileno(stdout), fileno(stderr)) != -1);
    assert( freopen(LOG_FILE_PATH,"a", stdout) != NULL);
 
-   check_recovery(argc, argv);
+   check_recovery(&argc, argv);
 
    return fuse_main(argc, argv, &ramfs_oper, NULL);
 }

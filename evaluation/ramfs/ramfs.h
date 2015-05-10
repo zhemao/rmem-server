@@ -45,7 +45,7 @@ dentry_t* get_dentry(dentry_t*, const char*);
 dentry_t* get_parent(const char*);
 void get_filename(const char*, char*);
 int d_addchild(dentry_t*, dentry_t*);
-void ramfs_opt_init();
+void ramfs_opt_init(bool);
 void ramfs_opt_destroy();
 
 #endif /*__RAM_FS_H__*/

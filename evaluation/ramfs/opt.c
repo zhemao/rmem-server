@@ -4,8 +4,9 @@
 #include "log.h"
 
 extern reg_t reg_s;
+extern void* mem_pool;
 
-static dentry_t* droot;
+dentry_t* droot;
 
 int ilink(dentry_t* d, inode_t* in)
 {  
@@ -304,7 +305,15 @@ void ramfs_opt_destroy()
 {
 }
 
-void ramfs_opt_init()
+void ramfs_opt_init(bool in_recovery)
 {
-   droot = alloc_dentry("", alloc_inode(S_IFDIR | 0755));
+    if (in_recovery) {
+        droot = *(dentry_t**)mem_pool;
+        LOG(8, ("initing droot to addr: %lx\n", (uintptr_t)droot));
+    } else {
+        droot = alloc_dentry("", alloc_inode(S_IFDIR | 0755));
+        *(dentry_t**)mem_pool = droot;
+        LOG(8, ("inited droot to addr: %lx\n", (uintptr_t)*(dentry_t**)mem_pool));
+    }
 }
+
