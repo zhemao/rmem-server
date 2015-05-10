@@ -352,6 +352,28 @@ int rc_atomic_commit(rmem_layer_t* rmem_layer, uint32_t* tags_src,
     return 0;
 }
 
+int rc_multi_malloc(rmem_layer_t* rmem_layer, uint64_t *addrs,
+	uint64_t size, uint32_t *tags, uint32_t n)
+{
+    for (int i = 0; i < n; i++) {
+        addrs[i] = rc_malloc(rmem_layer, size, tags[i]);
+        if (addrs[i] == 0)
+            return -1;
+    }
+    return 0;
+}
+
+int rc_multi_free(rmem_layer_t *rmem_layer, uint32_t *tags, uint32_t n)
+{
+    int res;
+    for (int i = 0; i < n; i++) {
+        res = rc_free(rmem_layer, tags[i]);
+        if (res != 0)
+            return res;
+    }
+    return 0;
+}
+
 void *rc_register_data(rmem_layer_t* rmem_layer, void *data, size_t size)
 {
     return (void*)1;
@@ -466,6 +488,8 @@ extern "C" {
         layer->put = rc_put;
         layer->get = rc_get;
         layer->atomic_commit = rc_atomic_commit;
+        layer->multi_malloc = rc_multi_malloc;
+        layer->multi_free = rc_multi_free;
         layer->register_data = rc_register_data;
         layer->deregister_data = rc_deregister_data;
 

@@ -1,6 +1,5 @@
 UBM_DIR=$(readlink -f $(dirname $0))
 RMEM_DIR=$(readlink -f "$UBM_DIR/../..")
-RAMC_DIR="$RMEM_DIR/evaluation/ramcloud"
 
 CLIENT=f1
 SERVER=f2
@@ -17,22 +16,26 @@ function stop_rmem_server {
     sleep 1
 }
 
-for i in {1..20}; do
-    printf "%d" $i
+PAGE_NUMS="1 5 10 20 50 100 200 500 1000"
+
+ARCH=$(uname -m)
+
+for pn in $PAGE_NUMS; do
+    printf "%d" $pn
     for trial in {1..3}; do
         start_rmem_server
-        result=$(ssh $CLIENT "$UBM_DIR/commit-bm-rm $SERVER $PORT $i" | tail -n 1)
+        result=$(ssh $CLIENT "setarch $ARCH -R $UBM_DIR/commit-bm-rm $SERVER $PORT $pn" | tail -n 1)
         printf ",%f" $result
         stop_rmem_server
     done
     printf "\n"
 done > commit-results-rm.csv
 
-for i in {1..20}; do
-    printf "%d" $i
+for pn in $PAGE_NUMS; do
+    printf "%d" $pn
     for trial in {1..3}; do
         start_rmem_server
-        result=$(ssh $CLIENT "$UBM_DIR/recovery-bm-rm $SERVER $PORT $i" | tail -n 1)
+        result=$(ssh $CLIENT "setarch $ARCH -R $UBM_DIR/recovery-bm-rm $SERVER $PORT $pn" | tail -n 1)
         printf ",%f" $result
         stop_rmem_server
     done

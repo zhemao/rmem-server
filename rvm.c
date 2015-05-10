@@ -151,8 +151,8 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer
         CHECK_ERROR(res == false, ("Failed to rebuild block table index\n"));
 
     } else {
-	    uint32_t tags[BLOCK_TBL_NPG*2];
-	    uint64_t addrs[BLOCK_TBL_NPG*2];
+        uint32_t tags[BLOCK_TBL_NPG*2];
+        uint64_t addrs[BLOCK_TBL_NPG*2];
 
 	    /* Initialize the raw block table (that will be preserved) */
         res = rbtbl_init(cfg->blk_tbl.rbtbl);
@@ -240,22 +240,24 @@ bool rvm_cfg_destroy(rvm_cfg_t *cfg)
     LOG(9, ("tearing down configuration\n"));
 
     /* Free all remote blocks (leave local blocks)*/
-    int bx;
-    for(bx = 0; bx < BLOCK_TBL_NENT; bx++)
+    for(int bx = 0; bx < BLOCK_TBL_NENT; bx++)
     {
         blk_desc_t *blk = &(cfg->blk_tbl.rbtbl->tbl[bx]);
         if(blk->bid < 0)
             continue;
+
+        /* Unprotect block */
+        rvm_unprotect(blk->local_addr, cfg->blk_sz);
 
         /* Free the remote blocks */
         rmem_layer->free(rmem_layer, BLK_REAL_TAG(blk->bid));
         rmem_layer->free(rmem_layer, BLK_SHDW_TAG(blk->bid));
 
         rmem_layer->deregister_data(rmem_layer, blk->blk_rec);
-
-        /* Unprotect block */
-        rvm_unprotect(blk->local_addr, cfg->blk_sz);
     }
+
+    // remove the special signal handler
+    signal(SIGSEGV, SIG_DFL);
 
     /* We need to commit in order for the frees to actually happen */
     rmem_layer->atomic_commit(rmem_layer, NULL, NULL, NULL, 0);
@@ -285,7 +287,7 @@ bool check_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
 {
     int err;
     rmem_layer_t *rmem_layer = cfg->rmem_layer;
- 
+
     /* Storage for copies of each block */
     char *blk_cpy = malloc(cfg->blk_sz);
     assert(blk_cpy != NULL);
@@ -507,6 +509,7 @@ bool rvm_blk_free(rvm_cfg_t* cfg, void *buf)
     bool res;
     rmem_layer_t* rmem_layer = cfg->rmem_layer;
     uint32_t tags[2];
+    void *local_addr;
 
     blk_desc_t *blk = btbl_lookup(&(cfg->blk_tbl), buf);
 
@@ -522,14 +525,15 @@ bool rvm_blk_free(rvm_cfg_t* cfg, void *buf)
     /* Unset the change bit for this block */
     btbl_clear_mod(&(cfg->blk_tbl), blk);
 
-    /* Free local info */
-    rvm_unprotect(blk->local_addr, cfg->blk_sz);
-    munmap(blk->local_addr, cfg->blk_sz);
-    blk->local_addr = NULL;
-
     /* free in the block table */
     res = btbl_free(&(cfg->blk_tbl), blk);
     CHECK_ERROR(res == false, ("Failed to free block in block table\n"));
+
+    /* Free local info */
+    rvm_unprotect(blk->local_addr, cfg->blk_sz);
+    local_addr = blk->local_addr;
+    blk->local_addr = NULL;
+    munmap(local_addr, cfg->blk_sz);
 
     return true;
 }

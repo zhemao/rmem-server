@@ -6,7 +6,7 @@
 
 #include "util.h"
 
-int *setup_pages(char *host, char *port, int npages)
+void setup_pages(char *host, char *port, int npages)
 {
     rvm_cfg_t *rvm;
     rvm_opt_t opt;
@@ -43,11 +43,9 @@ int *setup_pages(char *host, char *port, int npages)
 	perror("rvm_txn_commit");
 	exit(EXIT_FAILURE);
     }
-
-    return pages;
 }
 
-double recover_pages(char *host, char *port, int *pages, int npages)
+double recover_pages(char *host, char *port)
 {
     double starttime, endtime;
 
@@ -68,19 +66,6 @@ double recover_pages(char *host, char *port, int *pages, int npages)
 	exit(EXIT_FAILURE);
     }
 
-    rvm_txid_t txid = rvm_txn_begin(rvm);
-    if (txid < 0) {
-	perror("rvm_txn_begin");
-	exit(EXIT_FAILURE);
-    }
-
-    rvm_free(rvm, pages);
-
-    if (!rvm_txn_commit(rvm, txid)) {
-	perror("rvm_txn_commit");
-	exit(EXIT_FAILURE);
-    }
-
     rvm_cfg_destroy(rvm);
 
     return endtime - starttime;
@@ -88,7 +73,7 @@ double recover_pages(char *host, char *port, int *pages, int npages)
 
 int main(int argc, char *argv[])
 {
-    int *pages, npages;
+    int npages;
     char *host, *port;
     double rectime;
 
@@ -101,8 +86,8 @@ int main(int argc, char *argv[])
     port = argv[2];
     npages = atoi(argv[3]);
 
-    pages = setup_pages(host, port, npages);
-    rectime = recover_pages(host, port, pages, npages);
+    setup_pages(host, port, npages);
+    rectime = recover_pages(host, port);
 
     printf("%f\n", rectime);
 

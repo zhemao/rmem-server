@@ -159,7 +159,7 @@ int main(int argc, char **argv)
         
         fprintf(stderr, "Check txn commit after commit\n"); 
         CHECK_ERROR(check_txn_commit(cfg, txid) == false,
-                ("FAILURE: commit did not get through - %s", strerror(errno)));
+                ("FAILURE: commit did not get through - %s\n", strerror(errno)));
 
         printf("rvm_txn_begin\n");
         /* Start a new transaction */

@@ -14,7 +14,6 @@ struct rvm_cfg
     
     /* Block Table */
     blk_tbl_t blk_tbl;          /**< Info about all blocks tracked by rvm */
-    void* blk_tbl_rec;           /**< Ugly hack to get IB registration info */
 
     /* User-level allocator */
     rvm_alloc_t alloc_fp;        /**< Function pointer for allocation */
