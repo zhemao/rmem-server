@@ -5,14 +5,7 @@
 
 #include <stdio.h>
 
-#ifndef LOG_LEVEL
-#ifdef DEBUG
 #define LOG_LEVEL 10
-#else // !DEBUG
-#define LOG_LEVEL 1
-#endif // DEBUG
-#endif // LOG_LEVEL
-
 
 #define LOG(level, STR) do {\
     if ((level) < LOG_LEVEL) {\

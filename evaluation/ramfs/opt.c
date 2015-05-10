@@ -240,7 +240,7 @@ dentry_t* get_parent(const char* path)
    size_t len;
 
    // copy path, but leave filename
-   l = rindex(path, '/');
+   l = (char*)rindex(path, '/');
    len = (size_t)l - (size_t)path;
 
    memcpy(p, path, len);
