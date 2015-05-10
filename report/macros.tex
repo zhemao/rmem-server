@@ -1,0 +1,19 @@
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+\newcommand{\attGood}{\ensuremath{\checkmark}}
+\newcommand{\attBad}{\ensuremath{\times}}
+
+\newcount\Comments  % 0 suppresses notes to selves in text
+\Comments=1   % TODO: set to 0 for final version
+
+% for comments
+\usepackage{color}
+\definecolor{darkgreen}{rgb}{0,0.5,0}
+\definecolor{purple}{rgb}{1,0,1}
+% \kibitz{color}{comment} inserts a colored comment in the text
+\newcommand{\kibitz}[2]{\ifnum\Comments=1\textcolor{#1}{#2}\fi}
+% add yourself here:
+\newcommand{\joao}[1]{\kibitz{red}      {[JOAO: #1]}}
+\newcommand{\jianneng}[1]{\kibitz{cyan}     {[JIAN: #1]}}
+\newcommand{\team}[1]  {\kibitz{purple}   {[TEAM: #1]}}
