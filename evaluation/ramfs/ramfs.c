@@ -33,7 +33,8 @@ rvm_cfg_t *cfg;
 #define ONE_MB (1024*1024)
 // must be power of 2
 #define POOL_SIZE (32 *  ONE_MB) 
-#define PAGE_ORDER (12)
+#define PG_SIZE (4*1024)
+#define PAGE_ORDER (LOG2(PG_SIZE))
 
 #define TX_COMMIT {\
    rvm_txn_commit(cfg, main_tx); \
@@ -78,6 +79,11 @@ static int ramfs_getattr(const char *path, struct stat *stbuf)
       stbuf->st_mode = d->in->mode;
       stbuf->st_nlink = d->in->nlink;
       stbuf->st_size = d->in->len;
+      LOG(8, ("getattr path:%s st_mode: %d nlink: %d st_size: %d %d %d %d %d %d %d\n", 
+                  path, d->in->mode, d->in->nlink, d->in->len,
+                  S_ISDIR(d->in->mode), S_ISBLK(d->in->mode), S_ISCHR(d->in->mode), S_ISFIFO(d->in->mode),
+                  S_ISREG(d->in->mode), S_ISLNK(d->in->mode)));
+
    }
 
    LOG(8, ("getattr returns: %d\n", res));
@@ -262,31 +268,46 @@ static int __ramfs_mkentry(const char * path, mode_t mode)
    dentry_t* nd;
    char name[MAX_PATH_SIZE];
 
+   LOG(8, ("ramfs_mkentry getting parent\n"));
    d = get_parent(path);
+   LOG(8, ("ramfs_mkentry getting parent done\n"));
 
    if (!d) {
       LOG(8, ("get_parent returned ENOENT\n"));
       return -ENOENT;
    }
 
+   LOG(8, ("ramfs_mkentry getting filename\n"));
    // get filename
    get_filename(path, name);
+   
+   LOG(8, ("ramfs_mkentry name:%s \n", name));
+
+   //struct stat stbuf;
+   //int st = ramfs_getattr("/", &stbuf);
 
    // check if it already exists
    if (get_dentry(d, name)) {
       return -EEXIST;
    }
+   LOG(8, ("ramfs_mkentry allocing dentry\n"));
 
    // create new instance
-   nd = alloc_dentry(name, alloc_inode(mode));
+   inode_t* inode = alloc_inode(mode);
+   //st = ramfs_getattr("/", &stbuf);
+   nd = alloc_dentry(name, inode);
+   
+   LOG(8, ("ramfs_mkentry alloced dentry\n"));
+   //st = ramfs_getattr("/", &stbuf);
 
+   LOG(8, ("ramfs_mkentry adding dentry to parent\n"));
    // add dentry to parent list
-   if (d_addchild(d, nd))
-   {
-      // if fails, rollbak
+   if (d_addchild(d, nd)) {
       iunlink(nd, nd->in);
       return -ENOSPC;
    }
+   
+   LOG(8, ("ramfs_mkentry done\n"));
 
    return 0;
 }
@@ -295,7 +316,13 @@ static int ramfs_mknod(const char * path, mode_t mode, dev_t dev)
 {
    LOG(8, ("ramfs_mknod\n"));
    // new file
+   //struct stat stbuf;
+   //int st = ramfs_getattr("/", &stbuf);
+
    int ret = __ramfs_mkentry(path, mode);
+
+   //st = ramfs_getattr("/", &stbuf);
+
    TX_COMMIT;
    return ret;
 }
@@ -304,8 +331,14 @@ static int ramfs_mkdir(const char * path, mode_t mode)
 {
    LOG(8, ("ramfs_mkdir %s\n", path));
    // new dir
+
+   //struct stat stbuf;
+   //int st = ramfs_getattr("/", &stbuf);
+
    int ret =  __ramfs_mkentry(path, mode | S_IFDIR);
    LOG(8, ("ramfs_mkdir returns %d\n", ret));
+   
+   //st = ramfs_getattr("/", &stbuf);
 
    TX_COMMIT;
 
@@ -398,7 +431,7 @@ static void* ramfs_init(struct fuse_conn_info *conn)
    assert(mem_pool);
 #endif
    reg_s.sz = POOL_SIZE;
-   assert( buddy_meminit(&reg_s, PAGE_ORDER, mem_pool + sizeof(uintptr_t)) != -1);
+   assert( buddy_meminit(&reg_s, PAGE_ORDER, mem_pool + sizeof(uintptr_t), in_recovery) != -1);
    assert(reg_s.buf);
 #endif
 

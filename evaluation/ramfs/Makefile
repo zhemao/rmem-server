@@ -11,7 +11,7 @@ LINCLUDES = -L/nscratch/joao/ramcloud/obj.master
 RAMC_LIBS = -lramcloud -lboost_system -lboost_program_options
 RAMC_OBJS := /nscratch/joao/ramcloud/obj.master/OptionParser.o
 
-TARGETS = ramfs
+TARGETS = clean ramfs
 
 all: $(TARGETS)
 

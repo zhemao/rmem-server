@@ -2,6 +2,7 @@
 #include "config.h"
 #include "buddy.h"
 #include "log.h"
+#include <assert.h>
 
 extern reg_t reg_s;
 extern void* mem_pool;
@@ -100,6 +101,8 @@ inode_t* alloc_inode(mode_t mode)
 #endif
 
    if (in) {
+       LOG(8, ("allocated inode. data: %lx len: %d nlink: %d mode: %d\n",
+                   in->data, in->len, in->nlink, in->mode));
       in->data = NULL;
       in->len = 0;
       in->nlink = 0;
@@ -148,6 +151,9 @@ dentry_t* alloc_dentry(char* name, inode_t* in)
 #endif
 
    if (d) {
+      LOG(8, ("buddy malloc alloced dentry name: %lx\n", (uintptr_t)d->name));
+      if (d->name)
+          LOG(8, ("buddy malloc alloced dentry name: %s\n", d->name));
       d->in = NULL;
       d->dnext = NULL;
       d->dchild = NULL;
@@ -236,16 +242,27 @@ static dentry_t* __get_path(char* path)
 
 dentry_t* get_parent(const char* path)
 {
+    LOG(8, ("get_parent path: %s\n", path));
    char p[MAX_PATH_SIZE];
    char* l;
    size_t len;
 
    // copy path, but leave filename
    l = (char*)rindex(path, '/');
+
+   assert(l);
+
    len = (size_t)l - (size_t)path;
+    
+   LOG(8, ("get_parent l: %lx len: %d\n", (uintptr_t)l, len));
 
    memcpy(p, path, len);
    p[len] = '\0';
+
+//   if (len == 0)
+//       strcpy(p, "/");
+   
+   LOG(8, ("get_parent p: %s\n", p));
    
    return __get_path(p);
 }
