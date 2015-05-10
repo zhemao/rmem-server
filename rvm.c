@@ -241,25 +241,28 @@ bool rvm_cfg_destroy(rvm_cfg_t *cfg)
 
     /* Free all remote blocks (leave local blocks)*/
     int bx;
+
     for(bx = 0; bx < BLOCK_TBL_NENT; bx++)
     {
         blk_desc_t *blk = &(cfg->blk_tbl.rbtbl->tbl[bx]);
         if(blk->bid < 0)
             continue;
 
+        /* Unprotect block */
+        rvm_unprotect(blk->local_addr, cfg->blk_sz);
+
         /* Free the remote blocks */
         rmem_layer->free(rmem_layer, BLK_REAL_TAG(blk->bid));
         rmem_layer->free(rmem_layer, BLK_SHDW_TAG(blk->bid));
 
         rmem_layer->deregister_data(rmem_layer, blk->blk_rec);
-
-        /* Unprotect block */
-        rvm_unprotect(blk->local_addr, cfg->blk_sz);
     }
+
+    // remove the special signal handler
+    signal(SIGSEGV, SIG_DFL);
 
     /* We need to commit in order for the frees to actually happen */
     rmem_layer->atomic_commit(rmem_layer, NULL, NULL, NULL, 0);
-    rmem_layer->deregister_data(rmem_layer, cfg->blk_tbl_rec);
     rmem_layer->disconnect(rmem_layer);
 
     /* Free local memory */
@@ -538,6 +541,7 @@ bool rvm_blk_free(rvm_cfg_t* cfg, void *buf)
     bool res;
     rmem_layer_t* rmem_layer = cfg->rmem_layer;
     uint32_t tags[2];
+    void *local_addr;
 
     blk_desc_t *blk = btbl_lookup(&(cfg->blk_tbl), buf);
 
@@ -553,14 +557,15 @@ bool rvm_blk_free(rvm_cfg_t* cfg, void *buf)
     /* Unset the change bit for this block */
     btbl_clear_mod(&(cfg->blk_tbl), blk);
 
-    /* Free local info */
-    rvm_unprotect(blk->local_addr, cfg->blk_sz);
-    munmap(blk->local_addr, cfg->blk_sz);
-    blk->local_addr = NULL;
-
     /* free in the block table */
     res = btbl_free(&(cfg->blk_tbl), blk);
     CHECK_ERROR(res == false, ("Failed to free block in block table\n"));
+
+    /* Free local info */
+    rvm_unprotect(blk->local_addr, cfg->blk_sz);
+    local_addr = blk->local_addr;
+    blk->local_addr = NULL;
+    munmap(local_addr, cfg->blk_sz);
 
     return true;
 }
