@@ -88,11 +88,11 @@ typedef struct
 
 /* Get the tag for a real block
  int BX - index of the block in the block table */
-#define BLK_REAL_TAG(BX) (BLOCK_TBL_NPG + BX*2 + 1)
+#define BLK_REAL_TAG(BX) ((uint32_t)(BX*2))
 
 /* Get the tag for a shadow-block
    int BX - the index of the block in the block table */
-#define BLK_SHDW_TAG(BX) (BLOCK_TBL_NPG + BX*2 + 2)
+#define BLK_SHDW_TAG(BX) ((uint32_t)(BX*2 + 1))
 
 /* Initialize a freshly allocated raw block table */
 bool rbtbl_init(raw_blk_tbl_t *rbtbl);

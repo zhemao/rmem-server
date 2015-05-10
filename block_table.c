@@ -11,16 +11,15 @@
 bool rbtbl_init(raw_blk_tbl_t *rbtbl)
 {
     rbtbl->free = NULL;
+    rbtbl->n_blocks = 0;
+    rbtbl->alloc_data = NULL;
+    rbtbl->usr_data = NULL;
 
-    /*TODO Hack due to lazyness: block 0 is reserved because -0 is still
-     * 0 so we can't tell if it's free or not. We just don't put it on the
-     * free list */
-    rbtbl->tbl[0].bid = INT_MIN;
-    rbtbl->tbl[0].blk_rec = NULL;
-    rbtbl->tbl[0].local_addr = NULL;
-
-    /* Initialize all blocks to free. */
-    for(int bx = 1; bx < BLOCK_TBL_NENT; bx++)
+    /* Initialize all blocks to free.
+     * Loop goes backward so that the free-list goes forward. This is important
+     * because the block table takes the first BLOCK_TBL_NPG entries and those
+     * must be in the first block. */
+    for(int bx = BLOCK_TBL_NENT - 1; bx >= 0; bx--)
     {
         rbtbl->tbl[bx].bid = -bx;
         rbtbl->tbl[bx].blk_rec = NULL;
@@ -44,7 +43,7 @@ bool btbl_init(blk_tbl_t *btbl, raw_blk_tbl_t *rbtbl)
 
     /* Insert every allocated block from rbtbl into the index */
     size_t nalloc = 0; //Number of allocated blocks found so far
-    for(int bx = 1; bx < BLOCK_TBL_NENT; bx++)
+    for(int bx = 0; bx < BLOCK_TBL_NENT; bx++)
     {
         blk_desc_t *blk = &(rbtbl->tbl[bx]);
         if(blk->bid >= 0) {
@@ -90,6 +89,9 @@ blk_desc_t *btbl_alloc(blk_tbl_t *tbl, void *local_addr)
         tbl->rbtbl->n_blocks++;
         desc->local_addr = local_addr;
         hash_insert_item(tbl->blk_idx, (uint64_t)desc->local_addr, desc);
+
+        /* Allocated blocks are considered modified */
+        btbl_mark_mod(tbl, desc);
 
         return desc;
     }

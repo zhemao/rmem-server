@@ -235,7 +235,7 @@ void receive_tag_to_addr_info(struct rmem* rmem)
         sem_wait(&rmem->ctx.recv_sem);
 
         int size = rmem->ctx.recv_msg->data.tag_addr_map.size;
-	LOG(5, ("Received %d mappings\n", size));
+        LOG(5, ("Received %d mappings\n", size));
 
         tag_addr_entry_t* entries = 
             (tag_addr_entry_t*)rmem->ctx.recv_msg->data.tag_addr_map.data;
@@ -245,8 +245,8 @@ void receive_tag_to_addr_info(struct rmem* rmem)
             insert_tag_to_addr(rmem, entries[i].tag, entries[i].addr);
         }
 
-	TEST_NZ(send_message(rmem->id));
-	sem_wait(&rmem->ctx.send_sem);
+        TEST_NZ(send_message(rmem->id));
+        sem_wait(&rmem->ctx.send_sem);
 
         if (size < TAG_ADDR_MAP_SIZE_MSG)
             break;
@@ -586,13 +586,13 @@ static int rmem_multi_free_group(struct rmem *rmem, uint32_t *tags, int n)
     struct client_context *ctx = &rmem->ctx;
 
     for (int i = 0; i < n; i++) {
-	uint32_t tag = tags[i];
-	uint64_t addr = lookup_remote_addr(rmem->tag_to_addr, tag);
-	CHECK_ERROR(addr == 0,
-		("Failure: tag %d not found\n", tag));
-	LOG(8, ("rmem_free addr: %ld tag: %d\n", addr, tag));
-	ctx->send_msg->data.multi_free.addrs[i] = addr;
-	hash_delete_item(rmem->tag_to_addr, tag);
+        uint32_t tag = tags[i];
+        uint64_t addr = lookup_remote_addr(rmem->tag_to_addr, tag);
+        CHECK_ERROR(addr == 0,
+            ("Failure: tag %d not found\n", tag));
+        LOG(8, ("rmem_free addr: %ld tag: %d\n", addr, tag));
+        ctx->send_msg->data.multi_free.addrs[i] = addr;
+        hash_delete_item(rmem->tag_to_addr, tag);
     }
 
     ctx->send_msg->data.multi_free.nitems = n;
@@ -601,12 +601,12 @@ static int rmem_multi_free_group(struct rmem *rmem, uint32_t *tags, int n)
     if (send_message(rmem->id))
         return -1;
     if (post_receive(rmem->id))
-	return -1;
+        return -1;
 
     if (sem_wait(&ctx->send_sem))
         return -1;
     if (sem_wait(&ctx->recv_sem))
-	return -1;
+        return -1;
 
     return 0;
 }
