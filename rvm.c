@@ -151,8 +151,8 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer
         CHECK_ERROR(res == false, ("Failed to rebuild block table index\n"));
 
     } else {
-	    uint32_t tags[BLOCK_TBL_NPG*2];
-	    uint64_t addrs[BLOCK_TBL_NPG*2];
+        uint32_t tags[BLOCK_TBL_NPG*2];
+        uint64_t addrs[BLOCK_TBL_NPG*2];
 
 	    /* Initialize the raw block table (that will be preserved) */
         res = rbtbl_init(cfg->blk_tbl.rbtbl);
@@ -308,7 +308,7 @@ bool check_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
         err = rmem_layer->get(rmem_layer,
                 (btbl_cpy + cfg->blk_sz*i),
                 block_mr,
-                BLOCK_TBL_ID + i, cfg->blk_sz);
+                BLOCK_TBL_ID + 2 * i, cfg->blk_sz);
         if(err != 0) {
             rvm_log("Failed to recover block table\n");
             errno = EUNKNOWN;
