@@ -1,4 +1,5 @@
 *.o
+*.gch
 /rmem-server
 /rmem-test
 /librvm.a
