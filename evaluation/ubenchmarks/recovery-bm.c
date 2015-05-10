@@ -86,9 +86,7 @@ int main(int argc, char *argv[])
     port = argv[2];
     npages = atoi(argv[3]);
 
-    printf("Setting up pages\n");
     setup_pages(host, port, npages);
-    printf("Recovering pages\n");
     rectime = recover_pages(host, port);
 
     printf("%f\n", rectime);
