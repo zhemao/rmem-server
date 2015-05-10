@@ -1,8 +1,10 @@
 #include "ramfs.h"
 #include "config.h"
 #include "buddy.h"
+#include "log.h"
 
-extern struct reg_t reg_s;
+extern reg_t reg_s;
+
 static dentry_t* droot;
 
 int ilink(dentry_t* d, inode_t* in)
@@ -89,8 +91,10 @@ inode_t* alloc_inode(mode_t mode)
 {
    inode_t* in;
 
+   in = (inode_t*)buddy_memalloc(&reg_s, sizeof(inode_t));
 #ifdef USE_CUSTOM_ALLOC
-   in = buddy_memalloc(&reg_s, sizeof(inode_t));
+   in = (inode_t*)buddy_memalloc(&reg_s, sizeof(inode_t));
+   LOG(8, ("custom alloced %d bytes ptr: %lx\n", sizeof(inode_t), in));
 #else
    in = (inode_t*)malloc(sizeof(inode_t));
 #endif
@@ -112,10 +116,20 @@ int free_inode(inode_t* in)
       if (in->nlink)
          return -1;
 
-      if (in->data)
+      if (in->data) {
+#ifdef USE_CUSTOM_ALLOC
+         buddy_memfree(&reg_s, in->data);
+         LOG(8, ("custom freed ptr: %lx\n", in->data));
+#else
          free(in->data);
+#endif
+      }
 
+#ifdef USE_CUSTOM_ALLOC
+      buddy_memfree(&reg_s, in);
+#else
       free(in);
+#endif
    }
 
    return 0;
@@ -126,8 +140,10 @@ dentry_t* alloc_dentry(char* name, inode_t* in)
    dentry_t* d;
    int nlen;
 
+   //d = (dentry_t*)buddy_memalloc(&reg_s, sizeof(dentry_t));
 #ifdef USE_CUSTOM_ALLOC
-   d = (dentry_t*)buddy_memalloc(sizeof(dentry_t));
+   d = (dentry_t*)buddy_memalloc(&reg_s, sizeof(dentry_t));
+   LOG(8, ("custom alloced %d bytes ptr: %lx\n", sizeof(dentry_t), d));
 #else 
    d = (dentry_t*)malloc(sizeof(dentry_t));
 #endif
@@ -144,8 +160,10 @@ dentry_t* alloc_dentry(char* name, inode_t* in)
       {
          nlen = strlen(name);
 
+         //d->name = (char*)buddy_memalloc(&reg_s, sizeof(char) * nlen);
 #ifdef USE_CUSTOM_ALLOC
-         d->name = (char*)buddy_memalloc(sizeof(char) * nlen);
+         d->name = (char*)buddy_memalloc(&reg_s, sizeof(char) * nlen);
+         LOG(8, ("custom alloced %d bytes ptr: %lx\n", nlen, d->name));
 #else 
          d->name = (char*)malloc(sizeof(char)*nlen);
 #endif
@@ -162,10 +180,21 @@ int free_dentry(dentry_t* d)
       if (d->dnext || d->dchild || d->dinode)
          return -1;
 
-      if (d->name)
+      if (d->name) {
+#ifdef USE_CUSTOM_ALLOC
+         buddy_memfree(&reg_s, d->name);
+         LOG(8, ("custom freed ptr: %lx\n", d->name));
+#else
          free(d->name);
-
+#endif
+      }
+#ifdef USE_CUSTOM_ALLOC
+      buddy_memfree(&reg_s, d);
+      LOG(8, ("custom freed ptr: %lx\n", d));
+#else
       free(d);
+#endif
+
    }
 
    return 0;

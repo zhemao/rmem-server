@@ -5,6 +5,7 @@
 #include <rmem_backend.h>
 #include <unistd.h>
 
+#include "config.h"
 #include "buddy.h"
 #include "log.h"
 
@@ -12,14 +13,17 @@
 rvm_cfg_t *cfg;
 #endif
 
-#ifdef USE_CUSTOM_ALLOC
-int pool_handle = -1;
 #define ONE_MB (1024*1024)
-#define POOL_SIZE (500 *  ONE_MB)
 
-struct reg_t reg_s;
+// must be power of 2
+#define POOL_SIZE (16 *  ONE_MB) 
+//#ifdef USE_CUSTOM_ALLOC
 
-#endif
+reg_t reg_s;
+
+//#endif
+
+#define PAGE_ORDER (12)
 
 #define LOG_FILE_PATH "/nscratch/joao/repos/rmem-server/evaluation/ramfs/log_out"
 
@@ -51,14 +55,12 @@ static int ramfs_getattr(const char *path, struct stat *stbuf)
 static int ramfs_getxattr(const char *path, const char* name, char* value, size_t size)
 {
    LOG(8, ("getxattr path: %s\n", path));
-   assert(0);
    return -1;
 }
 
 static int ramfs_listxattr(const char *path, char* name, size_t size)
 {
    LOG(8, ("listxattr path: %s\n", path));
-   assert(0);
    return -1;
 }
 
@@ -166,10 +168,12 @@ static int ramfs_write(const char* path, const char* buf, size_t size, off_t off
       // this is a huge performance penalty
       // to improve performance a smarter memory management algorithm should be used
 
+      tmp = buddy_memalloc(&reg_s, in->len+size);
 #ifdef USE_CUSTOM_ALLOC
       tmp = buddy_memalloc(&reg_s, in->len+size);
+      LOG(8, ("custom alloced %lu bytes ptr: %lx\n", in->len+size, (uintptr_t)tmp));
 #else
-      tmp = malloc(in->len + size);
+      //tmp = malloc(in->len + size);
 #endif
 
       if (tmp)
@@ -182,10 +186,12 @@ static int ramfs_write(const char* path, const char* buf, size_t size, off_t off
             for (i = 0; i < in->len; i+=2) {
                ((char*)tmp)[i] = 'T';
             }
+            buddy_memfree(&reg_s, in->data);
 #ifdef USE_CUSTOM_ALLOC
             buddy_memfree(&reg_s, in->data);
+            LOG(8, ("custom freed %d ptr: %lx\n", in->data));
 #else
-            free(in->data);
+       //     free(in->data);
 #endif
          }
 
@@ -280,7 +286,27 @@ static int ramfs_rmdir(const char* path)
 
 static void* ramfs_init(struct fuse_conn_info *conn)
 {
+
    LOG(8, ("ramfs_init\n"));
+
+#ifdef USE_CUSTOM_ALLOC
+#ifdef USE_RVM
+   void *mem = rvm_alloc(cfg, POOL_SIZE);
+#else
+   void* mem = malloc(POOL_SIZE);
+   assert(mem);
+#endif
+   reg_s.sz = POOL_SIZE;
+   assert( buddy_meminit(&reg_s, PAGE_ORDER, mem) != -1);
+   assert(reg_s.buf);
+#endif
+
+/*   void* mem = malloc(POOL_SIZE);
+   assert(mem);
+   reg_s.sz = POOL_SIZE;
+   assert( buddy_meminit(&reg_s, PAGE_ORDER, mem) != -1);
+   */
+
    ramfs_opt_init();
 
 #ifdef USE_RVM
@@ -295,16 +321,7 @@ static void* ramfs_init(struct fuse_conn_info *conn)
    assert(cfg);
 #endif
 
-#ifdef USE_CUSTOM_ALLOC
-#ifdef USE_RVM
-   void *mem = rvm_alloc(cfg, POOL_SIZE);
-#else
-   void* mem = malloc(POOL_SIZE);
-   assert(mem);
-#endif
-   reg_s.sz = POOL_SIZE;
-   buddy_meminit(&reg_s, 4 * 1024, mem);
-#endif
+  
 
    // redirect stderr to stdout
    assert(dup2(fileno(stdout), fileno(stderr)) != -1);
@@ -326,8 +343,8 @@ static struct fuse_operations ramfs_oper = {
    .destroy = ramfs_destroy,
 
    .getattr   = ramfs_getattr,
-   .getxattr   = ramfs_getxattr,
-   .listxattr   = ramfs_listxattr,
+//   .getxattr   = ramfs_getxattr,
+//   .listxattr   = ramfs_listxattr,
 
    .open   = ramfs_open,
 // .create = ramfs_create, // open will be called
@@ -342,8 +359,8 @@ static struct fuse_operations ramfs_oper = {
    .unlink = ramfs_unlink,
    .rmdir = ramfs_rmdir,
 
-   .fsync = ramfs_fsync,
-   .fsyncdir = ramfs_fsyncdir,
+//   .fsync = ramfs_fsync,
+//   .fsyncdir = ramfs_fsyncdir,
 };
 
 int main(int argc, char *argv[])

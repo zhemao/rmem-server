@@ -1,5 +1,5 @@
 CC       = gcc
-CFLAGS   = -g -Wall -std=gnu11
+CFLAGS   = -Wall -std=gnu11 -ggdb
 INCLUDES = -I/nscratch/joao/repos/rmem-server -I/nscratch/joao/repos/rmem-server/backends
 LIBS     = -lrvm -lrdmacm -libverbs -lpthread
 LFLAGS   = -L/nscratch/joao/repos/rmem-server
