@@ -5,10 +5,20 @@
 #include <rmem_backend.h>
 #include <unistd.h>
 
+#include "buddy.h"
 #include "log.h"
 
 #ifdef USE_RVM
 rvm_cfg_t *cfg;
+#endif
+
+#ifdef USE_CUSTOM_ALLOC
+int pool_handle = -1;
+#define ONE_MB (1024*1024)
+#define POOL_SIZE (500 *  ONE_MB)
+
+struct reg_t reg_s;
+
 #endif
 
 #define LOG_FILE_PATH "/nscratch/joao/repos/rmem-server/evaluation/ramfs/log_out"
@@ -156,8 +166,8 @@ static int ramfs_write(const char* path, const char* buf, size_t size, off_t off
       // this is a huge performance penalty
       // to improve performance a smarter memory management algorithm should be used
 
-#ifdef USE_RVM
-      tmp = rvm_alloc(cfg, in->len + size);
+#ifdef USE_CUSTOM_ALLOC
+      tmp = buddy_memalloc(&reg_s, in->len+size);
 #else
       tmp = malloc(in->len + size);
 #endif
@@ -172,8 +182,8 @@ static int ramfs_write(const char* path, const char* buf, size_t size, off_t off
             for (i = 0; i < in->len; i+=2) {
                ((char*)tmp)[i] = 'T';
             }
-#ifdef USE_RVM
-            rvm_free(cfg, in->data);
+#ifdef USE_CUSTOM_ALLOC
+            buddy_memfree(&reg_s, in->data);
 #else
             free(in->data);
 #endif
@@ -285,9 +295,21 @@ static void* ramfs_init(struct fuse_conn_info *conn)
    assert(cfg);
 #endif
 
+#ifdef USE_CUSTOM_ALLOC
+#ifdef USE_RVM
+   void *mem = rvm_alloc(cfg, POOL_SIZE);
+#else
+   void* mem = malloc(POOL_SIZE);
+   assert(mem);
+#endif
+   reg_s.sz = POOL_SIZE;
+   buddy_meminit(&reg_s, 4 * 1024, mem);
+#endif
+
    // redirect stderr to stdout
    assert(dup2(fileno(stdout), fileno(stderr)) != -1);
    assert( freopen(LOG_FILE_PATH,"a", stdout) != NULL);
+
    return NULL;
 }
 

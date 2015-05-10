@@ -1,6 +1,8 @@
 #include "ramfs.h"
+#include "config.h"
+#include "buddy.h"
 
-// our fs' root
+extern struct reg_t reg_s;
 static dentry_t* droot;
 
 int ilink(dentry_t* d, inode_t* in)
@@ -77,8 +79,6 @@ int iunlink(dentry_t* d, inode_t* in)
    free_dentry(d);
    in->nlink--;
 
-   // no more dentries pointing to this inode?
-   // if so, it's unreachable and we can kill it
    if (!in->nlink)
       free_inode(in);
 
@@ -89,10 +89,13 @@ inode_t* alloc_inode(mode_t mode)
 {
    inode_t* in;
 
+#ifdef USE_CUSTOM_ALLOC
+   in = buddy_memalloc(&reg_s, sizeof(inode_t));
+#else
    in = (inode_t*)malloc(sizeof(inode_t));
+#endif
 
-   if (in)
-   {
+   if (in) {
       in->data = NULL;
       in->len = 0;
       in->nlink = 0;
@@ -105,8 +108,7 @@ inode_t* alloc_inode(mode_t mode)
 
 int free_inode(inode_t* in)
 {
-   if (in)
-   {
+   if (in) {
       if (in->nlink)
          return -1;
 
@@ -124,10 +126,13 @@ dentry_t* alloc_dentry(char* name, inode_t* in)
    dentry_t* d;
    int nlen;
 
+#ifdef USE_CUSTOM_ALLOC
+   d = (dentry_t*)buddy_memalloc(sizeof(dentry_t));
+#else 
    d = (dentry_t*)malloc(sizeof(dentry_t));
+#endif
 
-   if (d)
-   {
+   if (d) {
       d->in = NULL;
       d->dnext = NULL;
       d->dchild = NULL;
@@ -138,7 +143,12 @@ dentry_t* alloc_dentry(char* name, inode_t* in)
       if (!ilink(d, in))
       {
          nlen = strlen(name);
+
+#ifdef USE_CUSTOM_ALLOC
+         d->name = (char*)buddy_memalloc(sizeof(char) * nlen);
+#else 
          d->name = (char*)malloc(sizeof(char)*nlen);
+#endif
          strcpy(d->name, name);
       }
    }
@@ -148,8 +158,7 @@ dentry_t* alloc_dentry(char* name, inode_t* in)
 
 int free_dentry(dentry_t* d)
 {
-   if (d)
-   {
+   if (d) {
       if (d->dnext || d->dchild || d->dinode)
          return -1;
 
@@ -190,8 +199,7 @@ static dentry_t* __get_path(char* path)
    if ( (d = get_dentry(d, t)) == NULL )
       return NULL;
 
-   while ( (t = strtok(NULL, "/")) )
-   {
+   while ( (t = strtok(NULL, "/")) ) {
       if ( (d = get_dentry(d, t)) == NULL )
          break;
    }
@@ -234,9 +242,9 @@ void get_filename(const char* path, char* name)
 
    t = strtok(p, "/");
 
-   do
+   do {
       prev = t; 
-   while ( ( t = strtok(NULL, "/") ) );
+   } while ( ( t = strtok(NULL, "/") ) );
    
    strcpy(name, prev);
 
@@ -254,8 +262,7 @@ int d_addchild(dentry_t* dparent, dentry_t* child)
    // add child to parent list
    if (!dparent->dchild)
       dparent->dchild = child;      
-   else
-   {
+   else {
       for( d = dparent->dchild; d->dnext; d = d->dnext )
          ;
       
@@ -269,14 +276,9 @@ int d_addchild(dentry_t* dparent, dentry_t* child)
 
 void ramfs_opt_destroy()
 {
-   // oh, i'm just so lazy
-   // kernel will do it for me
-
-   // TODO: deepth first search and remove nodes botton up
 }
 
 void ramfs_opt_init()
 {
-   // alloc root inode and dentry
    droot = alloc_dentry("", alloc_inode(S_IFDIR | 0755));
 }

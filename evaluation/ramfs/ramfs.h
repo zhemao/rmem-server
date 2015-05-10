@@ -2,7 +2,6 @@
 #define __RAM_FS_H__
 
 #define FUSE_USE_VERSION  26
-   
 #define MAX_PATH_SIZE 256
 
 #include <fuse.h>  
@@ -24,8 +23,7 @@ typedef struct inode {
 } inode_t;
 
 
-typedef struct dentry
-{
+typedef struct dentry {
    inode_t* in;
    char* name;
 
