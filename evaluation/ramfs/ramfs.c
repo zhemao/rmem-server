@@ -13,17 +13,17 @@
 rvm_cfg_t *cfg;
 #endif
 
-#define ONE_MB (1024*1024)
+#ifdef USE_CUSTOM_ALLOC
 
+#define ONE_MB (1024*1024)
 // must be power of 2
-#define POOL_SIZE (16 *  ONE_MB) 
-//#ifdef USE_CUSTOM_ALLOC
+#define POOL_SIZE (64 *  ONE_MB) 
+#define PAGE_ORDER (12)
 
 reg_t reg_s;
 
-//#endif
+#endif
 
-#define PAGE_ORDER (12)
 
 #define LOG_FILE_PATH "/nscratch/joao/repos/rmem-server/evaluation/ramfs/log_out"
 
@@ -168,12 +168,11 @@ static int ramfs_write(const char* path, const char* buf, size_t size, off_t off
       // this is a huge performance penalty
       // to improve performance a smarter memory management algorithm should be used
 
-      tmp = buddy_memalloc(&reg_s, in->len+size);
 #ifdef USE_CUSTOM_ALLOC
       tmp = buddy_memalloc(&reg_s, in->len+size);
       LOG(8, ("custom alloced %lu bytes ptr: %lx\n", in->len+size, (uintptr_t)tmp));
 #else
-      //tmp = malloc(in->len + size);
+      tmp = malloc(in->len + size);
 #endif
 
       if (tmp)
@@ -186,12 +185,11 @@ static int ramfs_write(const char* path, const char* buf, size_t size, off_t off
             for (i = 0; i < in->len; i+=2) {
                ((char*)tmp)[i] = 'T';
             }
-            buddy_memfree(&reg_s, in->data);
 #ifdef USE_CUSTOM_ALLOC
             buddy_memfree(&reg_s, in->data);
             LOG(8, ("custom freed %d ptr: %lx\n", in->data));
 #else
-       //     free(in->data);
+            free(in->data);
 #endif
          }
 
@@ -301,12 +299,6 @@ static void* ramfs_init(struct fuse_conn_info *conn)
    assert(reg_s.buf);
 #endif
 
-/*   void* mem = malloc(POOL_SIZE);
-   assert(mem);
-   reg_s.sz = POOL_SIZE;
-   assert( buddy_meminit(&reg_s, PAGE_ORDER, mem) != -1);
-   */
-
    ramfs_opt_init();
 
 #ifdef USE_RVM
@@ -359,7 +351,7 @@ static struct fuse_operations ramfs_oper = {
    .unlink = ramfs_unlink,
    .rmdir = ramfs_rmdir,
 
-//   .fsync = ramfs_fsync,
+   .fsync = ramfs_fsync,
 //   .fsyncdir = ramfs_fsyncdir,
 };
 

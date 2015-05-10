@@ -91,7 +91,6 @@ inode_t* alloc_inode(mode_t mode)
 {
    inode_t* in;
 
-   in = (inode_t*)buddy_memalloc(&reg_s, sizeof(inode_t));
 #ifdef USE_CUSTOM_ALLOC
    in = (inode_t*)buddy_memalloc(&reg_s, sizeof(inode_t));
    LOG(8, ("custom alloced %d bytes ptr: %lx\n", sizeof(inode_t), in));
@@ -140,7 +139,6 @@ dentry_t* alloc_dentry(char* name, inode_t* in)
    dentry_t* d;
    int nlen;
 
-   //d = (dentry_t*)buddy_memalloc(&reg_s, sizeof(dentry_t));
 #ifdef USE_CUSTOM_ALLOC
    d = (dentry_t*)buddy_memalloc(&reg_s, sizeof(dentry_t));
    LOG(8, ("custom alloced %d bytes ptr: %lx\n", sizeof(dentry_t), d));
@@ -160,7 +158,6 @@ dentry_t* alloc_dentry(char* name, inode_t* in)
       {
          nlen = strlen(name);
 
-         //d->name = (char*)buddy_memalloc(&reg_s, sizeof(char) * nlen);
 #ifdef USE_CUSTOM_ALLOC
          d->name = (char*)buddy_memalloc(&reg_s, sizeof(char) * nlen);
          LOG(8, ("custom alloced %d bytes ptr: %lx\n", nlen, d->name));
