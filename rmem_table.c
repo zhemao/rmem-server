@@ -293,7 +293,8 @@ static inline struct alloc_entry *merge_free_blocks(
             list_insert(last_free, &entry->free_list);
         }
     } else {
-        list_append(&rmem->free_list, &entry->free_list);
+        // if there was no previous entry, add to the head of the free_list
+        list_insert(&rmem->free_list, &entry->free_list);
     }
 
     if (entry->list.next == &rmem->list) {
