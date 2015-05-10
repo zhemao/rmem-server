@@ -9,6 +9,7 @@ typedef struct
     int64_t skmerx;
     char cur_contig[MAXIMUM_CONTIG_SIZE];
     start_kmer_t *curStartNode;
+    kmer_t *cur_kmr;
     int64_t posInContig;
     size_t floc; /* Next writable location in output file */
 } probe_state_t;

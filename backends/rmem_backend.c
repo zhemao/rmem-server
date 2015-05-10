@@ -235,7 +235,7 @@ void receive_tag_to_addr_info(struct rmem* rmem)
         sem_wait(&rmem->ctx.recv_sem);
 
         int size = rmem->ctx.recv_msg->data.tag_addr_map.size;
-        LOG(5, ("Received %d mappings\n", size));
+        LOG(8, ("Received %d mappings\n", size));
 
         tag_addr_entry_t* entries = 
             (tag_addr_entry_t*)rmem->ctx.recv_msg->data.tag_addr_map.data;

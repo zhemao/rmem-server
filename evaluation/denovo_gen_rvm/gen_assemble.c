@@ -30,6 +30,9 @@ const char DEF_OUT_NAME[8] = "gen.out";
 
 rvm_cfg_t *cfg;
 
+int fa_freq;
+int cp_freq;
+
 void initialize_rvm(char*host, char* port, bool rec)
 {
     rvm_opt_t opt;
@@ -53,8 +56,10 @@ int main(int argc, char *argv[]) {
 	char *port = NULL;
 	const char *out_filename = DEF_OUT_NAME;
 	bool rec = false;
-    int fa_freq  = INT_MAX;
-    int cp_freq = 1;
+
+    /* Pick defaults that result in a clean baseline */
+    fa_freq  = INT_MAX;
+    cp_freq = INT_MAX;
 
 	/* Parse Args */
     int c;
@@ -108,8 +113,6 @@ int main(int argc, char *argv[]) {
         CHECK_ERROR(state == NULL, ("Failed to allocate initial state\n"));
 
         /* initialize state */
-        state->cp_freq = cp_freq;
-        state->fa_freq = fa_freq;
         state->memheap = rvm_alloc(cfg, sizeof(memory_heap_t));
         CHECK_ERROR(state->memheap == NULL, ("Failed to allocate mem heap\n"));
         state->tbl = NULL;
@@ -118,44 +121,42 @@ int main(int argc, char *argv[]) {
         state->pstate = NULL;
         state->phase = BUILD; /* First phase */
 
+        /* Save state in rvm layer */
+        rvm_set_usr_data(cfg, state);
+
         TX_COMMIT(txid);
         printf("Initialized State, starting build phase\n");
     }
 
+    /* Initialize the lookup table for kmer packing */
+    init_LookupTable();
+    
     switch(state->phase) {
     case BUILD:
         /** Graph construction **/
-        TX_START(txid);
         state->constrTime -= gettime();
-        TX_COMMIT(txid);
 
         build(state, input_UFX_name);
 
         printf("Built\n");
-        TX_START(txid);
         state->constrTime += gettime();
         build_state_free(state->pstate);
         state->pstate = NULL;
         state->phase = PROBE;
-        TX_COMMIT(txid);
 
     /* fall through */
     case PROBE:
         /** Graph traversal **/
-        TX_START(txid);
         state->traversalTime -= gettime();
-        TX_COMMIT(txid);
 
         FILE *out = fopen(out_filename, "w");
         probe(state, out);
         fclose(out);
 
         printf("Probed\n");
-        TX_START(txid);
         state->traversalTime += gettime();
         state->phase = DONE;
         probe_state_free(state->pstate);
-        TX_COMMIT(txid);
         break;
 
     default:

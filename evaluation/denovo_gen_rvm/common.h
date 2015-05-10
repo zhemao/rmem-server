@@ -9,6 +9,9 @@
 
 extern rvm_cfg_t *cfg;
 
+extern int fa_freq;
+extern int cp_freq;
+
 /* How frequently to print progress updates (in #kmers) */
 #define PRINT_FREQ 1000000
 
@@ -23,10 +26,6 @@ typedef enum
 typedef struct
 {
     phase_t phase;  /**< Current Phase of Execution */
-
-    /* Experimental Parameters */
-    int fa_freq;    //Failure frequency
-    int cp_freq;    //Checkpoint frequency
 
     /* Genome Data */
     memory_heap_t *memheap; /**< Memory heap for hashtable */

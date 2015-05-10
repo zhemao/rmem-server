@@ -16,15 +16,19 @@ int probe(gen_state_t *state, FILE *out)
         CHECK_ERROR(state->pstate == NULL,
                 ("Failed to allocate probe state\n"));
         pstate = (probe_state_t*)state->pstate;
-        pstate->skmerx = 0;
         pstate->curStartNode = state->start_list;
+        pstate->cur_kmr = state->start_list->kmerPtr;
         pstate->posInContig = 0;
         pstate->floc = 0;
         pstate->nkmer_proc = 0;
         TX_COMMIT(txid);
 
         printf("Allocated probe state\n");
+
     } else {
+        pstate = (probe_state_t*)state->pstate;
+        printf("Probe restarting from kmer %ld\n", pstate->nkmer_proc);
+
         /* Seek to the correct output location in file */
         fseek(out, pstate->floc, SEEK_SET);
     }
@@ -32,14 +36,16 @@ int probe(gen_state_t *state, FILE *out)
     char unpackedKmer[KMER_LENGTH+1];
 
     while (pstate->curStartNode != NULL ) {
-        /* Convenience alias */
-        kmer_t *cur_kmer_ptr = pstate->curStartNode->kmerPtr;
-
+        
+        /* Starting a new contig. This may not be true if we are recovering
+           from a failure. */
         if(pstate->posInContig == 0) {
             TX_START(txid);
 
+            pstate->cur_kmr = pstate->curStartNode->kmerPtr;
+
             /* Need to unpack the seed first */
-            unpackSequence((unsigned char*) cur_kmer_ptr->kmer,
+            unpackSequence((unsigned char*) pstate->cur_kmr->kmer,
                     (unsigned char*) unpackedKmer, KMER_LENGTH);
 
             /* Initialize current contig with the seed content */
@@ -48,18 +54,21 @@ int probe(gen_state_t *state, FILE *out)
 
             pstate->nkmer_proc++;
 
-            if(pstate->nkmer_proc % state->cp_freq == 0) {
+            if(pstate->nkmer_proc % PRINT_FREQ == 0) 
+               printf("Probe kmer %ld\n", pstate->nkmer_proc);
+
+            if(pstate->nkmer_proc % cp_freq == 0) {
                 TX_COMMIT(txid);
             }
 
-            if(pstate->nkmer_proc % state->fa_freq == 0) {
+            if(pstate->nkmer_proc % fa_freq == 0) {
                 printf("Simulating probe failure after %ldth kmer\n", pstate->nkmer_proc);
                 exit(EXIT_FAILURE);
             }
         }
 
-       /* Keep adding bases while not finding a terminal node */
-       char right_ext = cur_kmer_ptr->r_ext;
+       /* Keep adding bases until we find a terminal node */
+       char right_ext = pstate->cur_kmr->r_ext;
        while (right_ext != 'F') {
            TX_START(txid);
 
@@ -69,22 +78,22 @@ int probe(gen_state_t *state, FILE *out)
             * last k-mer in the current contig */
            unsigned char *nextKmer = (unsigned char *)
                    &(pstate->cur_contig[pstate->posInContig - KMER_LENGTH]);
-           cur_kmer_ptr = lookup_kmer(state->tbl, nextKmer);
-           CHECK_ERROR(cur_kmer_ptr == NULL,
-                   ("Couldn't find next kmer in hash table\n"));
+           pstate->cur_kmr = lookup_kmer(state->tbl, nextKmer);
+           CHECK_ERROR(pstate->cur_kmr == NULL,
+                   ("Couldn't find kmer %ld in hash table\n", pstate->nkmer_proc));
 
-           right_ext = cur_kmer_ptr->r_ext;
+           right_ext = pstate->cur_kmr->r_ext;
 
            pstate->nkmer_proc++;
 
            if(pstate->nkmer_proc % PRINT_FREQ == 0) 
                printf("Probe kmer %ld\n", pstate->nkmer_proc);
 
-           if(pstate->nkmer_proc % state->cp_freq == 0) {
+           if(pstate->nkmer_proc % cp_freq == 0) {
                TX_COMMIT(txid);
            }
 
-           if(pstate->nkmer_proc % state->fa_freq == 0) {
+           if(pstate->nkmer_proc % fa_freq == 0) {
                printf("Simulating probe failure after %ldth kmer\n", pstate->nkmer_proc);
                exit(EXIT_FAILURE);
            }

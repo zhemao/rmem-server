@@ -570,10 +570,10 @@ void block_write_sighdl(int signum, siginfo_t *siginfo, void *uctx)
         return;
     }
 
-    if(!cfg_glob->in_txn) {
-        /* Not allowed to change pages outside of a txn. Issue a warning. */
-        LOG(5, ("Recoverable page modified outside a txn\n"));
-    }
+    //if(!cfg_glob->in_txn) {
+    //    /* Not allowed to change pages outside of a txn. Issue a warning. */
+    //    LOG(5, ("Recoverable page modified outside a txn\n"));
+    //}
 
     void *page_addr = (void*)(((uint64_t)siginfo->si_addr / cfg_glob->blk_sz) *
         cfg_glob->blk_sz);

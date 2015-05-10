@@ -191,7 +191,7 @@ int main(int argc, char *argv[])
 
         state->iter++;
 
-        /* Simulate a failure every cp_freq iterations */
+        /* Checkpoint every cp_freq iterations */
         if(state->iter % cp_freq == 0) {
             res = rvm_txn_commit(cfg, txid);
             if(!res) {

@@ -1,10 +1,10 @@
 #ifndef _LOG_H_
 #define _LOG_H_
 
-#define DEBUG
+//#define DEBUG
 
 #include <stdio.h>
-
+/*
 #ifndef LOG_LEVEL
 #ifdef DEBUG
 #define LOG_LEVEL 10
@@ -12,6 +12,8 @@
 #define LOG_LEVEL 1
 #endif // DEBUG
 #endif // LOG_LEVEL
+*/
+#define LOG_LEVEL 6
 
 #define LOG(LEVEL, STR) do {\
     if ((LEVEL) < LOG_LEVEL) {\
