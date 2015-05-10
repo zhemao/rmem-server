@@ -85,17 +85,18 @@ double rvm_test(int npages, char *host, char *port)
 int main(int argc, char *argv[])
 {
     int npages;
-    double txn_time;
+    double txn_time = 0.0;
 
     if (argc < 4) {
 	fprintf(stderr, "Usage: %s <host> <port> <npages>\n", argv[0]);
 	return -1;
     }
 
+    char *host = argv[1];
+    char *port = argv[2];
     npages = atoi(argv[3]);
 
-    txn_time = rvm_test(npages, argv[1], argv[2]);
-
+    txn_time = rvm_test(npages, host, port);
     printf("%f\n", txn_time);
 
     return 0;

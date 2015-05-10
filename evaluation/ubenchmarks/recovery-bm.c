@@ -44,8 +44,6 @@ int *setup_pages(char *host, char *port, int npages)
 	exit(EXIT_FAILURE);
     }
 
-    rvm_cfg_destroy(rvm);
-
     return pages;
 }
 
