@@ -474,7 +474,7 @@ int rmem_free(rmem_layer_t *rmem_layer, uint32_t tag)
     CHECK_ERROR(addr == 0,
             ("Failure: tag %d not found\n", tag));
 
-    LOG(8, ("rmem_free addr: %ld tag: %d\n", addr, tag));
+    LOG(8, ("rmem_free addr: %lx tag: %d\n", addr, tag));
 
     hash_delete_item(rmem->tag_to_addr, tag);
 
@@ -590,7 +590,7 @@ static int rmem_multi_free_group(struct rmem *rmem, uint32_t *tags, int n)
         uint64_t addr = lookup_remote_addr(rmem->tag_to_addr, tag);
         CHECK_ERROR(addr == 0,
             ("Failure: tag %d not found\n", tag));
-        LOG(8, ("rmem_free addr: %ld tag: %d\n", addr, tag));
+        LOG(8, ("rmem_free addr: %lx tag: %d\n", addr, tag));
         ctx->send_msg->data.multi_free.addrs[i] = addr;
         hash_delete_item(rmem->tag_to_addr, tag);
     }
