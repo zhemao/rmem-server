@@ -13,9 +13,12 @@
 #endif // DEBUG
 #endif // LOG_LEVEL
 
-#define LOG(file, STR) do {\
-    fprintf(file, "%-20s | %3d |  ",__FUNCTION__,__LINE__); \
-    fprintf(file, STR); \
+
+#define LOG(level, STR) do {\
+    if ((level) < LOG_LEVEL) {\
+        printf("%-20s | %3d |  ",__FUNCTION__,__LINE__); \
+        printf STR; \
+    }\
 } while(0);
 
 #endif // _LOG_H_
