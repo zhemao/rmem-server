@@ -1,0 +1,13 @@
+In large-scale distributed systems failures are the norm rather than the exception. 
+To cope with hardware and software failures developers make use of two main techniques: 1) persisting data to a non-volatile storage device such as a hard drive, or storing data in a distributed storage system such as a DBMS or key-value store. 
+While the first approach is slow and leaves the program's progress disk-bound, the second approach requires the usage of complex APIs that require serialization of user's data structures.
+
+To solve this problem we built Nephele, a framework that provides replication of in-memory data structures efficiently through a simple API. 
+Nephele replicates a program's data to a remote node through RDMA providing snapshots of program's data with latency on the order of a few microseconds.
+The framework provides a transactional interface to users that guarantees atomicity and durability even in the face of failures.
+
+Nephele consists of two layers: a transactional layer for recoverable virtual memory (RVM) and a remote memory storage layer. The user-facing transaction layer provides an API consisting of 15 methods and is responsible for detecting changes and replicating changes at commit time. The remote memory storage layer is responsible for storing user's data in a remote node over RDMA. For this layer we have implemented two backends: one using a custom RDMA protocol with a custom server, and one using RAMCloud, a RDMA-optimized key-value store.
+
+To demonstrate the flexibility and performance of our system we applied our framework to three applications: an in-memory file system, a genomic assembly program and a single-node key-value store.
+We show that our framework provides data replication with negligible overhead.
+
