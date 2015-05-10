@@ -230,7 +230,6 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer
 bool rvm_cfg_destroy(rvm_cfg_t *cfg)
 {
     rmem_layer_t* rmem_layer = cfg->rmem_layer;
-    uint32_t block_tbl_tags[BLOCK_TBL_NPG];
 
     if(cfg == NULL) {
         rvm_log("Received Null configuration\n");
@@ -242,7 +241,7 @@ bool rvm_cfg_destroy(rvm_cfg_t *cfg)
 
     /* Free all remote blocks (leave local blocks)*/
     int bx;
-    for(bx = 0; bx < BLOCK_TBL_NENT; bx+=2)
+    for(bx = 0; bx < BLOCK_TBL_NENT; bx++)
     {
         blk_desc_t *blk = &(cfg->blk_tbl.rbtbl->tbl[bx]);
         if(blk->bid < 0)
@@ -257,12 +256,6 @@ bool rvm_cfg_destroy(rvm_cfg_t *cfg)
         /* Unprotect block */
         rvm_unprotect(blk->local_addr, cfg->blk_sz);
     }
-
-    /* Clean up config info on server */
-    for (size_t i = 0; i < BLOCK_TBL_NPG; i++)
-	block_tbl_tags[i] = BLOCK_TBL_ID + i;
-
-    rmem_layer->multi_free(rmem_layer, block_tbl_tags, BLOCK_TBL_NPG);
 
     /* We need to commit in order for the frees to actually happen */
     rmem_layer->atomic_commit(rmem_layer, NULL, NULL, NULL, 0);
