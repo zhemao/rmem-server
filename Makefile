@@ -8,9 +8,10 @@ INCLUDES := -I. -Idata -Iutils -Ibackends
 RAMC_INCLUDES = -I/nscratch/joao/ramcloud/src/ -I/nscratch/joao/ramcloud/ -I/nscratch/joao/ramcloud/obj.master 
 LINCLUDES = -L/nscratch/joao/ramcloud/obj.master
 RAMC_LIBS = -lramcloud -lboost_system -lboost_program_options
-#CFLAGS  := -Wall -O3 -fPIC -std=gnu11 $(INCLUDES) 
-CFLAGS  := -Wall -O0 -g -fPIC -std=gnu11 $(INCLUDES) 
+CFLAGS  := -Wall -O3 -fPIC -std=gnu11 $(INCLUDES) 
+#CFLAGS  := -Wall -O0 -g -fPIC -std=gnu11 $(INCLUDES) 
 CXXFLAGS := -Wall -O3 -fPIC -std=gnu++0x $(RAMC_INCLUDES) $(INCLUDES)
+#CXXFLAGS := -Wall -O0 -g -fPIC -std=gnu++0x $(RAMC_INCLUDES) $(INCLUDES)
 RAMC_OBJS := /nscratch/joao/ramcloud/obj.master/OptionParser.o
 
 APPS    := rmem-server 
@@ -18,7 +19,7 @@ TESTS   := tests/rvm_test_normal_rc tests/rvm_test_normal tests/rvm_test_txn_com
 
 COMMON_FILES := common.o data/hash.o data/list.o data/stack.o
 SERVER_FILES := rmem_table.o rmem_multi_ops.o $(COMMON_FILES)
-CLIENT_FILES := rvm.o backends/rmem_backend.o backends/ramcloud_backend.o buddy_malloc.o block_table.o $(COMMON_FILES)
+CLIENT_FILES := rvm.o backends/rmem_backend.o backends/ramcloud_backend.o backends/stub_backend.o buddy_malloc.o block_table.o $(COMMON_FILES)
 RVM_LIB := -L. -lrvm
 
 STATIC_LIB = librvm.a

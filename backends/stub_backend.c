@@ -100,6 +100,8 @@ rmem_layer_t* create_stub_layer()
     rcfg->disconnect = stub_disconnect;
     rcfg->malloc = stub_malloc;
     rcfg->free = stub_free;
+    rcfg->multi_malloc = stub_multi_malloc;
+    rcfg->multi_free = stub_multi_free;
     rcfg->put = stub_put;
     rcfg->get = stub_get;
     rcfg->atomic_commit = stub_atomic_commit;

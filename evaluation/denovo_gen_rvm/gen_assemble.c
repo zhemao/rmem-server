@@ -7,8 +7,8 @@
 #include <time.h>
 #include <limits.h>
 #include <buddy_malloc.h>
-#include <backends/rmem_generic_interface.h>
-//#include <backends/rmem_backend.h>
+//#include <backends/rmem_generic_interface.h>
+#include <backends/rmem_backend.h>
 #include <backends/stub_backend.h>
 #include "common.h"
 #include "build.h"
@@ -40,8 +40,8 @@ void initialize_rvm(char*host, char* port, bool rec)
     opt.alloc_fp = buddy_malloc;
     opt.free_fp = buddy_free;
 
-//    cfg = rvm_cfg_create(&opt, create_rmem_layer);
-    cfg = rvm_cfg_create(&opt, create_stub_layer);
+    cfg = rvm_cfg_create(&opt, create_rmem_layer);
+//    cfg = rvm_cfg_create(&opt, create_stub_layer);
 }
 
 int main(int argc, char *argv[]) {
