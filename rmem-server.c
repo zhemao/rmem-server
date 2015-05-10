@@ -237,6 +237,7 @@ static void on_completion(struct ibv_wc *wc)
                 TEST_NZ(pthread_mutex_lock(&alloc_mutex));
 		txn_commit(&rmem, &ctx->txn_list);
                 TEST_NZ(pthread_mutex_unlock(&alloc_mutex));
+		txn_list_clear(&ctx->txn_list);
                 ctx->send_msg->id = MSG_TXN_ACK;
                 send_message(id);
                 break;

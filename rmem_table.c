@@ -275,14 +275,13 @@ static inline struct alloc_entry *merge_free_blocks(
     start = entry->start;
     end = entry->start + entry->size;
 
-    list_delete(&entry->htable);
-
     if (entry->list.prev != &rmem->list) {
         prev_entry = entry_of_list(entry->list.prev);
         if (prev_entry->free) {
             start = prev_entry->start;
             prev_entry->size = (uintptr_t)end - (uintptr_t)start;
             list_delete(&entry->list);
+	    list_delete(&entry->htable);
             free(entry);
             entry = prev_entry;
         } else {
@@ -300,6 +299,7 @@ static inline struct alloc_entry *merge_free_blocks(
     if (entry->list.next == &rmem->list) {
         list_delete(&entry->list);
         list_delete(&entry->free_list);
+	list_delete(&entry->htable);
         rmem->alloc_size -= entry->size;
         free(entry);
         return NULL;
@@ -310,6 +310,7 @@ static inline struct alloc_entry *merge_free_blocks(
         end = next_entry->start + next_entry->size;
         list_delete(&next_entry->list);
         list_delete(&next_entry->free_list);
+	list_delete(&next_entry->htable);
         free(next_entry);
     } else {
         end = next_entry->start;
@@ -348,8 +349,8 @@ void rmem_table_free(struct rmem_table *rmem, void *ptr)
     memcpy(&entry, start, sizeof(struct alloc_entry *));
 
     if (entry->free) {
-	fprintf(stderr, "This block has already been freed.\n");
-	abort();
+	LOG(1, ("Block at %p has already been freed.\n", ptr));
+	return;
     }
 
     rmem->nblocks--;
