@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <malloc_simple.h>
 #include <rmem_backend.h>
+#include <unistd.h>
 
 #include "log.h"
 
@@ -10,13 +11,11 @@
 rvm_cfg_t *cfg;
 #endif
 
-#if LOGGING
-FILE* flog;
-#endif
+#define LOG_FILE_PATH "/nscratch/joao/repos/rmem-server/evaluation/ramfs/log_out"
 
 static int ramfs_getattr(const char *path, struct stat *stbuf)
 {
-   fprintf(stderr, "getattr\n");
+   LOG(8, ("getattr path: %s\n", path));
    int res;
    dentry_t* d;
 
@@ -24,6 +23,7 @@ static int ramfs_getattr(const char *path, struct stat *stbuf)
    d = get_path(path);
 
    if (!d) {
+      LOG(8, ("getattr ENOENT\n"));
       res = -ENOENT;
    }
    else {
@@ -34,72 +34,91 @@ static int ramfs_getattr(const char *path, struct stat *stbuf)
       stbuf->st_size = d->in->len;
    }
 
+   LOG(8, ("getattr returns: %d\n", res));
    return res;
+}
+
+static int ramfs_getxattr(const char *path, const char* name, char* value, size_t size)
+{
+   LOG(8, ("getxattr path: %s\n", path));
+   assert(0);
+   return -1;
+}
+
+static int ramfs_listxattr(const char *path, char* name, size_t size)
+{
+   LOG(8, ("listxattr path: %s\n", path));
+   assert(0);
+   return -1;
 }
 
 static int ramfs_fsync(const char *path, int only_data, struct fuse_file_info *fi)
 {
-#ifdef LOGGING
-   LOG(flog, ("ramfs_fsync: path: %s only_data: %d\n", path, only_data)); 
-#endif
+   LOG(8, ("ramfs_fsync: path: %s only_data: %d\n", path, only_data)); 
    return 0;
 }
-  
-static int ramfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
-                         off_t offset, struct fuse_file_info *fi)
+
+static int ramfs_fsyncdir(const char *path, int only_data, struct fuse_file_info *fi)
 {
-   fprintf(stderr, "readdir\n");
-   (void) offset;
-   (void) fi;
-  
+   LOG(8, ("ramfs_fsyncdir: path: %s only_data: %d\n", path, only_data)); 
+   return 0;
+}
+
+static int ramfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
+      off_t offset, struct fuse_file_info *fi)
+{
+   LOG(8, ("readdir\n"));
+
    dentry_t* d;
 
-   if(!( d = get_path(path) ))
+   if(!( d = get_path(path) )) {
+      LOG(8, ("readdir ENOENT\n"));
       return -ENOENT;
-  
-   // filler fills buf with each directory entry
+   }
+
    filler(buf, ".", NULL, 0);
    filler(buf, "..", NULL, 0);
-  
+
    for (d = d->dchild; d; d = d->dnext)
       filler(buf, d->name, NULL, 0);
-  
+
+   LOG(8, ("readdir return 0\n"));
    return 0;
 }
-  
+
 static int ramfs_open(const char *path, struct fuse_file_info *fi)
 {
-    fprintf(stderr, "ramfs_open\n");
+   LOG(8, ("ramfs_open path: %s\n", path));
    dentry_t* d;
 
    d = get_path(path);
 
-   if (!d)
+   if (!d) {
+      LOG(8, ("ramfs_open ENOENT\n"));
       return -ENOENT;
-  
-   // you could test access permitions here
-   // take a look at man open for possible errors
-  
+   }
+
    return 0;
 }
-  
+
 static int ramfs_read(const char *path, char *buf, size_t size, off_t offset,
-                      struct fuse_file_info *fi)
+      struct fuse_file_info *fi)
 {
-    fprintf(stderr, "ramfs_read\n");
+   LOG(8, ("ramfs_read path: %s\n", path));
    size_t len;
    dentry_t* d;
    (void) fi;
 
    d = get_path(path);
 
-   if(!d)
+   if(!d) {
+      LOG(8, ("ramfs_read ENOENT\n"));
       return -ENOENT;
-  
+   }
+
    len = d->in->len;
 
-   if (offset < len) 
-   {
+   if (offset < len) {
       if (offset + size > len)
          size = len - offset;
 
@@ -108,14 +127,16 @@ static int ramfs_read(const char *path, char *buf, size_t size, off_t offset,
    }
    else
       size = 0;
-  
+      
+   LOG(8, ("ramfs_read return size:%ld\n", size));
+
    return size;
 }
 
 static int ramfs_write(const char* path, const char* buf, size_t size, off_t offset,
-                       struct fuse_file_info *fi)
+      struct fuse_file_info *fi)
 {
-    fprintf(stderr, "ramfs_write\n");
+   LOG(8, ("ramfs_write\n"));
    dentry_t* d;
    inode_t* in;
    void* tmp;
@@ -140,7 +161,7 @@ static int ramfs_write(const char* path, const char* buf, size_t size, off_t off
 #else
       tmp = malloc(in->len + size);
 #endif
-      
+
       if (tmp)
       {
          if (in->data)
@@ -149,7 +170,7 @@ static int ramfs_write(const char* path, const char* buf, size_t size, off_t off
 
             int i;
             for (i = 0; i < in->len; i+=2) {
-                ((char*)tmp)[i] = 'T';
+               ((char*)tmp)[i] = 'T';
             }
 #ifdef USE_RVM
             rvm_free(cfg, in->data);
@@ -173,7 +194,7 @@ static int ramfs_write(const char* path, const char* buf, size_t size, off_t off
 // generic operations to create file and directories
 static int __ramfs_mkentry(const char * path, mode_t mode)
 {
-    fprintf(stderr, "ramfs_mkentry\n");
+   LOG(8, ("ramfs_mkentry\n"));
    dentry_t* d;
    dentry_t* nd;
    char name[MAX_PATH_SIZE];
@@ -206,21 +227,21 @@ static int __ramfs_mkentry(const char * path, mode_t mode)
 
 static int ramfs_mknod(const char * path, mode_t mode, dev_t dev)
 {
-    fprintf(stderr, "ramfs_mknod\n");
+   LOG(8, ("ramfs_mknod\n"));
    // new file
    return __ramfs_mkentry(path, mode);
 }
 
 static int ramfs_mkdir(const char * path, mode_t mode)
 {
-    fprintf(stderr, "ramfs_mkdir\n");
+   LOG(8, ("ramfs_mkdir %s\n", path));
    // new dir
    return __ramfs_mkentry(path, mode | S_IFDIR);
 }
 
 static int ramfs_unlink(const char* path)
 {
-    fprintf(stderr, "ramfs_unlink\n");
+   LOG(8, ("ramfs_unlink\n"));
    dentry_t* d;
 
    d = get_path(path);
@@ -235,7 +256,7 @@ static int ramfs_unlink(const char* path)
 
 static int ramfs_rmdir(const char* path)
 {
-    fprintf(stderr, "ramfs_rmdir\n");
+   LOG(8, ("ramfs_rmdir\n"));
    dentry_t* d;
 
    d = get_path(path);
@@ -249,8 +270,7 @@ static int ramfs_rmdir(const char* path)
 
 static void* ramfs_init(struct fuse_conn_info *conn)
 {
-   (void) conn;
-
+   LOG(8, ("ramfs_init\n"));
    ramfs_opt_init();
 
 #ifdef USE_RVM
@@ -265,39 +285,49 @@ static void* ramfs_init(struct fuse_conn_info *conn)
    assert(cfg);
 #endif
 
-#ifdef LOGGING
-   flog = fopen(LOG_FILE_PATH, "w");
-   assert(flog);
-#endif
+   // redirect stderr to stdout
+   assert(dup2(fileno(stdout), fileno(stderr)) != -1);
+   assert( freopen(LOG_FILE_PATH,"a", stdout) != NULL);
    return NULL;
 }
 
 static void ramfs_destroy(void* v)
 {
-    ramfs_opt_destroy();
+   LOG(8, ("ramfs_destroy\n"));
+   ramfs_opt_destroy();
 }
 
 
 // function mapping
 static struct fuse_operations ramfs_oper = {
-    .init = ramfs_init,
-    .destroy = ramfs_destroy,
-    .getattr   = ramfs_getattr,
-    .readdir = ramfs_readdir,
-    .open   = ramfs_open,
-    .read   = ramfs_read,
-    .write = ramfs_write,
-    .mknod = ramfs_mknod,
-    .mkdir = ramfs_mkdir,
-    .unlink = ramfs_unlink,
-    .rmdir = ramfs_rmdir,
-    .fsync = ramfs_fsync,
+   .init = ramfs_init,
+   .destroy = ramfs_destroy,
+
+   .getattr   = ramfs_getattr,
+   .getxattr   = ramfs_getxattr,
+   .listxattr   = ramfs_listxattr,
+
+   .open   = ramfs_open,
+// .create = ramfs_create, // open will be called
+   
+   .read   = ramfs_read,
+   .readdir = ramfs_readdir,
+   .write = ramfs_write,
+
+   .mknod = ramfs_mknod,
+   .mkdir = ramfs_mkdir,
+
+   .unlink = ramfs_unlink,
+   .rmdir = ramfs_rmdir,
+
+   .fsync = ramfs_fsync,
+   .fsyncdir = ramfs_fsyncdir,
 };
 
 int main(int argc, char *argv[])
 {
+   LOG(8, ("main\n"));
    // fuse will parse mount options
    return fuse_main(argc, argv, &ramfs_oper, NULL);
 }
-
 
