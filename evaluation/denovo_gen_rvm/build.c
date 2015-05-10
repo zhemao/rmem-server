@@ -73,7 +73,7 @@ int build(gen_state_t *state, char *input_UFX_name)
           printf("Build Kmer %ld\n", bstate->kmerx);
       if(bstate->kmerx % state->fa_freq == 0) {
           printf("Simulating build failure after %ldth kmer\n", bstate->kmerx);
-          return EXIT_FAILURE;
+          exit(EXIT_FAILURE);
       }
 
    }

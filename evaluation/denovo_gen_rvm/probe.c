@@ -54,7 +54,7 @@ int probe(gen_state_t *state, FILE *out)
 
             if(pstate->nkmer_proc % state->fa_freq == 0) {
                 printf("Simulating probe failure after %ldth kmer\n", pstate->nkmer_proc);
-                return EXIT_FAILURE;
+                exit(EXIT_FAILURE);
             }
         }
 
@@ -86,12 +86,11 @@ int probe(gen_state_t *state, FILE *out)
 
            if(pstate->nkmer_proc % state->fa_freq == 0) {
                printf("Simulating probe failure after %ldth kmer\n", pstate->nkmer_proc);
-               return EXIT_FAILURE;
+               exit(EXIT_FAILURE);
            }
        }
 
        /* Move on to the next contig */
-       TX_START(txid);
        /* Print the contig since we have found the corresponding terminal node */
        pstate->cur_contig[pstate->posInContig] = '\0';
        pstate->floc += fprintf(out,"%s\n", pstate->cur_contig);
@@ -99,10 +98,7 @@ int probe(gen_state_t *state, FILE *out)
        /* Move to the next start node in the list */
        pstate->curStartNode = pstate->curStartNode->next;
        pstate->posInContig = 0;
-       if(pstate->nkmer_proc % state->cp_freq == 0) {
-           TX_COMMIT(txid);
-       }
-    }
+   }
 
     return 1;
 }
