@@ -2,18 +2,24 @@
 
 PROJ=main
 TEXFILES=$(wildcard *.tex)
-FIGURE_DATA=$(wildcard graphs/*.csv)
-FIGURES=$(FIGURE_DATA:.csv=.pdf)
-
-PYTHON=python
+GRAPH_DATA=$(wildcard graphs/*.csv)
+GRAPHS=$(GRAPH_DATA:.csv=.pdf)
+DRAWING_SOURCES=$(wildcard graphs/*.svg)
+DRAWINGS=$(DRAWING_SOURCES:.svg=.pdf)
+FIGURES=$(GRAPHS) $(DRAWINGS)
 
 main.pdf: $(TEXFILES) $(FIGURES)
 	pdflatex main.tex
 	bibtex main
 	pdflatex main.tex
 
+figures: $(FIGURES)
+
 %.pdf: %.csv
-	$(PYTHON) plot_results.py $<
+	python plot_results.py $<
+
+%.pdf: %.svg
+	inkscape -D $< -A $@
 
 open: $(PROJ).pdf
 	kpdf $^
