@@ -41,7 +41,7 @@ tests/rvm_test_full: tests/rvm_test_full.o $(STATIC_LIB)
 	${LD} -o $@ $< $(RVM_LIB) ${RMEM_LIBS}
 
 tests/rvm_test_txn_commit: tests/rvm_test_txn_commit.o $(STATIC_LIB)
-	${LD} -o $@ $< $(RVM_LIB) ${RMEM_LIBS}
+	${LD} -o $@ $< $(RVM_LIB) ${RMEM_LIBS} $(CFLAGS)
 
 tests/rvm_test_free: tests/rvm_test_free.o $(STATIC_LIB)
 	${LD} -o $@ $< $(RVM_LIB) ${RMEM_LIBS}
@@ -62,7 +62,7 @@ tests/rvm_test_full_rc: tests/rvm_test_full_rc.o $(STATIC_LIB) $(RAMC_OBJS)
 	$(LD) -o $@ $< $(RAMC_OBJS) $(RVM_LIB) $(LINCLUDES) $(RAMC_LIBS)
 
 tests/rvm_test_txn_commit_rc: tests/rvm_test_txn_commit_rc.o $(STATIC_LIB) $(RAMC_OBJS)
-	$(LD) -o $@ $< $(RAMC_OBJS) $(RVM_LIB) $(LINCLUDES) $(RAMC_LIBS)
+	$(LD) -o $@ $< $(RAMC_OBJS) $(RVM_LIB) $(LINCLUDES) $(RAMC_LIBS) $(CFLAGS)
 
 backends/ramcloud_backend.o: backends/ramcloud_backend.cpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $< $(RAMC_INCLUDES)
