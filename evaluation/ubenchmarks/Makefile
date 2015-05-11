@@ -1,11 +1,12 @@
 INCLUDES := -I../.. -I../../backends
-CFLAGS  := $(INCLUDES) -Wall -O3 -std=gnu11 -pg
+CFLAGS  := $(INCLUDES) -Wall -O3 -std=gnu11
+#CFLAGS  := $(INCLUDES) -Wall -O0 -g -pg -std=gnu11
 RVM_LIB := -L../.. -lrvm
 RAMC_LIBS := $(RVM_LIB) -L/nscratch/joao/ramcloud/obj.master \
 	-lramcloud -lboost_system -lboost_program_options -lstdc++
 RMEM_LIBS := $(RVM_LIB) -lrvm -lrdmacm -libverbs -lpthread
 RAMC_OBJS := /nscratch/joao/ramcloud/obj.master/OptionParser.o
-LDFLAGS := -pg
+#LDFLAGS := -pg -g
 BENCHMARKS := commit-bm-rm recovery-bm-rm commit-bm-rc recovery-bm-rc
 STATIC_LIB := ../../librvm.a
 
