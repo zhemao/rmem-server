@@ -46,7 +46,6 @@ copying data from the server.
 \label{fig:rc-commit-ubm}
 \end{figure}
 
-\subsection{RAMCloud Backend}
 \begin{figure}[t!]
 \begin{center}
 \includegraphics[scale=0.40]{graphs/recovery_time_rc_latencies.pdf}
@@ -60,7 +59,7 @@ The end-to-end latency of a commit operation is dominated by the number of pages
 The RAMCloud backend also needs to save the table that contains the mapping between tags and keys in, but this only requires one interaction with the server.
 The RAMCloud backend requires roughly 10 microseconds to write a page to RAMCloud. As can be seen in the graph, the commit time grows linearly with the number of pages as expected.
 
-
-
-
-
+Figure~\ref{fig:rc-recovery-ubm} shows the results of the recovery micro-benchmark.
+The end-to-end recovery time is mostly dominated by the time to establish a connection with the RAMCloud server (roughly 80ms).
+Once the connection is established the RAMCloud backend retrieves the pages previously committed. The time to do this is dominated by the communication with the server, as in the commit benchmark, which grows linear with the number of pages.
+Because of this we see a linear recovery time increase as the number of pages increases.
