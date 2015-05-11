@@ -7,6 +7,7 @@ recovery flag and time how long it takes \verb|rvm_cfg_create()| to complete.
 When benchmarking the IB backend, we run three trials for each number of pages,
 restarting the server after each trial.
 
+\subsection{IB Backend}
 Figure \ref{fig:ib-commit-ubm} shows the results of the commit micro-benchmark
 using the IB backend. At the smallest page count, the commit time is around
 150 microseconds. At 10K pages, the commit time has increased to 140 milliseconds.
@@ -35,3 +36,22 @@ copying data from the server.
     \includegraphics[width=\linewidth]{graphs/recovery-results-rm.pdf}
     \label{fig:ib-recovery-ubm}
 \end{figure}
+
+\subsection{RAMCloud Backend}
+\begin{figure}[t!]
+\begin{center}
+\includegraphics[scale=0.40]{graphs/commit_time_rc_latencies.pdf}
+\end{center}
+\caption{Commit time micro-benchmark when using the RAMCloud backend}
+\label{fig:inmem_fs_design}
+\end{figure}
+
+Figure~\ref{fig:inmem_fs_design} shows the results of the commit micro-benchmark when using the RAMCloud backend. 
+The end-to-end latency of a commit operation is dominated by the number of pages to be commited, as each page write requires a round-trip to the RAMCloud server.
+The RAMCloud backend also needs to save the table that contains the mapping between tags and keys in, but this only requires one interaction with the server.
+The RAMCloud backend requires roughly 10 microseconds to write a page to RAMCloud. As can be seen in the graph, the commit time grows linearly with the number of pages as expected.
+
+
+
+
+
