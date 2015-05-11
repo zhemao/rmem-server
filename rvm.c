@@ -37,9 +37,13 @@ static bool recover_blocks(rvm_cfg_t *cfg)
 {
     int err;
     rmem_layer_t* rmem_layer = (rmem_layer_t*)cfg->rmem_layer;
+    uint64_t btbl_nentries, btbl_npg;
+
+    btbl_nentries = cfg->blk_tbl.rbtbl->nentries;
+    btbl_npg = BLOCK_TBL_NPG(btbl_nentries);
 
     /* Recover the block table */
-    for(size_t i = 0; i < BLOCK_TBL_NPG; i++)
+    for(size_t i = 0; i < btbl_npg; i++)
     {
         /* Register with rmem */
         void *rec_tmp = rmem_layer->register_data(rmem_layer,
@@ -62,7 +66,7 @@ static bool recover_blocks(rvm_cfg_t *cfg)
     /* Recover every previously allocated block. Start reading the block table
      * after the entries describing itself (those were recovered above). */
     int bx;
-    for(bx = BLOCK_TBL_NPG; bx < BLOCK_TBL_NENT; bx++)
+    for(bx = btbl_npg; bx < btbl_nentries; bx++)
     {
         blk_desc_t *blk = &(cfg->blk_tbl.rbtbl->tbl[bx]);
         if(blk->bid < 0)
@@ -110,7 +114,7 @@ static bool recover_blocks(rvm_cfg_t *cfg)
     }
 
     /* Protect the block table to prevent further changes */
-    rvm_protect(cfg->blk_tbl.rbtbl, BLOCK_TBL_SIZE);
+    rvm_protect(cfg->blk_tbl.rbtbl, BLOCK_TBL_SIZE(btbl_nentries));
 
     return true;
 }
@@ -118,6 +122,8 @@ static bool recover_blocks(rvm_cfg_t *cfg)
 rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer_function)
 {
     bool res;
+    size_t btbl_nentries = opts->nentries;
+    size_t btbl_npg = BLOCK_TBL_NPG(btbl_nentries);
     rvm_cfg_t *cfg = (rvm_cfg_t*)malloc(sizeof(rvm_cfg_t));
     if(cfg == NULL)
         return NULL;
@@ -132,7 +138,7 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer
     rmem_layer->connect(rmem_layer, opts->host, opts->port);
 
     /* Allocate and initialize the block table locally */
-    cfg->blk_tbl.rbtbl = (raw_blk_tbl_t *)mmap(NULL, BLOCK_TBL_SIZE,
+    cfg->blk_tbl.rbtbl = (raw_blk_tbl_t *)mmap(NULL, BLOCK_TBL_SIZE(btbl_nentries),
             PROT_READ | PROT_WRITE | PROT_EXEC,
             (MAP_ANONYMOUS | MAP_PRIVATE), -1, 0);
     assert((size_t)cfg->blk_tbl.rbtbl % sysconf(_SC_PAGESIZE) == 0);
@@ -141,6 +147,7 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer
         errno = EUNKNOWN;
         return NULL;
     }
+    cfg->blk_tbl.rbtbl->nentries = btbl_nentries;
 
     if(opts->recovery) {
         if(!recover_blocks(cfg))
@@ -151,8 +158,8 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer
         CHECK_ERROR(res == false, ("Failed to rebuild block table index\n"));
 
     } else {
-        uint32_t tags[BLOCK_TBL_NPG*2];
-        uint64_t addrs[BLOCK_TBL_NPG*2];
+        uint32_t tags[btbl_npg*2];
+        uint64_t addrs[btbl_npg*2];
 
 	    /* Initialize the raw block table (that will be preserved) */
         res = rbtbl_init(cfg->blk_tbl.rbtbl);
@@ -162,7 +169,7 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer
         res = btbl_init(&(cfg->blk_tbl), cfg->blk_tbl.rbtbl);
         CHECK_ERROR(res == false, ("Failed to rebuild block table index\n"));
 
-        for(size_t i = 0; i < BLOCK_TBL_NPG; i++) {
+        for(size_t i = 0; i < btbl_npg; i++) {
            /* Grab block descriptors for the block table itself. */
             blk_desc_t *blk = btbl_alloc(&(cfg->blk_tbl),
                     (void*)cfg->blk_tbl.rbtbl + i*cfg->blk_sz);
@@ -177,16 +184,16 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer
 
             /* Set up rmem_malloc info */
 	        tags[i] = BLK_REAL_TAG(blk->bid);
-	        tags[BLOCK_TBL_NPG + i] = BLK_SHDW_TAG(blk->bid);
+	        tags[btbl_npg + i] = BLK_SHDW_TAG(blk->bid);
         }
 
         /* Allocate and register the block table remotely */
         int ret = rmem_layer->multi_malloc(
-            rmem_layer, addrs, cfg->blk_sz, tags, BLOCK_TBL_NPG*2);
+            rmem_layer, addrs, cfg->blk_sz, tags, btbl_npg*2);
         CHECK_ERROR(ret != 0, ("Failed to allocate memory for block table\n"));
 
 #if (LOG_LEVEL > 9)
-        for (size_t i = 0; i < BLOCK_TBL_NPG; i++)
+        for (size_t i = 0; i < btbl_npg; i++)
         {
             LOG(9, ("Allocated block table page %ld - local addr: %p "
                     "- remote addr: %lx\n",
@@ -230,6 +237,7 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer
 bool rvm_cfg_destroy(rvm_cfg_t *cfg)
 {
     rmem_layer_t* rmem_layer = cfg->rmem_layer;
+    size_t btbl_nentries = cfg->blk_tbl.rbtbl->nentries;
 
     if(cfg == NULL) {
         rvm_log("Received Null configuration\n");
@@ -240,7 +248,7 @@ bool rvm_cfg_destroy(rvm_cfg_t *cfg)
     LOG(9, ("tearing down configuration\n"));
 
     /* Free all remote blocks (leave local blocks)*/
-    for(int bx = 0; bx < BLOCK_TBL_NENT; bx++)
+    for(int bx = 0; bx < btbl_nentries; bx++)
     {
         blk_desc_t *blk = &(cfg->blk_tbl.rbtbl->tbl[bx]);
         if(blk->bid < 0)
@@ -264,7 +272,7 @@ bool rvm_cfg_destroy(rvm_cfg_t *cfg)
     rmem_layer->disconnect(rmem_layer);
 
     /* Free local memory */
-    munmap(cfg->blk_tbl.rbtbl, BLOCK_TBL_SIZE);
+    munmap(cfg->blk_tbl.rbtbl, BLOCK_TBL_SIZE(btbl_nentries));
     free(cfg);
 
     return true;
@@ -287,6 +295,7 @@ bool check_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
 {
     int err;
     rmem_layer_t *rmem_layer = cfg->rmem_layer;
+    size_t btbl_nentries = cfg->blk_tbl.rbtbl->nentries;
 
     /* Storage for copies of each block */
     char *blk_cpy = malloc(cfg->blk_sz);
@@ -296,7 +305,7 @@ bool check_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
 
     /* Recover every previously allocated block */
     int bx;
-    for(bx = 0; bx < BLOCK_TBL_NENT; bx++)
+    for(bx = 0; bx < btbl_nentries; bx++)
     {
         blk_desc_t *blk = &(cfg->blk_tbl.rbtbl->tbl[bx]);
         if(blk->bid < 0)
@@ -328,6 +337,8 @@ bool check_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
 
 bool rvm_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
 {
+    size_t btbl_nentries = cfg->blk_tbl.rbtbl->nentries;
+
     LOG(5, ("TXN Commit\n"));
 
     /* TODO This is a brain-dead initial implementation. We simply copy over
@@ -355,14 +366,14 @@ bool rvm_txn_commit(rvm_cfg_t* cfg, rvm_txid_t txid)
 //        }
 //    }
     
-    uint32_t tags_src[BLOCK_TBL_NENT];
-    uint32_t tags_dst[BLOCK_TBL_NENT];
-    uint32_t tags_size[BLOCK_TBL_NENT];
+    uint32_t tags_src[btbl_nentries];
+    uint32_t tags_dst[btbl_nentries];
+    uint32_t tags_size[btbl_nentries];
     int count = 0;
 
     /* Walk the block table and commit everything that's changed */
     int bx;
-    for(bx = 0; bx < BLOCK_TBL_NENT; bx++)
+    for(bx = 0; bx < btbl_nentries; bx++)
     {
         blk_desc_t *blk = &(cfg->blk_tbl.rbtbl->tbl[bx]);
 
@@ -414,6 +425,8 @@ void *rvm_alloc(rvm_cfg_t *cfg, size_t size)
  * of allocations. */
 void *rvm_blk_alloc(rvm_cfg_t* cfg, size_t size)
 {
+    size_t btbl_nentries = cfg->blk_tbl.rbtbl->nentries;
+
     LOG(6, ("Block Alloc of size %ld\n", size));
 
     rmem_layer_t* rmem_layer = cfg->rmem_layer;
@@ -423,7 +436,7 @@ void *rvm_blk_alloc(rvm_cfg_t* cfg, size_t size)
     }
 
     /* Allocate and initialize the block locally */
-    if(cfg->blk_tbl.rbtbl->n_blocks == BLOCK_TBL_NENT) {
+    if(cfg->blk_tbl.rbtbl->n_blocks == btbl_nentries) {
         //Out of room in the block table
         rvm_log("Block table out of space\n");
         errno = ENOMEM;

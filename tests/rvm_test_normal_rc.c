@@ -14,6 +14,7 @@
 
 //#include "malloc_simple.h"
 #include "buddy_malloc.h"
+#include "rvm_test_common.h"
 
 #define ARR_SIZE 2048
 
@@ -49,26 +50,6 @@ static bool check_arr(int *a, int expect, int size)
     return true;
 }
 
-rvm_cfg_t* initialize_rvm(char* host, char* port) {
-    rvm_opt_t opt;
-    opt.host = host;
-    opt.port = port;
-//    opt.alloc_fp = simple_malloc;
-//    opt.free_fp = simple_free;
-    opt.alloc_fp = buddy_malloc;
-    opt.free_fp = buddy_free;
-        
-    /* Non-recovery case */
-    opt.recovery = false;
-
-    LOG(8, ("rvm_cfg_create\n"));
-    rvm_cfg_t *cfg = rvm_cfg_create(&opt, create_ramcloud_layer);
-    CHECK_ERROR(cfg == NULL, 
-            ("FAILURE: Failed to initialize rvm configuration - %s\n", strerror(errno)));
-
-    return cfg;
-}
-
 int main(int argc, char **argv)
 {
     if (argc != 4) {
@@ -78,14 +59,10 @@ int main(int argc, char **argv)
     }
     bool restart = (strcmp(argv[3],"y") == 0 || strcmp(argv[3],"Y") == 0) ? true : false;
 
-    rvm_opt_t opt;
-    opt.host = argv[1];
-    opt.port = argv[2];
-
     if(restart) {
         /* Try to recover from server */
-        opt.recovery = true;
-        rvm_cfg_t *cfg = rvm_cfg_create(&opt, create_ramcloud_layer);
+        rvm_cfg_t *cfg = initialize_rvm(argv[1], argv[2], true,
+                create_ramcloud_layer);
 
         /* Get the new addresses for arr0 and arr1 */
         int **arr_ptr = (int**)rvm_get_usr_data(cfg);
@@ -113,7 +90,8 @@ int main(int argc, char **argv)
 
         printf("SUCCESS: Memory recovered after \"failure\"\n");
     } else {
-        rvm_cfg_t* cfg = initialize_rvm(argv[1], argv[2]);
+        rvm_cfg_t* cfg = initialize_rvm(argv[1], argv[2], false,
+                create_ramcloud_layer);
 
         LOG(8,("rvm_txn_begin\n"));
         rvm_txid_t txid = rvm_txn_begin(cfg);

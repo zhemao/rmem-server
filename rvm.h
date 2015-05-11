@@ -13,6 +13,8 @@
 
 #include "backends/rmem_generic_interface.h"
 
+#define DEFAULT_BLK_TBL_NENT (1 << 10)
+
 /** Transaction ID
  *  Valid txid's have positive values. Negative valued txid's indicate errors*/
 typedef int8_t rvm_txid_t;
@@ -39,6 +41,7 @@ typedef struct
     bool recovery; /**< Are we recovering from a fault? */
     rvm_alloc_t alloc_fp; /**< Custom allocation function */
     rvm_free_t free_fp;   /**< Custom free for alloc_fp */
+    size_t nentries;
 } rvm_opt_t;
 
 /** Configure rvm.

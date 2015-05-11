@@ -17,6 +17,7 @@ void setup_pages(char *host, char *port, int npages)
     opt.alloc_fp = buddy_malloc;
     opt.free_fp = buddy_free;
     opt.recovery = false;
+    opt.nentries = CALC_NENTRIES(npages);
 
     int *pages;
 
@@ -45,7 +46,7 @@ void setup_pages(char *host, char *port, int npages)
     }
 }
 
-double recover_pages(char *host, char *port)
+double recover_pages(char *host, char *port, int npages)
 {
     double starttime, endtime;
 
@@ -57,6 +58,7 @@ double recover_pages(char *host, char *port)
     opt.alloc_fp = buddy_malloc;
     opt.free_fp = buddy_free;
     opt.recovery = true;
+    opt.nentries = CALC_NENTRIES(npages);
 
     starttime = gettime();
     rvm = rvm_cfg_create(&opt, backend_layer);
@@ -87,7 +89,7 @@ int main(int argc, char *argv[])
     npages = atoi(argv[3]);
 
     setup_pages(host, port, npages);
-    rectime = recover_pages(host, port);
+    rectime = recover_pages(host, port, npages);
 
     printf("%f\n", rectime);
 

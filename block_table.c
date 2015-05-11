@@ -19,7 +19,7 @@ bool rbtbl_init(raw_blk_tbl_t *rbtbl)
      * Loop goes backward so that the free-list goes forward. This is important
      * because the block table takes the first BLOCK_TBL_NPG entries and those
      * must be in the first block. */
-    for(int bx = BLOCK_TBL_NENT - 1; bx >= 0; bx--)
+    for(int bx = rbtbl->nentries - 1; bx >= 0; bx--)
     {
         rbtbl->tbl[bx].bid = -bx;
         rbtbl->tbl[bx].blk_rec = NULL;
@@ -35,15 +35,15 @@ bool rbtbl_init(raw_blk_tbl_t *rbtbl)
 bool btbl_init(blk_tbl_t *btbl, raw_blk_tbl_t *rbtbl)
 {
     /* Allocate and initialize the block change list */
-    btbl->blk_chlist = (bitmap_t*)malloc(BITNSLOTS(BLOCK_TBL_NENT)*sizeof(int32_t));
-    memset(btbl->blk_chlist, 0, BITNSLOTS(BLOCK_TBL_NENT)*sizeof(int32_t));
+    btbl->blk_chlist = (bitmap_t*)malloc(BITNSLOTS(rbtbl->nentries)*sizeof(int32_t));
+    memset(btbl->blk_chlist, 0, BITNSLOTS(rbtbl->nentries)*sizeof(int32_t));
 
     /* Initialize the block index */
-    btbl->blk_idx = hash_create(BLOCK_TBL_NENT);
+    btbl->blk_idx = hash_create(rbtbl->nentries);
 
     /* Insert every allocated block from rbtbl into the index */
     size_t nalloc = 0; //Number of allocated blocks found so far
-    for(int bx = 0; bx < BLOCK_TBL_NENT; bx++)
+    for(int bx = 0; bx < rbtbl->nentries; bx++)
     {
         blk_desc_t *blk = &(rbtbl->tbl[bx]);
         if(blk->bid >= 0) {

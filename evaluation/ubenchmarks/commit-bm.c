@@ -24,6 +24,7 @@ double rvm_test(int npages, char *host, char *port)
     opt.alloc_fp = buddy_malloc;
     opt.free_fp = buddy_free;
     opt.recovery = false;
+    opt.nentries = CALC_NENTRIES(npages);
 
     rvm = rvm_cfg_create(&opt, backend_layer);
     if (rvm == NULL) {

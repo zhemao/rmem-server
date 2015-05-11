@@ -41,6 +41,7 @@ typedef struct
 typedef struct
 {
     uint64_t n_blocks; /**< Counter of how many blocks are currently being used (also shadow blocks) */
+    uint64_t nentries;
 
     void *usr_data; /**< A user-defined pointer to recoverable data */
     void *alloc_data; /**< Pointer to custom allocator data */
@@ -49,7 +50,7 @@ typedef struct
      * pointer */
     blk_desc_t *free;
 
-    /** Table of block descriptors. It has BLOCK_TBL_SIZE entries. */
+    /** Table of block descriptors. It has nentries entries. */
     blk_desc_t tbl[];
 } raw_blk_tbl_t;
 
@@ -75,16 +76,11 @@ typedef struct
 /* An invalid block ID, used like NULL */
 #define BID_INVAL UINT32_MAX
 
-/** Number of block descriptors in the block table */
-//#define BLOCK_TBL_NENT (1 << 16)
-#define BLOCK_TBL_NENT (1 << 10)
-
 /* Size (in bytes) of the block table struct
  * This is rounded up to the nearest multiple of 4096 */
-#define BLOCK_TBL_SIZE ((((sizeof(blk_tbl_t) + sizeof(blk_desc_t)*BLOCK_TBL_NENT) / 4096) + 1) * 4096)
+#define BLOCK_TBL_NPG(nentries) (((sizeof(raw_blk_tbl_t) + sizeof(blk_desc_t) * (nentries)) / 4096) + 1)
 
-/* Number of pages needed to contain block table */
-#define BLOCK_TBL_NPG (BLOCK_TBL_SIZE / 4096)
+#define BLOCK_TBL_SIZE(nentries) (BLOCK_TBL_NPG(nentries) * 4096)
 
 /* Get the tag for a real block
  int BX - index of the block in the block table */

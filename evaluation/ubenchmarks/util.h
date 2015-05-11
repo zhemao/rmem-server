@@ -15,6 +15,9 @@
 #define backend_layer create_rmem_layer
 #endif
 
+#define BASE_ENTRIES 32
+#define CALC_NENTRIES(npages) (2 * (BASE_ENTRIES + npages))
+
 static inline double gettime(void)
 {
     struct timespec ts;

@@ -16,6 +16,7 @@
 #include "backends/rmem_backend.h"
 //#include "malloc_simple.h"
 #include "buddy_malloc.h"
+#include "rvm_test_common.h"
 
 /* The sizes of the arrays and linked list used for testing */
 /* Biger than a page worth of ints, will use block allocator */
@@ -116,26 +117,6 @@ static bool check_arr(int *a, int expect, int size)
     return true;
 }
 
-rvm_cfg_t* initialize_rvm(char* host, char* port, bool rec) {
-    rvm_opt_t opt;
-    opt.host = host;
-    opt.port = port;
-//    opt.alloc_fp = simple_malloc;
-//    opt.free_fp = simple_free;
-    opt.alloc_fp = buddy_malloc;
-    opt.free_fp = buddy_free;
-        
-    /* Non-recovery case */
-    opt.recovery = rec;
-
-    LOG(1, ("rvm_cfg_create\n"));
-    rvm_cfg_t *cfg = rvm_cfg_create(&opt, create_rmem_layer);
-    CHECK_ERROR(cfg == NULL, 
-            ("FAILURE: Failed to initialize rvm configuration - %s\n", strerror(errno)));
-
-    return cfg;
-}
-
 int main(int argc, char **argv)
 {
     if (argc != 4) {
@@ -151,13 +132,15 @@ int main(int argc, char **argv)
     rvm_cfg_t *cfg;
     if(start_phase >= 0) {
         /* Try to recover from server */
-        cfg = initialize_rvm(argv[1], argv[2], true);
+        cfg = initialize_rvm(argv[1], argv[2], true,
+                create_rmem_layer);
 
         /* Recover the state (if any) */
         state = (test_state_t*)rvm_get_usr_data(cfg);
     } else {
         /* Starting from scratch */
-        cfg = initialize_rvm(argv[1], argv[2], false);
+        cfg = initialize_rvm(argv[1], argv[2], false,
+                create_rmem_layer);
         CHECK_ERROR(cfg == NULL, ("Failed to initialize rvm\n"));
 
         state = NULL;

@@ -16,7 +16,7 @@ function stop_rmem_server {
     sleep 1
 }
 
-PAGE_NUMS="1 5 10 20 50 100 200 500 1000"
+PAGE_NUMS="1 10 100 1000 10000"
 
 ARCH=$(uname -m)
 
