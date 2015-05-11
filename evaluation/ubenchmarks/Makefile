@@ -1,6 +1,5 @@
 INCLUDES := -I../.. -I../../backends
-CFLAGS  := $(INCLUDES) -Wall -O3 -std=gnu11
-#CFLAGS  := $(INCLUDES) -Wall -O0 -g -pg -std=gnu11
+CFLAGS  := $(INCLUDES) -Wall -O3 -std=gnu11 -pg -ggdb
 RVM_LIB := -L../.. -lrvm
 RAMC_LIBS := $(RVM_LIB) -L/nscratch/joao/ramcloud/obj.master \
 	-lramcloud -lboost_system -lboost_program_options -lstdc++

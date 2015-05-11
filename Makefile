@@ -9,8 +9,7 @@ RAMC_INCLUDES = -I/nscratch/joao/ramcloud/src/ -I/nscratch/joao/ramcloud/ -I/nsc
 LINCLUDES = -L/nscratch/joao/ramcloud/obj.master
 RAMC_LIBS = -lramcloud -lboost_system -lboost_program_options
 CFLAGS  := -Wall -O3 -fPIC -std=gnu11 -ggdb $(INCLUDES)
-CXXFLAGS := -Wall -O3 -fPIC -std=gnu++0x $(RAMC_INCLUDES) $(INCLUDES)
-#CXXFLAGS := -Wall -O0 -g -fPIC -std=gnu++0x $(RAMC_INCLUDES) $(INCLUDES)
+CXXFLAGS := -Wall -O3 -fPIC -std=gnu++0x $(RAMC_INCLUDES) $(INCLUDES) -ggdb
 RAMC_OBJS := /nscratch/joao/ramcloud/obj.master/OptionParser.o
 
 APPS    := rmem-server 
