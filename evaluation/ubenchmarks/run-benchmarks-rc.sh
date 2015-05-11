@@ -4,16 +4,16 @@ RAMC_DIR="$RMEM_DIR/evaluation/ramcloud"
 
 CLIENT=f1
 SERVER=f2
-PORT=11101
+PORT=11100
 
 function start_ramcloud {
-    echo "ssh -f $SERVER \"$RAMC_DIR/manage_ramcloud.py start &> ramcloud.log\""
-    ssh -f $SERVER "$RAMC_DIR/manage_ramcloud.py start &> ramcloud.log"
+    echo "$RAMC_DIR/manage_ramcloud.py start &> ramcloud.log"
+    $RAMC_DIR/manage_ramcloud.py start &> ramcloud.log
     sleep 3
 }
 
 function stop_ramcloud {
-    ssh $SERVER "$RAMC_DIR/manage_ramcloud.py stop"
+    $RAMC_DIR/manage_ramcloud.py stop
     sleep 3
 }
 
