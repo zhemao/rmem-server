@@ -14,7 +14,7 @@
 <rect x="297.717" y="57.479" fill="#C0C2C4" stroke="#000000" stroke-miterlimit="10" width="63.354" height="47.289"/>
 <text transform="matrix(1 0 0 1 310.9082 81.6719)" font-family="'MyriadPro-Bold'" font-size="14">Server</text>
 <text transform="matrix(1 0 0 1 191.0063 32.0454)" font-family="'MyriadPro-Bold'" font-size="18">RAMCloud</text>
-<rect x="15.508" y="89.117" fill="#C0C2C4" stroke="#000000" stroke-miterlimit="10" width="132.763" height="23.029"/>
+<rect x="15.508" y="89.117" fill="#939598" stroke="#000000" stroke-miterlimit="10" width="132.763" height="23.029"/>
 <rect x="15.508" y="65.398" fill="#C0C2C4" stroke="#000000" stroke-miterlimit="10" width="132.763" height="23.029"/>
 <rect x="15.508" y="42.254" fill="#C0C2C4" stroke="#000000" stroke-miterlimit="10" width="132.763" height="23.029"/>
 <text transform="matrix(1 0 0 1 19.7891 105.9854)" font-family="'MyriadPro-Bold'" font-size="14">RAMCloud Backend</text>
