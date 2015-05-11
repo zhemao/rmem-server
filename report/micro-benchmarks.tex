@@ -43,10 +43,19 @@ copying data from the server.
 \includegraphics[scale=0.40]{graphs/commit_time_rc_latencies.pdf}
 \end{center}
 \caption{Commit time micro-benchmark when using the RAMCloud backend}
-\label{fig:inmem_fs_design}
+\label{fig:rc-commit-ubm}
 \end{figure}
 
-Figure~\ref{fig:inmem_fs_design} shows the results of the commit micro-benchmark when using the RAMCloud backend. 
+\subsection{RAMCloud Backend}
+\begin{figure}[t!]
+\begin{center}
+\includegraphics[scale=0.40]{graphs/recovery_time_rc_latencies.pdf}
+\end{center}
+\caption{Recovery time micro-benchmark when using the RAMCloud backend}
+\label{fig:rc-recovery-ubm}
+\end{figure}
+
+Figure~\ref{fig:rc-commit-ubm} shows the results of the commit micro-benchmark when using the RAMCloud backend. 
 The end-to-end latency of a commit operation is dominated by the number of pages to be commited, as each page write requires a round-trip to the RAMCloud server.
 The RAMCloud backend also needs to save the table that contains the mapping between tags and keys in, but this only requires one interaction with the server.
 The RAMCloud backend requires roughly 10 microseconds to write a page to RAMCloud. As can be seen in the graph, the commit time grows linearly with the number of pages as expected.
