@@ -1,0 +1,21 @@
+The RVM API consists of the following functions.
+
+\begin{verbatim}
+    rvm_cfg_create() / rvm_cfg_destroy()
+\end{verbatim}
+
+The \verb|rvm_cfg_create()| function sets up a connection to the remote node and, if necessary, recovers remote memory left over from a previous (failed) run of the application. The RVM configuration object returned by \verb|rvm_cfg_create()| is used in all the other commands. The \verb|rvm_cfg_destroy()| object cleans up the configuration object and closes the connection to the remote node.
+
+\begin{verbatim}
+    rvm_alloc() / rvm_free()
+\end{verbatim}
+
+    The \verb|rvm_alloc()| functions allocates memory both locally and on the remote node. Any modifications to the local pages allocated by \verb|rvm_alloc()| are automatically detected and copied to the remote node at commit time. \verb|The rvm_free()| function releases the local and remote memory allocated by \verb|rvm_alloc()|.
+
+\begin{verbatim}
+    rvm_txn_begin() / rvm_txn_commit()
+\end{verbatim}
+
+    All operations on recoverable memory (alloc, free, read, and write) should occur between a call to \verb|rvm_txn_begin()| and a call to \verb|rvm_txn_commit()|. When \verb|rvm_txn_commit()| is called, all memory pages that have been modified since the last call to \verb|rvm_txn_begin()| will be copied over to the remote node. The client then requests the remote node to atomically commit the modifications.
+
+

@@ -1,24 +1,15 @@
 \subsection{The RVM API}
 
-The RVM API consists of the following functions.
+\input{rvm-layer}
 
-%rvm_cfg_create() / rvm_cfg_destroy()
-%
-%    The rvm_cfg_create() function sets up a connection to the remote node and, if necessary, recovers remote memory left over from a previous (failed) run of the application. The RVM configuration object returned by rvm_cfg_create() is used in all the other commands. The rvm_cfg_destroy() object cleans up the configuration object and closes the connection to the remote node.
-%
-%    rvm_alloc() / rvm_free()
-%
-%    The rvm_alloc() functions allocates memory both locally and on the remote node. Any modifications to the local pages allocated by rvm_alloc() are automatically detected and copied to the remote node at commit time. The rvm_free() function releases the local and remote memory allocated by rvm_alloc().
-%
-%    rvm_txn_begin() / rvm_txn_commit()
-%
-%    All operations on recoverable memory (alloc, free, read, and write) should occur between a call to rvm_txn_begin() and a call to rvm_txn_commit(). When rvm_txn_commit() is called, all memory pages that have been modified since the last call to rvm_txn_begin() will be copied over to the remote node. The client then requests the remote node to atomically commit the modifications.
-%
-%    The RDMA Backend
-%
-%    Our primary backend uses Infiniband Remote Direct Memory Access (RDMA) to talk to a server managing a large pool of memory. At startup, the remote memory server allocates a large block of system memory. When a client connects, this memory is registered with the infiniband drivers, allowing for one-sided RDMA. Control commands like allocation and free are sent through two-sided sends and receives, but read and write operations are performed using one-sided RDMA initiated by the client.
-%
-%    The five most important control commands used by the RDMA backend are rmem_alloc, rmem_free, rmem_cp, and rmem_txn_go. The rmem_alloc command takes a size and a unique tag. If a memory region with that tag has not yet been allocated, it will reserve space for a memory region of the given size, associate it with the tag, and return the start address of the allocated region. If there is already an allocated memory region with the same tag, the previously allocated address is returned. The rmem_free command queues freeing of an allocated memory region. However, the memory will not actually be freed until the transaction is committed. Similarly, the rmem_cp command queues a copy from one part of remote memory to another. The rmem_txn_go command commits the transaction by instructing the server to perform all outstanding frees and copies. Once the server receives this message, it can perform all the operations without any interaction from the client, so the client can fail and the transaction will still complete.
-%
-%    The two one-sided operations are rmem_put and rmem_get. The rmem_put function copies data from local memory to remote memory. The rmem_get function copies data from remote memory to local memory. These remote memory operations are not atomic. So, to ensure that changes to remote memory are done atomically, RVM allocates two remote memory pages for each local memory page. The real page holds the canonical data, but there is also a shadow page to which all uncommitted modifications are made. When the change is committed, the shadow pages are copied over to the real pages using the transactional copy.
-%
+\subsection{The Remote Memory Layer}
+
+\input{rmem-layer}
+
+\subsection{Infiniband Backend}
+
+\input{ib-backend}
+
+\subsection{Ramcloud Backend}
+
+\input{ramcloud-backend}
