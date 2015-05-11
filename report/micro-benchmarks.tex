@@ -1,1 +1,37 @@
-% Micro-Benchmarks
+We used micro-benchmarks to test the performance of RVM commits and RVM
+recovery. To test commits, we allocated a number of pages, made modifications
+to each one of them, and measured the time it took for \verb|rvm_txn_commit()|
+to complete. To test recovery, we first allocate a number of pages and
+close the connection to the server. We then restart the connection using the
+recovery flag and time how long it takes \verb|rvm_cfg_create()| to complete.
+When benchmarking the IB backend, we run three trials for each number of pages,
+restarting the server after each trial.
+
+Figure \ref{fig:ib-commit-ubm} shows the results of the commit micro-benchmark
+using the IB backend. At the smallest page count, the commit time is around
+150 microseconds. At 10K pages, the commit time has increased to 140 milliseconds.
+As can be seen in the graph, the relation between page count and commit time
+is fairly linear, with a slope of about 13.7 microseconds per page.
+
+\begin{figure}[h]
+    \caption{IB Commit Micro-Benchmark Results}
+    \includegraphics[width=\linewidth]{commit-results-rm.png}
+    \label{fig:ib-commit-ubm}
+\end{figure}
+
+Figure \ref{fig:ib-recovery-ubm} shows the results of the recovery
+micro-benchmark using the IB backend. Recovery is quite a bit slower than
+commit. Recovering a single page takes about 50 milliseconds, while recovering
+10,000 pages takes more than 2 seconds. The relationship between number of
+pages and recovery time is also not entirely linear.
+The recovery time increases steadily until about 2000 pages, after which it
+increases drastically. It is uncertain what is causing this sort of behavior,
+as startup time involves a lot of different things, including the allocation
+of local memory pages, receiving tag to address mappings from the server, and
+copying data from the server.
+
+\begin{figure}[h]
+    \caption{IB Recovery Micro-Benchmark Results}
+    \includegraphics[width=\linewidth]{recovery-results-rm.png}
+    \label{fig:ib-recovery-ubm}
+\end{figure}
