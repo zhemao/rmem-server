@@ -283,6 +283,11 @@ size_t rvm_get_blk_sz(rvm_cfg_t *cfg)
     return cfg->blk_sz;
 }
 
+size_t rvm_get_alloc_sz(rvm_cfg_t *cfg)
+{
+    return btbl_get_nalloc(&cfg->blk_tbl)*cfg->blk_sz;
+}
+
 rvm_txid_t rvm_txn_begin(rvm_cfg_t* cfg)
 {
     cfg->in_txn = true;

@@ -14,6 +14,7 @@ int build(gen_state_t *state, char *input_UFX_name)
 
    if(state->pstate == NULL) {
        /* We need to initialize build */
+       double init_time = 0 - gettime();
        TX_START(txid);
 
        printf("Build starting from scratch\n");
@@ -26,8 +27,8 @@ int build(gen_state_t *state, char *input_UFX_name)
        bstate->kmerx = 0;
 
        TX_COMMIT(txid);
-
-       printf("Allocated build state\n");
+       init_time += gettime();
+       printf("Allocated build state: took %lf seconds\n", init_time);
    } else {
        bstate = (build_state_t*)state->pstate;
        printf("Build recovering, starting from kmer %ld\n", bstate->kmerx);

@@ -32,11 +32,6 @@ typedef struct
     hash_table_t  *tbl;     /**< Hash table of kmers */
     start_kmer_t *start_list; /**< List of start kmers */
 
-    /* Performance Measurements */
-    double inputTime;
-    double constrTime;
-    double traversalTime;
-
     /* Pointer to phase-specific state info */
     void *pstate;
 } gen_state_t;

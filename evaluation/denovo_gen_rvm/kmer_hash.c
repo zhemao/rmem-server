@@ -12,7 +12,8 @@ hash_table_t* create_hash_table(int64_t nEntries, memory_heap_t *memory_heap)
    result->table = (bucket_t*) rvm_alloc(cfg, n_buckets * sizeof(bucket_t));
 
    if (result->table == NULL) {
-      fprintf(stderr, "ERROR: Could not allocate memory for the hash table: %ld buckets of %lu bytes\n", n_buckets, sizeof(bucket_t));
+      fprintf(stderr, "ERROR: Could not allocate memory for the hash"
+             " table: %ld buckets of %lu bytes\n", n_buckets, sizeof(bucket_t));
       exit(1);
    }
 

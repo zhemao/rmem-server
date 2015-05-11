@@ -69,6 +69,9 @@ bool rvm_cfg_destroy(rvm_cfg_t *cfg);
  */
 size_t rvm_get_blk_sz(rvm_cfg_t *cfg);
 
+/* Get the amount of memory (in bytes) of recoverable memory allocated */
+size_t rvm_get_alloc_sz(rvm_cfg_t *cfg);
+
 /** Begin a transaction.
  *  rvm_begin_txn starts a new recoverable memory transaction. Any modifications
  *  to any recoverable memory region will be made atomically with respect to

@@ -39,6 +39,7 @@ void initialize_rvm(char*host, char* port, bool rec)
     opt.host = host;
     opt.port = port;
     opt.recovery = rec;
+    opt.nentries = (1 << 16);
 
     opt.alloc_fp = buddy_malloc;
     opt.free_fp = buddy_free;
@@ -56,10 +57,19 @@ int main(int argc, char *argv[]) {
 	char *port = NULL;
 	const char *out_filename = DEF_OUT_NAME;
 	bool rec = false;
+    size_t init_mem_sz = 0;
+    size_t build_mem_sz = 0;
+    size_t probe_mem_sz = 0;
+
+    double init_time = 0;
+    double build_time = 0;
+    double probe_time = 0;
 
     /* Pick defaults that result in a clean baseline */
     fa_freq  = INT_MAX;
     cp_freq = INT_MAX;
+
+    init_time -= gettime();
 
 	/* Parse Args */
     int c;
@@ -117,7 +127,6 @@ int main(int argc, char *argv[]) {
         CHECK_ERROR(state->memheap == NULL, ("Failed to allocate mem heap\n"));
         state->tbl = NULL;
         state->start_list = NULL;
-        state->constrTime = state->inputTime = state->traversalTime = 0.0;
         state->pstate = NULL;
         state->phase = BUILD; /* First phase */
 
@@ -125,21 +134,30 @@ int main(int argc, char *argv[]) {
         rvm_set_usr_data(cfg, state);
 
         TX_COMMIT(txid);
+
+        init_mem_sz = rvm_get_alloc_sz(cfg);
         printf("Initialized State, starting build phase\n");
+        printf("Initial recoverable memory: %ld\n", init_mem_sz);
     }
+
 
     /* Initialize the lookup table for kmer packing */
     init_LookupTable();
     
+    init_time += gettime();
+
     switch(state->phase) {
     case BUILD:
         /** Graph construction **/
-        state->constrTime -= gettime();
+        build_time -= gettime();
 
         build(state, input_UFX_name);
+        build_mem_sz = rvm_get_alloc_sz(cfg) - init_mem_sz;
 
         printf("Built\n");
-        state->constrTime += gettime();
+        printf("Build Recoverable Memory: %ld\n", build_mem_sz);
+
+        build_time += gettime();
         build_state_free(state->pstate);
         state->pstate = NULL;
         state->phase = PROBE;
@@ -147,14 +165,18 @@ int main(int argc, char *argv[]) {
     /* fall through */
     case PROBE:
         /** Graph traversal **/
-        state->traversalTime -= gettime();
+        probe_time -= gettime();
 
         FILE *out = fopen(out_filename, "w");
         probe(state, out);
         fclose(out);
 
+        probe_mem_sz = rvm_get_alloc_sz(cfg) - init_mem_sz - build_mem_sz;
+
         printf("Probed\n");
-        state->traversalTime += gettime();
+        printf("Probe Recoverable Memory: %ld\n", probe_mem_sz);
+
+        probe_time += gettime();
         state->phase = DONE;
         probe_state_free(state->pstate);
         break;
@@ -170,10 +192,10 @@ int main(int argc, char *argv[]) {
     //TX_COMMIT(txid);
 
 	/** Print timing and output info **/
-	/***** DO NOT CHANGE THIS PART ****/
+    printf("Total Recoverable Memory: %ld\n", rvm_get_alloc_sz(cfg));
 	printf("%s: Input set: %s\n", argv[0], argv[1]);
-	printf("Input reading time: %f seconds\n", state->inputTime);
-	printf("Graph construction time: %f seconds\n", state->constrTime);
-	printf("Graph traversal time: %f seconds\n", state->traversalTime);
+	printf("Initialization time: %f seconds\n", init_time);
+	printf("Build time: %f seconds\n", build_time);
+	printf("Build time: %f seconds\n", probe_time);
 	return 0;
 }

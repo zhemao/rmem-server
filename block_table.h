@@ -40,7 +40,7 @@ typedef struct
 /** The block table is a page-sized list of every block tracked by rvm */
 typedef struct
 {
-    uint64_t n_blocks; /**< Counter of how many blocks are currently being used (also shadow blocks) */
+    uint64_t n_blocks; /**< Counter of how many blocks are currently being used */
     uint64_t nentries;
 
     void *usr_data; /**< A user-defined pointer to recoverable data */
@@ -140,6 +140,12 @@ static inline bool btbl_test_mod(blk_tbl_t *tbl, blk_desc_t *blk)
         return false;
 
     return BITTEST(tbl->blk_chlist, blk->bid);
+}
+
+/* Return the number of blocks allocated in the block table */
+static inline size_t btbl_get_nalloc(blk_tbl_t *tbl)
+{
+    return tbl->rbtbl->n_blocks;
 }
 
 #endif /* BLOCK_TABLE_H_ */
