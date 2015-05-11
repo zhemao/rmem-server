@@ -128,11 +128,13 @@ static void send_tag_to_addr_info(struct rdma_cm_id *id)
 {
     struct conn_context *ctx = (struct conn_context *)id->context;
     struct rmem_iterator iter;
+    int nleft = rmem.nblocks;
 
     ctx->send_msg->id = MSG_TAG_ADDR_MAP;
 
     if (rmem.nblocks == 0) {
 	ctx->send_msg->data.tag_addr_map.size = 0;
+	ctx->send_msg->data.tag_addr_map.nleft = 0;
 	send_message(id);
 	return;
     }
@@ -142,7 +144,9 @@ static void send_tag_to_addr_info(struct rdma_cm_id *id)
     while (!rmem_iter_finished(&iter)) {
 	int to_send = rmem_iter_next_set(&iter,
 		ctx->send_msg->data.tag_addr_map.data);
+        nleft -= to_send;
 	ctx->send_msg->data.tag_addr_map.size = to_send;
+        ctx->send_msg->data.tag_addr_map.nleft = nleft;
 
 	LOG(5, ("Sending %d mappings\n", to_send));
 

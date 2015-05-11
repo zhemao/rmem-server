@@ -55,6 +55,7 @@ struct message {
 	} cp;
 	struct {
             int size;
+            int nleft;
 	    tag_addr_entry_t data[TAG_ADDR_MAP_SIZE_MSG];
 	} tag_addr_map;
 	struct {

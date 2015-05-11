@@ -235,6 +235,7 @@ void receive_tag_to_addr_info(struct rmem* rmem)
         sem_wait(&rmem->ctx.recv_sem);
 
         int size = rmem->ctx.recv_msg->data.tag_addr_map.size;
+        int nleft = rmem->ctx.recv_msg->data.tag_addr_map.nleft;
         LOG(8, ("Received %d mappings\n", size));
 
         tag_addr_entry_t* entries = 
@@ -248,7 +249,7 @@ void receive_tag_to_addr_info(struct rmem* rmem)
         TEST_NZ(send_message(rmem->id));
         sem_wait(&rmem->ctx.send_sem);
 
-        if (size < TAG_ADDR_MAP_SIZE_MSG)
+        if (nleft == 0)
             break;
     }
 }
