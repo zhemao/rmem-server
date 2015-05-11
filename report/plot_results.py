@@ -6,9 +6,9 @@ from os.path import splitext
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: plot_results.py title results.csv")
-    title = sys.argv[1]
-    infname = sys.argv[2]
+        return "Usage: plot_results.py results.csv"
+
+    infname = sys.argv[1]
     df = pandas.read_csv(infname)
 
     x = df.iloc[:,0].values
@@ -19,11 +19,10 @@ def main():
 
     plt.xscale('log')
     plt.yscale('log')
-    plt.title(title)
     plt.xlabel("Num. Pages")
     plt.ylabel("Time (s)")
     plt.plot(x, y)
     plt.savefig(outname)
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

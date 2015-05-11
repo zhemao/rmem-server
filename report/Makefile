@@ -1,30 +1,27 @@
-PROJ=main
 .PHONY: clean open spell
 
-FILES=$(wildcard *.tex)
+PROJ=main
+TEXFILES=$(wildcard *.tex)
+FIGURE_DATA=$(wildcard *.csv)
+FIGURES=$(FIGURE_DATA:.csv=.png)
 
-all: clean
+PYTHON=python
+
+main.pdf: $(TEXFILES) $(FIGURES)
 	pdflatex main.tex
 	bibtex main
 	pdflatex main.tex
-	pdflatex main.tex
+
+%.png: %.csv
+	$(PYTHON) plot_results.py $<
 
 open: $(PROJ).pdf
 	kpdf $^
 
-$(PROJ).pdf: $(PROJ).tex $(PROJ).bbl
-	pdflatex $(PROJ)
-	pdflatex $(PROJ)
-
-$(PROJ).bbl: biblio.bib $(PROJ).tex
-	pdflatex $(PROJ)
-	bibtex $(PROJ)
-
 clean:
-	rm -f $(PROJ).pdf *.aux *.toc *.bbl *.blg *.log *.out *.bak
-
+	rm -f $(PROJ).pdf *.aux *.toc *.bbl *.blg *.log *.out *.bak $(FIGURES)
 
 spell:
-	for i in $(FILES) ; do \
+	for i in $(TEXFILES) ; do \
 	aspell -t -c -p $(shell pwd)/dict.txt $$i ; \
 	done;
