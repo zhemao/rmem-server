@@ -15,7 +15,7 @@ def main():
     y = np.mean(df.iloc[:,1:].values, 1)
 
     outname, _ = splitext(infname)
-    outname += ".png"
+    outname += ".pdf"
 
     plt.xscale('log')
     plt.yscale('log')
