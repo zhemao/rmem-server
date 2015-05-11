@@ -15,8 +15,8 @@
 #define backend_layer create_rmem_layer
 #endif
 
-#define BASE_ENTRIES 32
-#define CALC_NENTRIES(npages) (2 * (BASE_ENTRIES + npages))
+#define BASE_ENTRIES 16
+#define CALC_NENTRIES(npages) (BASE_ENTRIES + 2 * (npages))
 
 static inline double gettime(void)
 {
