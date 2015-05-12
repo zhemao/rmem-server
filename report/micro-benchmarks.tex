@@ -72,3 +72,35 @@ Figure~\ref{fig:rc-recovery-ubm} shows the results of the recovery micro-benchma
 The end-to-end recovery time is mostly dominated by the time to establish a connection with the RAMCloud server (roughly 80ms).
 Once the connection is established the RAMCloud backend retrieves the pages previously committed. The time to do this is dominated by the communication with the server, as in the commit benchmark, which grows linear with the number of pages.
 Because of this we see a linear recovery time increase as the number of pages increases.
+
+\subsection{BLCR Microbenchmark}
+
+To compare our implementation against an existing tool, we ran similar
+microbenchmarks for the Berkeley Labs Checkpoint Restart (BLCR) tool.
+The microbenchmark maps in a given number of pages of memory and makes
+modifications to it. We measure commit time by having the process call the
+"cr\_checkpoint" program on its own PID and timing how long it takes for the
+checkpoint program to run. The "cr\_checkpoint" program saves the process state
+to a file. We can measure recovery time by running "cr\_restart" on the
+checkpoint file and timing how long it takes for the program to run to completion.
+
+As seen in Figure \ref{fig:blcr-commit-ubm}, commit latency for BLCR is
+considerably longer than for either of the two RVM backends. For a single page,
+commit takes approximately 60 milliseconds, and the commit time increased by
+47 microseconds per page.
+
+Recovery time (Figure \ref{fig:blcr-recovery-ubm} does not show a clear trend
+as the number of pages increases, but the time is always rather slow, taking
+around one to two seconds to restart the application.
+
+\begin{figure}[t!]
+    \caption{BLCR Commit Micro-Benchmark Results}
+    \includegraphics[width=\linewidth]{graphs/commit-results-blcr.pdf}
+    \label{fig:blcr-commit-ubm}
+\end{figure}
+
+\begin{figure}[t!]
+    \caption{BLCR Recovery Micro-Benchmark Results}
+    \includegraphics[width=\linewidth]{graphs/recovery-results-blcr.pdf}
+    \label{fig:blcr-recovery-ubm}
+\end{figure}
