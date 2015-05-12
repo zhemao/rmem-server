@@ -8,12 +8,74 @@
 \label{fig:inmem_fs_design}
 \end{figure}
 
-To demonstrate the flexibility and applicability of our framework we have applied our framework to a VFS compliant in-memory file system (see Figure~\ref{fig:inmem_fs_design}). 
-Our file system uses main memory as the only storage medium to provide very fast writes and reads. 
+To demonstrate the flexibility and applicability of our framework we have applied our framework to RvmFS, a VFS compliant in-memory file system (see Figure~\ref{fig:inmem_fs_design}). 
+RvmFS uses main memory as the only storage medium to provide very fast writes and reads. 
 To be able to use our framework we have developed the file system using FUSE, a kernel module that allows the creation of user-space file systems.
 The decision of running our file system in user-space greatly simplified the development and debugging of both the file system as well as the framework. 
 First, because we have no restrictions in the type of system calls we can use we were able to use our framework without major changes to the design and code of RVM.
 Secondly, we were able to use tools like GDB or Valgrind to iterate quickly while debugging.
 
+To evaluate the performance of the system we ran a subset of the benchmarks in the Filebench~\cite{filebench} benchmark suite. 
+We compare the performance of the benchmark when running it against an ext4 file system backed by an SSD drive and when running on RvmFS backed by a remote server.
+Table~\ref{tab:description} describes each specific benchmark that we ran and table~\ref{tab:results} shows the performance obtained.
+We show the average latency of each operation in each benchmark.
 
+\begin{table}[h]
+\centering
+\caption{Description of Macro Benchmark Tests. The file size of the randomread benchmark was reduced to simplify evaluation.}
+\label{tab:description}
+\begin{tabular}{ | l | c |} 
+\hline
+Benchmark name & Description \\
+\hline
+\hline
+file\_micro\_create  & \pbox{20cm}{Create an empty file and issue\\ 1024 appends of 1MB each} \\
+ramdomread  & Random reads (8K) from a file with size 1Mb \\
+other  & other \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{Macro Benchmark Results}
+\label{tab:results}
+\begin{tabular}{ | l | c | c |} 
+\hline
+\pbox{20cm}{Benchmark\\ name} & \pbox{20cm}{Latency per Op.\\ (SSD)} & \pbox{20cm}{Latency per Op.\\ (RvmFS)} \\
+\hline
+\hline
+file\_micro\_create  & 0.0004 sec & 21 sec\\
+randomread  & 25us & 25us \\
+other  & 0 & 0 \\
+\hline
+\end{tabular}
+\end{table}
+
+\paragraph{Discussion}
+
+As shown in Table~\ref{tab:results}, RvmFS is considerably slower for some specific benchmarks while obtaining similar performance in others.
+The poor performance of the file system stems from different reasons.
+First, some of the file system operations are not optimized for performance. For instance, when extending a file length, RvmFS allocates a new region of memory and copies all the file contents
+to the new region. Not only copying all the data is slow, this also means that the next commit operation will backup the whole file contents even if only a small part of the file changed.
+Secondly, RvmFS currently does not support multi-threaded access, common in modern file systems such as ext4.
+Thirdly, RvmFS is ultimately limited by the performance of RVM. Due to the high overheads involved when backing up large contiguous regions of memory in RVM, RvmFS suffers.
+Finally, RvmFS is not built with locality of storage in mind. This means that simple operations can touch many files.
+
+Next we comment on the performance of each benchmark.
+
+\paragraph{\bf file\_micro\_create}
+\paragraph{\bf randomread} 
+
+% random read with ramfs
+%26236: 61.739: Per-Operation Breakdown
+%rand-read1           2440621ops    40675ops/s 317.8mb/s      0.0ms/op       12us/op-cpu [0ms - 0ms]
+%26236: 61.739: IO Summary: 2440621 ops, 40674.879 ops/s, (40675/0 r/w), 317.8mb/s,     25us cpu/op,   0.0ms latency
+
+% Random read with ssd
+%26602: 61.006: Per-Operation Breakdown
+%rand-read1           2435691ops    40592ops/s 317.1mb/s      0.0ms/op       12us/op-cpu [0ms - 0ms]
+%26602: 61.006: IO Summary: 2435691 ops, 40592.390 ops/s, (40592/0 r/w), 317.1mb/s,     25us cpu/op,   0.0ms latency
+
+% random read with ssd
 
