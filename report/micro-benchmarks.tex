@@ -13,6 +13,11 @@ using the IB backend. At the smallest page count, the commit time is around
 150 microseconds. At 10K pages, the commit time has increased to 140 milliseconds.
 As can be seen in the graph, the relation between page count and commit time
 is fairly linear, with a slope of about 13.7 microseconds per page.
+From examining the performance of \verb|rvm_txn_commit()| using the profiler,
+we find that commit time is taken up mostly by sending the MULTI\_TXN\_CP
+commands to the server, as well as performing RDMA writes to the remote memory pool.
+Since these the number of commands and writes that need to be done scales
+linearly with the number of pages, this accounts for the linear increase.
 
 \begin{figure}[h]
     \caption{IB Commit Micro-Benchmark Results}
@@ -24,12 +29,20 @@ Figure \ref{fig:ib-recovery-ubm} shows the results of the recovery
 micro-benchmark using the IB backend. Recovery is quite a bit slower than
 commit. Recovering a single page takes about 50 milliseconds, while recovering
 10,000 pages takes more than 2 seconds. The relationship between number of
-pages and recovery time is also not entirely linear.
-The recovery time increases steadily until about 2000 pages, after which it
-increases drastically. It is uncertain what is causing this sort of behavior,
-as startup time involves a lot of different things, including the allocation
-of local memory pages, receiving tag to address mappings from the server, and
-copying data from the server.
+pages and recovery time is also not entirely linear. The recovery time
+increases steadily until about 2000 pages, after which it increases drastically.
+
+From profiling, we find that a large portion of time in recovery is spent
+fetching the data for the recovered pages using RDMA reads. However, an even
+larger portion of the time is spent registering pages with the Infiniband
+driver. There is a potential optimization we could make here. A lot of the
+pages being allocated are contiguous and so can be registered all at once.
+Instead, we register each page one by one. Similarly, data for contiguous
+pages could be fetched by a single RDMA read, instead of one read for each page.
+
+It is uncertain what is causing the non-linear increase in recovery time.
+It is possible that registering a new page with the Infiniband driver takes
+longer as the number of pages registered increases.
 
 \begin{figure}[h]
     \caption{IB Recovery Micro-Benchmark Results}
