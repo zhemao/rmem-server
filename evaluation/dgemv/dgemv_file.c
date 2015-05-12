@@ -33,6 +33,7 @@
     "\t-n NUMBER The n dimension of the matrix\n"                   \
     "\t-i NUMBER The number of iterations\n"                        \
     "\t-f PATH Optional output file\n"                              \
+    "\t-r Are we recovering from a failure?\n"                      \
     "\t-s NUM Shall we simulate a failure every NUM iterations?\n"  \
     "\t-c NUM Commit frequency\n"
 
@@ -103,7 +104,7 @@ int main(int argc, char *argv[])
     if(out_filename == NULL) {
         out = stdout;
     } else {
-        FILE *out = fopen(out_filename, "w");
+        out = fopen(out_filename, "w");
         if(out == NULL) {
             printf("Failed to open output file: %s\n", out_filename);
             return EXIT_FAILURE;
@@ -164,7 +165,7 @@ int main(int argc, char *argv[])
         //Hard-coded failure
         if(fail_freq != 0 && (state->iter % fail_freq) == 0) {
             printf("Simulating failure after %dth iteration\n", state->iter);
-            return EXIT_SUCCESS;
+            return EXIT_FAILURE;
         }
     }
 

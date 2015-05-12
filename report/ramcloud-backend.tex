@@ -2,7 +2,7 @@
 
 \begin{figure}[t!]
 \begin{center}
-\includegraphics[scale=0.60]{graphs/ramcloud_backend_design2.pdf}
+\includegraphics[scale=0.60]{graphs/ramcloud_backend_design_final.pdf}
 \end{center}
 \caption{RAMCloud backend layer operating along side RAMCloud.}
 \label{fig:ramcloud_backend_design}
@@ -27,13 +27,13 @@ To provide atomicity and durability of the tag/key mapping, this backend keeps a
 
 Th RMEM's layer operations are implemented in the following way:
 
-\paragraph {\bf Connect} During connection the backend creates a RAMCloud client instance that is responsible for estabilishing a connection to the RAMCloud server.
-If this is not the first time this connection is performed, i.e., if the client is under recovery, the backend recoveres each tag-key mapping.
+\paragraph {\bf Connect} During connection the backend creates a RAMCloud client instance that is responsible for establishing a connection to the RAMCloud server.
+If this is not the first time this connection is performed, i.e., if the client is under recovery, the backend recovers each tag-key mapping.
 Otherwise, this layer initializes a RAMCloud table and stores an empty master entry in the RAMCloud's server.
 \paragraph{\bf Allocate} During allocation, first the backend creates a key that identifies the memory being allocated in the RAMCloud server. Secondly, RAMCloud initializes
 \paragraph{\bf Write} To write a memory region (identified by a tag) the backend fetches the tag's corresponding key and issues a {\emph put } operation with that key and corresponding data.
 \paragraph{\bf Read} Likewise, to read a memory region the backend issues a {\emph get} operation with the tag's corresponding key. The data read from RAMCloud is copied to the final destination.
-\paragraph{\bf Commit} To perform commit, the backend constructs a new master entry where each tag points to the key of the shadow memory being commited (see Figure~\ref{fig:ramcloud_backend_commit}). Likewise, the tag for each of the shadow
+\paragraph{\bf Commit} To perform commit, the backend constructs a new master entry where each tag points to the key of the shadow memory being committed (see Figure~\ref{fig:ramcloud_backend_commit}). Likewise, the tag for each of the shadow
 memory regions is made to point to the key of the old memory region (rephrase). Once this master entry is constructed in the backend, it is written atomically to RAMCloud.
 \paragraph{\bf Disconnect} To disconnect, the backend clears the main data structures (e.g., local tag-key map).
 
