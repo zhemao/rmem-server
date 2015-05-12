@@ -9,9 +9,11 @@
 #define ONE_MB (1024*1024)
 #define EIGHT_MB (8*ONE_MB)
 #define VALUE_MAX_SIZE (4*1024)
+#define TAG_VALUE_SIZE (7*1024*1024)
 #define TAG_ENTRIES_SIZE \
-        ((VALUE_MAX_SIZE - sizeof(uint32_t)) / sizeof(tag_entry_t))
-#define KEY_MAX_SIZE 6
+        ((TAG_VALUE_SIZE - sizeof(uint32_t)) / sizeof(tag_entry_t))
+#define NUM_TAG_ENTRIES (TAG_ENTRIES_SIZE / sizeof(tag_entry_t))
+#define KEY_MAX_SIZE 7
 #define TABLE_NAME "T"
 #define MAIN_ENTRY_KEY "M"
 #define TAG_TO_MAIN_KEY(tag) int_to_str(tag)
@@ -93,6 +95,7 @@ std::string shadow_key_from_main(const std::string& key)
 
 void rmc_disconnect(rmem_layer_t *rmem_layer)
 {
+    fprintf(stderr, "rmc_disconnect\n");
     ramcloud_data_t* data = (ramcloud_data_t*)rmem_layer->layer_data;
     //data->client->dropTable(TABLE_NAME);
 
@@ -105,6 +108,9 @@ void rmc_disconnect(rmem_layer_t *rmem_layer)
 
 uint64_t rc_malloc(rmem_layer_t *rmem_layer, size_t size, uint32_t tag)
 {
+#ifdef RAMC_DEBUG
+    fprintf(stderr, "rc_malloc\n");
+#endif
     ramcloud_data_t* data = (ramcloud_data_t*)rmem_layer->layer_data;
     uint64_t table_id = data->table_id;
     tag_map* tag_to_key = data->tag_to_key;
@@ -134,12 +140,18 @@ uint64_t rc_malloc(rmem_layer_t *rmem_layer, size_t size, uint32_t tag)
         size_left -= VALUE_MAX_SIZE;
     }
 
+#ifdef RAMC_DEBUG
+    fprintf(stderr, "rc_malloc done\n");
+#endif
     return 1;
 }
 
 int rc_put(rmem_layer_t *rmem_layer, uint32_t tag,
         void *src, void *data_mr, size_t size)
 {
+#ifdef DEBUG
+    fprintf(stderr, "rc_put\n");
+#endif
     double put_start_time = gettime();
     ramcloud_data_t* data = (ramcloud_data_t*)rmem_layer->layer_data;
     tag_map* tag_to_key = data->tag_to_key;
@@ -188,6 +200,9 @@ int rc_put(rmem_layer_t *rmem_layer, uint32_t tag,
 int rc_get(rmem_layer_t *rmem_layer, void *dst, void *data_mr,
         uint32_t tag, size_t size)
 {
+#ifdef RAMC_DEBUG
+    fprintf(stderr, "rc_get\n");
+#endif
     ramcloud_data_t* data = (ramcloud_data_t*)rmem_layer->layer_data;
     uint64_t table_id = data->table_id;
     tag_map* tag_to_key = data->tag_to_key;
@@ -232,6 +247,9 @@ int rc_get(rmem_layer_t *rmem_layer, void *dst, void *data_mr,
  */ 
 int rc_free(rmem_layer_t *rmem_layer, uint32_t tag)
 {
+#ifdef DEBUG
+    fprintf(stderr, "rc_free\n");
+#endif
     ramcloud_data_t* data = (ramcloud_data_t*)rmem_layer->layer_data;
     tag_map* tag_to_key = data->tag_to_key;
     std::map<uint32_t, size_t>* tag_to_size = data->tag_to_size;
@@ -247,6 +265,7 @@ int rc_free(rmem_layer_t *rmem_layer, uint32_t tag)
 static
 void write_tag_to_tag(ramcloud_data_t* data, uint32_t tag_src, uint32_t tag_dst)
 {
+    assert(0);
     tag_map* tag_to_key = data->tag_to_key;
     std::map<uint32_t, size_t>* tag_to_size = data->tag_to_size;
     uint64_t table_id = data->table_id;
@@ -291,133 +310,11 @@ void write_tag_to_tag(ramcloud_data_t* data, uint32_t tag_src, uint32_t tag_dst)
     }
 }
 
-/*
- * we currently commit everything
- */
-
-/*
- * We are commiting tags_dst by copying tafs_src to tags_dst
- * this means tags_dst should point to tags_src
- *
- */
 int rc_atomic_commit(rmem_layer_t* rmem_layer, uint32_t* tags_src,
         uint32_t* tags_dst, uint32_t* tags_size,
         uint32_t num_tags)
 {
-    double commit_start_time = gettime();
-
-    ramcloud_data_t* data = (ramcloud_data_t*)rmem_layer->layer_data;
-    tag_map* tag_to_key = data->tag_to_key;
-    std::map<uint32_t, size_t>* tag_to_size = data->tag_to_size;
-    uint64_t table_id = data->table_id;
-
-    std::vector<std::string> to_be_removed;
-
-    /*
-     * For each tag to be commited (shadow->final destination)
-     * We write it to a new place, update atomically the main table in RC
-     * and remove the old entries
-     */
-    
-    double phase1_start_time = gettime();
-    for (unsigned int i = 0; i < num_tags; ++i) {
-        int tag_src = tags_src[i];
-        int tag_dst = tags_dst[i];
-
-        std::map<uint32_t, std::string>::iterator src_key_it = tag_to_key->find(tag_src);
-        std::map<uint32_t, std::string>::iterator dst_key_it = tag_to_key->find(tag_dst);
-
-        // both src and dest tags should exist
-        assert(src_key_it != tag_to_key->end());
-        assert(dst_key_it != tag_to_key->end());
-
-
-        // this is the old key, because we are going to write this to a new place
-        std::string old_dst_key = dst_key_it->second;
-
-        // new key 
-        // add 's' or remove, alternating
-        std::string new_dst_key = shadow_key_from_main(old_dst_key); 
-
-#ifdef RAMC_DEBUG   
-        fprintf(stderr, "commiting tag_src: %d to tag_dst: %d\n", tag_src, tag_dst);
-#endif
-        double start_time = gettime();
-        write_tag_to_tag(data, tag_src, tag_dst);
-        double end_time = gettime();
-        fprintf(stderr, "tag_to_tag time: %f\n", end_time-start_time);
-        /*
-
-
-        // get data from src (shadow)
-
-        Buffer buffer;
-        data->client->read(table_id, src_key_it->second.c_str(), src_key_it->second.size(), &buffer);
-
-        const char* bufferString = static_cast<const char*>(
-        buffer.getRange(0, buffer.size()));
-        data->client->write(table_id, new_dst_key.c_str(), 
-        new_dst_key.size(), bufferString, buffer.size());
-         */
-
-        // update the tag-to-key map
-        tag_to_key->operator[](tag_dst) = new_dst_key;
-
-        // this is going to be removed after we commit the new main table entry
-        // cant be done before otherwise we may lose pages
-        to_be_removed.push_back(old_dst_key);
-    }
-    double phase1_end_time = gettime();
-    double phase2_start_time = gettime();
-
-    // main table to be populated
-    rc_main_table_t* main_table = new rc_main_table_t;
-    main_table->num_tags = tag_to_key->size();
-
-    // traverse all tags, not just those committed
-    // all need to be saved in main table
-    int i = 0;
-    for (std::map<uint32_t, std::string>::iterator it = tag_to_key->begin();
-            it != tag_to_key->end(); ++it, ++i) {
-        int tag = it->first;
-        std::string key = it->second;
-        size_t tag_size = tag_to_size->operator[](tag);
-
-        main_table->tag_entries[i].tag = tag;
-        main_table->tag_entries[i].size = tag_size;
-        strcpy(main_table->tag_entries[i].key, key.c_str());
-    }
-    double phase2_end_time = gettime();
-    double phase3_start_time = gettime();
-    data->client->write(table_id, MAIN_ENTRY_KEY,
-            strlen(MAIN_ENTRY_KEY), (char*)main_table, sizeof(rc_main_table_t));
-    double phase3_end_time = gettime();
-    double phase4_start_time = gettime();
-
-    //for (std::vector<std::string>::iterator it = to_be_removed.begin();
-    //        it != to_be_removed.end(); ++it) {
-    //    data->client->remove(table_id, it->c_str(), it->size());
-    //}
-    double phase4_end_time = gettime();
-
-    delete main_table;
-    
-    double commit_end_time = gettime();
-    fprintf(stderr, "commit time: %f phase1_time: %lf phase2_time: %lf"
-            "phase3_time: %lf phase4_time: %lf\n", 
-            commit_end_time-commit_start_time,
-            phase1_end_time - phase1_start_time,
-            phase2_end_time - phase2_start_time,
-            phase3_end_time - phase3_start_time,
-            phase4_end_time - phase4_start_time);
-
-    return 0;
-}
-
-int rc_atomic_commit2(rmem_layer_t* rmem_layer, uint32_t* tags_src,
-        uint32_t* tags_dst, uint32_t* tags_size,
-        uint32_t num_tags)
-{
+    fprintf(stderr, "rc_atomic_commit\n");
     double commit_start_time = gettime();
 
     ramcloud_data_t* data = (ramcloud_data_t*)rmem_layer->layer_data;
@@ -495,6 +392,9 @@ int rc_atomic_commit2(rmem_layer_t* rmem_layer, uint32_t* tags_src,
             phase3_end_time - phase3_start_time,
             phase4_end_time - phase4_start_time);
 
+#ifdef RAMC_DEBUG
+    fprintf(stderr, "rc_atomic_commit2 done\n");
+#endif
     return 0;
 }
 
@@ -511,6 +411,7 @@ int rc_multi_malloc(rmem_layer_t* rmem_layer, uint64_t *addrs,
 
 int rc_multi_free(rmem_layer_t *rmem_layer, uint32_t *tags, uint32_t n)
 {
+    fprintf(stderr, "rc_multi_Free\n");
     int res;
     for (int i = 0; i < n; i++) {
         res = rc_free(rmem_layer, tags[i]);
@@ -531,6 +432,7 @@ void rc_deregister_data(rmem_layer_t* rmem_layer, void *data)
 
 void ramcloud_connect(rmem_layer_t *rmem_layer, char *host, char *port)
 {
+    fprintf(stderr, "ramcloud_connect\n");
     double connect_start_time = gettime();
     double connect_start_time1 = 0;
     double connect_start_time2 = 0;
@@ -592,6 +494,7 @@ void ramcloud_connect(rmem_layer_t *rmem_layer, char *host, char *port)
                     buffer.getRange(0, buffer.size()));
             memcpy(main_table, bufferString, sizeof(*main_table));
 
+            assert(main_table->num_tags < NUM_TAG_ENTRIES);
             for (unsigned int i = 0; i < main_table->num_tags; ++i) {
                 int tag = main_table->tag_entries[i].tag;
                 char* key = main_table->tag_entries[i].key;
@@ -643,6 +546,7 @@ void ramcloud_connect(rmem_layer_t *rmem_layer, char *host, char *port)
             connect_end_time3 - connect_start_time3,
             connect_end_time4 - connect_start_time4,
             connect_end_time5 - connect_start_time5);
+    fprintf(stderr, "ramcloud_connect done\n");
 }
 
 
