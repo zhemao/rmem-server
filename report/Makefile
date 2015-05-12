@@ -1,4 +1,4 @@
-.PHONY: clean open spell
+.PHONY: clean clean-latex open spell
 
 PROJ=main
 TEXFILES=$(wildcard *.tex)
@@ -7,25 +7,35 @@ GRAPHS=$(GRAPH_DATA:.csv=.pdf)
 DRAWING_SOURCES=$(wildcard graphs/*.svg)
 DRAWINGS=$(DRAWING_SOURCES:.svg=.pdf)
 FIGURES=$(GRAPHS) $(DRAWINGS)
+BIBFILE=main.bib
 
-main.pdf: $(TEXFILES) $(FIGURES)
-	pdflatex main.tex
-	bibtex main
-	pdflatex main.tex
+INKSCAPE=inkscape
+PYTHON=python
+LATEX=pdflatex
+BIBTEX=bibtex
+
+main.pdf: $(TEXFILES) $(BIBFILE) $(FIGURES)
+	$(LATEX) main.tex
+	$(BIBTEX) main
+	$(LATEX) main.tex
+	$(LATEX) main.tex
 
 figures: $(FIGURES)
 
 %.pdf: %.csv
-	python plot_results.py $<
+	$(PYTHON) plot_results.py $<
 
 %.pdf: %.svg
-	/Applications/Inkscape.app/Contents/Resources/bin/inkscape -D $< -A $@
+	$(INKSCAPE) -D $< -A $@
 
 open: $(PROJ).pdf
 	kpdf $^
 
-clean:
-	rm -f $(PROJ).pdf *.aux *.toc *.bbl *.blg *.log *.out *.bak $(FIGURES)
+clean: clean-latex
+	rm -f $(FIGURES)
+
+clean-latex:
+	rm -f $(PROJ).pdf *aux *.toc *.bbl *.blg *.log *.out *.bak *.cb *.cb2
 
 spell:
 	for i in $(TEXFILES) ; do \
