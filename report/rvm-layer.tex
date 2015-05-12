@@ -26,7 +26,7 @@ is loaded to the same address it was at before failure, otherwise pointers in
 the data would no longer be valid. The original address is read from the block
 table and then allocated using the \emph{mmap()} system call. To ensure that
 these addresses are always available, RVM requires that any OS address space
-layout randomization be disabled, and that rvm_cfg_create() be called before any
+layout randomization be disabled, and that \verb|rvm_cfg_create()| be called before any
 other local allocations.
 
 \subsubsection{Allocation}
