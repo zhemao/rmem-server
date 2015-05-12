@@ -48,7 +48,7 @@ We show the average latency of each operation in each benchmark.
     \pbox{20cm}{Benchmark\\ name} & \pbox{20cm}{Latency per Op. (SSD)} & \pbox{20cm}{Latency per Op. (RvmFS)} \\
     \hline
     \hline
-    file\_micro\_create  & 0.0004 sec & 21 sec\\
+    file\_micro\_create  & append-file: 292us & 2967.7ms sec\\
     \hline
     randomread  & Read: 25us & Read: 25us \\
     \hline
@@ -73,10 +73,22 @@ Next we comment on the performance of each benchmark.
 \paragraph{\bf file\_micro\_create}
 The performance of RvmFS is far from the performance of ext4. This has to do with the inefficiency of RvmFS when extending the length of a file, as previously described.
 \paragraph{\bf randomread} 
-In this benchmark RvmFS has similar performance to the ext4 file system. Because the file being used to benchmark the read operations is small it can fit in memory. This favours ext4, which would have to perform disk reads if the file was bigger.
-We will have to address the issue in the future.
+In this benchmark RvmFS has similar performance to the ext4 file system. Because the file being used to benchmark the read operations is small it can fit in memory. This favours ext4, 
+which can rely on the kernel buffers to directly serve data.
 \paragraph{\bf openfiles} 
-In this benchmark the close operation in RvmFS takes a bit more time than the ext4
+In this benchmark the close operation in RvmFS is on par with the performance of ext4. On the other hand, the open operation is roughly four times slower.
+
+% filemicro_create.f ssd
+% 1808: 2.081: Per-Operation Breakdown
+% finish               512ops      512ops/s   0.0mb/s      0.0ms/op        0us/op-cpu [0ms - 0ms]
+% append-file          513ops      513ops/s 511.9mb/s      0.3ms/op      292us/op-cpu [0ms - 0ms]
+%  1808: 2.081: IO Summary:   513 ops, 512.938 ops/s, (0/513 r/w), 511.9mb/s,    351us cpu/op,   0.3ms latency
+
+%filemicro_create.f with rvmfs
+% 1890: 63.099: Per-Operation Breakdown
+% finish               19ops        0ops/s   0.0mb/s      0.0ms/op        0us/op-cpu [0ms - 0ms]
+% append-file          20ops        0ops/s   0.3mb/s   2967.7ms/op     8000us/op-cpu [0ms - 6087ms]
+%  1890: 63.099: IO Summary:    20 ops, 0.333 ops/s, (0/0 r/w),   0.3mb/s, 3286000us cpu/op, 2967.7ms latency
 
 % random read with rvmfs
 %26236: 61.739: Per-Operation Breakdown
