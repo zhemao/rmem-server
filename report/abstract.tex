@@ -9,5 +9,5 @@ The framework provides a transactional interface to users that guarantees atomic
 Nephele consists of two layers: a transactional layer for recoverable virtual memory (RVM) and a remote memory storage layer. The user-facing transaction layer provides an API consisting of 15 methods and is responsible for detecting changes and replicating changes at commit time. The remote memory storage layer is responsible for storing user's data in a remote node over RDMA. For this layer we have implemented two backends: one using a custom RDMA protocol with a custom server, and one using RAMCloud, a RDMA-optimized key-value store.
 
 To demonstrate the flexibility and performance of our system we applied our framework to three applications: a genomic assembly program, an in-memory file system and a vector-matrix multiplication application.
-We show that our framework provides data replication with negligible overhead.
+We show that our framework provides data replication efficiently through a simple to use API.
 
