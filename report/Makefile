@@ -19,7 +19,7 @@ figures: $(FIGURES)
 	python plot_results.py $<
 
 %.pdf: %.svg
-	inkscape -D $< -A $@
+	/Applications/Inkscape.app/Contents/Resources/bin/inkscape -D $< -A $@
 
 open: $(PROJ).pdf
 	kpdf $^

@@ -27,3 +27,24 @@ reading a relatively large, sequential file from an SSD is very performant and
 competes will with RDMA. We believe that further optimizations in the RMEM layer
 could make up some of this difference, see \ref{future work} for some possible
 performance enhancements.
+
+\begin{figure}[t!]
+\begin{center}
+\resizebox{\columnwidth}{!}{%
+\includegraphics[scale=0.30]{graphs/dgemv_total_time_commit.pdf}
+}
+\end{center}
+\caption{Total time of DGEMV application when committing at different rates}
+\label{fig:dgemv_total_time_commit}
+\end{figure}
+
+\begin{figure}[t!]
+\begin{center}
+\resizebox{\columnwidth}{!}{%
+\includegraphics[scale=0.30]{graphs/dgemv_total_time_fail.pdf}
+}
+\end{center}
+\caption{Total time of DGEMV application when failing/recovering at different rates}
+\label{fig:dgemv_total_time_fail}
+\end{figure}
+

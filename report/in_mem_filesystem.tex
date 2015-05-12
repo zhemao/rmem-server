@@ -1,6 +1,6 @@
 %in_memory_file_system
 
-\begin{figure}[t!]
+\begin{figure}[t]
 \begin{center}
 \includegraphics[scale=0.60]{graphs/inmem_fs_design.pdf}
 \end{center}
@@ -20,7 +20,7 @@ We show the average latency of each operation in each benchmark.
 
 \begin{table}[h]
 \centering
-\caption{Description of Macro Benchmark Tests. The file size of the randomread benchmark was reduced to simplify evaluation.}
+\caption{Description of the macro-benchmark tests used to evaluate RvmFS.}
 \label{tab:description}
 \resizebox{\columnwidth}{!}{%
     \begin{tabular}{ | l | c |} 
@@ -38,12 +38,12 @@ We show the average latency of each operation in each benchmark.
 }
 \end{table}
 
-\begin{table}[h]
+\begin{table}[t!]
 \centering
-\caption{Macro Benchmark Results}
+\caption{Macro benchmark results of RvmFS}
 \label{tab:results}
 \resizebox{\columnwidth}{!}{%
-\begin{tabular}{ | l | c | c |} 
+  \begin{tabular}{ | l | c | c |} 
     \hline
     \pbox{20cm}{Benchmark\\ name} & \pbox{20cm}{Latency per Op. (SSD)} & \pbox{20cm}{Latency per Op. (RvmFS)} \\
     \hline
@@ -54,7 +54,7 @@ We show the average latency of each operation in each benchmark.
     \hline
     \emph{openfiles}  & Open/close: 590us & Open: 2842us, Close: 740us \\
     \hline
-    \end{tabular}
+  \end{tabular}
 }
 \end{table}
 

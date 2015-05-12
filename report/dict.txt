@@ -1,4 +1,4 @@
-personal_ws-1.1 en 122 
+personal_ws-1.1 en 135 
 cfg
 DBMSs
 runtime
@@ -26,6 +26,7 @@ RAMCloud's
 Jianneng
 serializedTask
 Streaming's
+virtualized
 IB
 Mellanox
 MapReduce
@@ -43,6 +44,8 @@ Jian
 LRVM
 dequeued
 malloc
+disaggregated
+quiesced
 dataflows
 natively
 taskBinary
@@ -54,7 +57,7 @@ taskBytes
 metadata
 pipelining
 alloc
-ALLOC
+mprotect
 deserializing
 timestamps
 TelegraphCQ
@@ -68,6 +71,7 @@ benchmarking
 GraphX
 Postgres
 runtimes
+BLCR
 workflow
 APIs
 updateDependencies
@@ -76,14 +80,18 @@ Hadoop
 SEDA
 codebase
 deserialize
+modularization
+FireBox
 latencies
 ACK
+filesystem
 Filesystem
 txn
 darkgreen
 Neng
 VMWare
 RAMCloud
+usr
 deserialization
 inode
 Datasets
@@ -91,6 +99,9 @@ punctuations
 workflows
 throughputs
 topologies
+mmap
+GASNet
+allocator
 stateful
 discretized
 transactional
@@ -101,8 +112,10 @@ scalability
 struct
 abbrv
 benchmarked
+checkpointed
 profiler
 tuples
+Tardigrade
 BlinkDB
 RDD
 backend
@@ -119,5 +132,5 @@ Carreira
 ADDR
 SparkSQL
 RDDs
-InfiniBand
 infiniband
+InfiniBand

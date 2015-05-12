@@ -1,3 +1,4 @@
+
 We used micro-benchmarks to test the performance of RVM commits and RVM
 recovery. To test commits, we allocated a number of pages, made modifications
 to each one of them, and measured the time it took for \verb|rvm_txn_commit()|
@@ -19,10 +20,11 @@ commands to the server, as well as performing RDMA writes to the remote memory p
 Since these the number of commands and writes that need to be done scales
 linearly with the number of pages, this accounts for the linear increase.
 
+
 \begin{figure}[t!]
-    \caption{IB Commit Micro-Benchmark Results}
-    \includegraphics[width=\linewidth]{graphs/commit-results-rm.pdf}
-    \label{fig:ib-commit-ubm}
+    \caption{IB Recovery Micro-Benchmark Results}
+    \includegraphics[width=\linewidth]{graphs/recovery-results-rm.pdf}
+    \label{fig:ib-recovery-ubm}
 \end{figure}
 
 Figure \ref{fig:ib-recovery-ubm} shows the results of the recovery
@@ -43,12 +45,6 @@ pages could be fetched by a single RDMA read, instead of one read for each page.
 We are uncertain what is causing the non-linear increase in recovery time.
 It is possible that registering pages with the Infiniband driver takes
 longer as the total number of pages registered grows larger.
-
-\begin{figure}[t!]
-    \caption{IB Recovery Micro-Benchmark Results}
-    \includegraphics[width=\linewidth]{graphs/recovery-results-rm.pdf}
-    \label{fig:ib-recovery-ubm}
-\end{figure}
 
 \subsection{RAMCloud Backend}
 \begin{figure}[t!]

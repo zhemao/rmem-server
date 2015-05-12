@@ -17,7 +17,7 @@ example, the FireBox warehouse-scale computer (an ASPIRE lab project) will have
 a central pool of universally accessible DRAM and non-volatile memory. Currently
 there is no FireBox hardware to experiment with, but we do have an infiniband
 based cluster (Firebox-0). So far, we have implemented two backends, one using
-the Infiniband RDMA API and one using the Ramcloud key-value store.
+the Infiniband RDMA API and one using the RAMCloud key-value store.
 
 \subsection{Current Solutions}
 The need to preserve critical data in the event of a hardware failure is not
@@ -36,14 +36,14 @@ checkpoint. Manual serialization also leads to significant increases in code
 complexity. Each data structure must have two definitions, one for on-disk and
 the other for in-memory. Maintaining this serialization code can be
 time-consuming and error-prone. Finally, databases are commonly used to
-replicate critial state.
+replicate critical state.
 Databases provide clean transactional semantics that can be appealing for
 high-availability applications. Databases, however, often have a complex
 interface that requires manual serialization. They also provide more features
 than are required for state replication, which leads to poor performance.
 
 \subsection{RVM Interface}
-The RVM interface is designed to be as unobtrusive as possbile. Users should be
+The RVM interface is designed to be as unobtrusive as possible. Users should be
 able to preserve just their critical state without worrying about re-writing
 pointers or packing data into a file. To do this our framework requires only
 that the user identify which memory is considered critical, and identify points
@@ -79,4 +79,4 @@ preserved, external state (like open files or sockets) is not. RVM is intended
 as a low-level library that can be exploited by more full-featured recovery
 libraries. An analogous relationship can be seen in the GASNet \cite{GASNET}
 library which can be used directly, but is really intended as a low-level
-interface for global address space langauges.
+interface for global address space languages.
