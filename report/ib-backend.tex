@@ -48,14 +48,6 @@ The server responds to a MULTI\_ALLOC request with a MULTI\_MEMRESP response,
 which contains an array of addresses, one for each tag in the MULTI\_ALLOC
 request. The server responds to MULTI\_TXN\_FREE with a TXN\_ACK.
 
-\begin{figure}[t!]
-\begin{center}
-\includegraphics[scale=0.60]{graphs/ramcloud_backend_design_final.pdf}
-\end{center}
-\caption{RAMCloud backend layer operating along side RAMCloud.}
-\label{fig:ramcloud_backend_design}
-\end{figure}
-
 \subsubsection{Commit}
 
 The \texttt{atomic\_commit()} operation involves two different message types.

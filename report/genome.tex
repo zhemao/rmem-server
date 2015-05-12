@@ -23,7 +23,7 @@ processing, where in the current contig it was, and where in the output file it
 was writing. Each phase processed all 4 million kmers, for a total of 8 million
 processing steps.
 
-In figure \ref{GEN COMMIT RATE} we vary the commit rate (in terms of number of
+In figure \ref{fig:genome_total_time_commit} we vary the commit rate (in terms of number of
 processing steps) from every 10 thousand (out of 8 million) up to 4 million
 (one checkpoint per phase). At higher commit rates, RVM clearly outperforms
 BLCR. In the exreme, RVM was able to complete in 800 seconds with a commit rate

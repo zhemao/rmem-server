@@ -46,23 +46,6 @@ We are uncertain what is causing the non-linear increase in recovery time.
 It is possible that registering pages with the Infiniband driver takes
 longer as the total number of pages registered grows larger.
 
-\subsection{RAMCloud Backend}
-\begin{figure}[t!]
-\begin{center}
-\includegraphics[scale=0.40]{graphs/commit_time_rc_latencies.pdf}
-\end{center}
-\caption{Commit time micro-benchmark when using the RAMCloud backend}
-\label{fig:rc-commit-ubm}
-\end{figure}
-
-\begin{figure}[t!]
-\begin{center}
-\includegraphics[scale=0.40]{graphs/recovery_time_rc_latencies.pdf}
-\end{center}
-\caption{Recovery time micro-benchmark when using the RAMCloud backend}
-\label{fig:rc-recovery-ubm}
-\end{figure}
-
 Figure~\ref{fig:rc-commit-ubm} shows the results of the commit micro-benchmark when using the RAMCloud backend. 
 The end-to-end latency of a commit operation is dominated by the number of pages to be committed, as each page write requires a round-trip to the RAMCloud server.
 The RAMCloud backend also needs to save the table that contains the mapping between tags and keys in, but this only requires one interaction with the server.
