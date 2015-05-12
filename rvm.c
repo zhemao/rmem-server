@@ -418,7 +418,10 @@ void *rvm_get_alloc_data(rvm_cfg_t *cfg)
 
 void *rvm_alloc(rvm_cfg_t *cfg, size_t size)
 {
-    return cfg->alloc_fp(cfg, size);
+    if(cfg->alloc_fp == NULL)
+        return rvm_blk_alloc(cfg, size);
+    else
+        return cfg->alloc_fp(cfg, size);
 }
 
 /* Can now allocate more than one page. It still allocates in multiples of the
@@ -519,7 +522,11 @@ void *rvm_blk_alloc(rvm_cfg_t* cfg, size_t size)
 
 bool rvm_free(rvm_cfg_t *cfg, void *buf)
 {
-    return cfg->free_fp(cfg, buf);
+    if(cfg->free_fp == NULL) {
+        return rvm_blk_free(cfg, buf);
+    } else {
+        return cfg->free_fp(cfg, buf);
+    }
 }
 
 bool rvm_blk_free(rvm_cfg_t* cfg, void *buf)

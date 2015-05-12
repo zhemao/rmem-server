@@ -1,3 +1,4 @@
+#include "common.h"
 #include "kmer_hash.h"
 
 /* Creates a hash table and (pre)allocates memory for the memory heap */
@@ -11,7 +12,8 @@ hash_table_t* create_hash_table(int64_t nEntries, memory_heap_t *memory_heap)
    result->table = (bucket_t*) malloc(n_buckets * sizeof(bucket_t));
 
    if (result->table == NULL) {
-      fprintf(stderr, "ERROR: Could not allocate memory for the hash table: %lld buckets of %lu bytes\n", n_buckets, sizeof(bucket_t));
+      fprintf(stderr, "ERROR: Could not allocate memory for the hash"
+             " table: %ld buckets of %lu bytes\n", n_buckets, sizeof(bucket_t));
       exit(1);
    }
 
@@ -97,7 +99,7 @@ void addKmerToStartList(memory_heap_t *memory_heap, start_kmer_t **startKmersLis
 
    int64_t prevPosInHeap = memory_heap->posInHeap - 1;
    ptrToKmer = &(memory_heap->heap[prevPosInHeap]);
-   new_entry = (start_kmer_t*) malloc(sizeof(start_kmer_t));
+   new_entry = (start_kmer_t*) malloc( sizeof(start_kmer_t));
    new_entry->next = (*startKmersList);
    new_entry->kmerPtr = ptrToKmer;
    (*startKmersList) = new_entry;
@@ -106,7 +108,7 @@ void addKmerToStartList(memory_heap_t *memory_heap, start_kmer_t **startKmersLis
 /* Deallocation functions */
 int dealloc_heap(memory_heap_t *memory_heap)
 {
-   free(memory_heap->heap);
+   free( memory_heap->heap);
    return 0;
 }
 

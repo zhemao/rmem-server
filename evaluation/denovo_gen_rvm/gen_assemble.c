@@ -145,6 +145,7 @@ int main(int argc, char *argv[]) {
     init_LookupTable();
     
     init_time += gettime();
+	printf("Initialization time: %f seconds\n", init_time);
 
     switch(state->phase) {
     case BUILD:
@@ -187,15 +188,12 @@ int main(int argc, char *argv[]) {
     }
 
 	/* Clean up */
-    //TX_START(txid);
-    //dealloc_heap(state->memheap);
-    //TX_COMMIT(txid);
+    //rvm_cfg_destroy(cfg);
 
 	/** Print timing and output info **/
     printf("Total Recoverable Memory: %ld\n", rvm_get_alloc_sz(cfg));
 	printf("%s: Input set: %s\n", argv[0], argv[1]);
-	printf("Initialization time: %f seconds\n", init_time);
 	printf("Build time: %f seconds\n", build_time);
-	printf("Build time: %f seconds\n", probe_time);
+	printf("Probe time: %f seconds\n", probe_time);
 	return 0;
 }

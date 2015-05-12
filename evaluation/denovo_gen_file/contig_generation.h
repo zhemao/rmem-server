@@ -24,15 +24,15 @@
 #define LINE_SIZE (KMER_LENGTH+4)
 #endif
 
-static int64_t gettime(void) {
-    int64_t retval;
+static inline double gettime(void) {
+    double retval;
     struct timeval tv;
     if (gettimeofday(&tv, NULL)) {
 	perror("gettimeofday");
 	abort();
     }
     retval = ((int64_t)tv.tv_sec) * 1000000 + tv.tv_usec;
-    return retval/1000000;
+    return ((double)retval)/1000000;
 }
 
 /* K-mer data structure */
