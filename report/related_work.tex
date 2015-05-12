@@ -1,18 +1,20 @@
 \paragraph {\bf Virtual machine / Container checkpoint}
-Systems such as~\ref{Tardigrade} or VMWare provide some level of fault-tolerance by checkpointing containers and virtual machines, respectively.
-While these systems can checkpoint a program's data without knowing the program's internals they have limitations. 
-First, using virtual machines incurs a performance overhead on applications. Secondly, checkpointing an entire virtual machine or container can be expensive.
-We believe RVM provides an API that can be used to checkpoint only the data that matters to the user, and thus it can provide better performance with minimal developer effort.
+Systems such as Tardigrade~\cite{Tardigrade} or VMWare provide data fault-tolerance by checkpointing containers and virtual machines, respectively.
+While these systems can checkpoint a program's data without knowing the program's internals they still have limitations. 
+First, using virtual machines incurs a non-negligible performance overhead on virtualized applications. Secondly, checkpointing an entire virtual machine or container can be much more expensive
+than necessary.
+We believe RVM provides a small API that can be used to checkpoint only the data that matters to the user, and thus it can provide better performance with minimal developer effort.
 
 \paragraph {\bf Key-value stores and DBMSs}
 Key-value stores such as RAMCloud and DBMSs such as Postgres can be used to store a program's data to remote nodes and provide similar
 properties as RVM. While we believe that many of the techniques and lessons used in these systems can be applied in RVM, we think these 
-systems are not a good fit for the applications we envision using with RVM.
-First, most modern key-value stores do not provide atomic multi-key writes.
-Secondly, the API provided by key-value stores despite being simple is not suitable for virtual memory replication.
-Likewise, DBMSs sacrifice data access latency in favour of many features that are not required in this context while. Additionally, the schema model required by traditional DBMSs is
+systems are not a good fit for the replication of in-memory data structures.
+First, most modern key-value stores do not provide atomic multi-key writes -- required to atomically store large memory regions.
+Secondly, the API provided by key-value stores despite being simple is not suitable for virtual memory replication, forcing developers to serialize data structures into a suitable format.
+Likewise, DBMSs sacrifice data access latency in favour of database features that are not required in this context. 
+Additionally, the schema model required by traditional DBMSs 
 does not fit well with arbitrarily-sized regions of memory.
 
 
 \paragraph {\bf Virtual memory replication}
-Systems like Mojim~\cite{Mojim} or LRVM~{LRVM} can be used to replicate virtual memory.
+Systems like Mojim~\cite{Mojim} or LRVM~\cite{LRVM} can also be used to replicate virtual memory.
