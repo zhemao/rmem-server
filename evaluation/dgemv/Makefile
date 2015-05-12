@@ -1,8 +1,8 @@
 RVM_DIR = ../../
 CC = gcc
 
-#CFLAGS 	= -O3
-CFLAGS 	= -g -std=gnu11
+CFLAGS 	= -pg -O3 -std=gnu11
+#CFLAGS 	= -g -std=gnu11
 LIBS	= -lblas -lrdmacm -libverbs -lpthread
 TARGETS	= dgemv dgemv_rvm dgemv_file
 RVM_LIB = $(RVM_DIR)librvm.a

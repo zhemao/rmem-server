@@ -1,1 +1,19 @@
-This version of denovo genome assembly checkpoints itself to a file.
+This version of denovo genome assembly uses rvm for HA.
+
+To run this with the standard test file:
+
+Setup:
+1. download: http://www.eecs.berkeley.edu/~penpornk/cs267.spr15/hw3/test.zip
+2. Change the buddy allocator's memory pool to (1 << 18)
+    buddy_malloc.c:25 POOL_SZ (1 << 18)
+3. Ensure the heap size on the rmem server is at least (1 << 30)
+    rmem_table.h:9 RMEM_SIZE (1 << 30)
+4. Ensure the block table has enough entries
+    rvm_int.h:10 BLOCK_TBL_NENT (1 << 16)
+
+Run:
+1. Start rmem-server on another node (f2 in this example)
+2. Run genome assemble on current node (f1 in this example)
+    ./gen_assemble -i test -h f2 -p PORT_NUM -c 1000000
+
+see ./gen_assemble -? for details

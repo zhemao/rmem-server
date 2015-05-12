@@ -36,6 +36,6 @@ int64_t getNumKmersInUFX(const char *filename) {
    }
    fclose(f);
    int64_t numKmers = totalSize / LINE_SIZE;
-   printf("Detected %lld kmers in text UFX file: %s\n", numKmers, filename);
+   printf("Detected %ld kmers in text UFX file: %s\n", numKmers, filename);
    return numKmers;
 }

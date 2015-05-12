@@ -28,11 +28,11 @@ We show the average latency of each operation in each benchmark.
     Benchmark name & Description \\
     \hline
     \hline
-    file\_micro\_create  & \pbox{20cm}{Create an empty file and issue 1024 appends of 1MB each} \\
+    \emph{file\_micro\_create}  & \pbox{20cm}{Create an empty file and issue 1024 appends of 1MB each} \\
     \hline
-    ramdomread  & \pbox{20cm}{Random reads (8K) from a file with size 1Mb} \\
+    \emph{ramdomread}  & \pbox{20cm}{Random reads (8K) from a file with size 1Mb} \\
     \hline
-    openfiles  &  \pbox{20cm}{Creates a fileset with 500 empty files, \\then proceeds to open each one.} \\
+    \emph{openfiles}  &  \pbox{20cm}{Creates a fileset with 500 empty files, \\then proceeds to open each one.} \\
     \hline
     \end{tabular}
 }
@@ -48,11 +48,11 @@ We show the average latency of each operation in each benchmark.
     \pbox{20cm}{Benchmark\\ name} & \pbox{20cm}{Latency per Op. (SSD)} & \pbox{20cm}{Latency per Op. (RvmFS)} \\
     \hline
     \hline
-    file\_micro\_create  & append-file: 292us & 2967.7ms sec\\
+    \emph{file\_micro\_create}  & append-file: 292us & 2967.7ms\\
     \hline
-    randomread  & Read: 25us & Read: 25us \\
+    \emph{randomread}  & Read: 25us & Read: 25us \\
     \hline
-    openfiles  & Open/close: 590us & Open: 2842us, Close: 740us \\
+    \emph{openfiles}  & Open/close: 590us & Open: 2842us, Close: 740us \\
     \hline
     \end{tabular}
 }
@@ -70,12 +70,12 @@ Finally, RvmFS is not built with locality of storage in mind. This means that si
 
 Next we comment on the performance of each benchmark.
 
-\paragraph{\bf file\_micro\_create}
+\paragraph{\bf \emph{file\_micro\_create}}
 The performance of RvmFS is far from the performance of ext4. This has to do with the inefficiency of RvmFS when extending the length of a file, as previously described.
-\paragraph{\bf randomread} 
+\paragraph{\bf \emph{randomread}} 
 In this benchmark RvmFS has similar performance to the ext4 file system. Because the file being used to benchmark the read operations is small it can fit in memory. This favours ext4, 
 which can rely on the kernel buffers to directly serve data.
-\paragraph{\bf openfiles} 
+\paragraph{\bf \emph{openfiles}}
 In this benchmark the close operation in RvmFS is on par with the performance of ext4. On the other hand, the open operation is roughly four times slower.
 
 % filemicro_create.f ssd

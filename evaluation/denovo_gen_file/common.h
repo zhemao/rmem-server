@@ -4,11 +4,10 @@
 #include <errno.h>
 #include <assert.h>
 #include <unistd.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <utils/error.h>
-#include <rvm.h>
 #include "contig_generation.h"
-
-extern rvm_cfg_t *cfg;
 
 extern int fa_freq;
 extern int cp_freq;
@@ -62,11 +61,12 @@ static inline bool checkpoint(rvm_txid_t txid)
 #endif
 
 /* BLCR Checkpoint */
-static inline bool checkpoint(rvm_txid_t txid)
+static inline bool checkpoint(int txid)
 {
     int ret;
     char cmd[256];
-    ret = sprintf(cmd, "cr_checkpont --file gen.blcr %d", getpid());
+    ret = sprintf(cmd, "cr_checkpoint --file gen.blcr %d", getpid());
+    printf("%s\n", cmd);
     assert(ret > 0);
     ret = system(cmd);
     assert(ret == EXIT_SUCCESS);
