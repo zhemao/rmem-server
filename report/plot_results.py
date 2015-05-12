@@ -17,8 +17,6 @@ def main():
     outname, _ = splitext(infname)
     outname += ".pdf"
 
-    plt.xscale('log')
-    plt.yscale('log')
     plt.xlabel("Num. Pages")
     plt.ylabel("Time (s)")
     plt.plot(x, y)
