@@ -1,3 +1,75 @@
-As the number of nodes in distributed computing clusters increases, so does the probability of failures. Therefore, it is important for distributed applications to be resilient to single-node failures. 
-One important feature necessary for fault-tolerance is the ability to replicate the application's working state to another failure domain. In this report, we present an implementation of Recoverable Virtual Memory (RVM), an API that allows the programmer to easily add state checkpointing and recovery to their application. RVM operates by detecting modifications to recoverable memory regions and replicating the memory to a remote node. So far, we have implemented two backends, one using the Infiniband RDMA API and one using the Ramcloud key-value store.
+As the number of nodes in distributed systems increases, failures become the
+rule, not the exception. Because of this, it is important to be able to recover
+from crashes quickly.  In addition, the application should not be made
+significantly more complicated by the addition of recovery code.
 
+While it would be overly ambitious to try and solve this entire goal, we propose
+a tool that could simplify such a solution by providing the ability to replicate
+the application's working state to another failure domain. In this report, we
+present an implementation of Recoverable Virtual Memory (RVM), an API that
+allows the programmer to easily add state checkpointing and recovery to their
+application. RVM operates by detecting modifications to recoverable memory
+regions and replicating the memory to a remote node.
+
+The proliferation of high-performance RDMA and future disaggregated memory
+systems offer an opportunity to perform this replication efficiently. For
+example, the FireBox warehouse-scale computer (an ASPIRE lab project) will have
+a central pool of universally accessible DRAM and non-volatile memory. Currently
+there is no FireBox hardware to experiment with, but we do have an infiniband
+based cluster (Firebox-0). So far, we have implemented two backends, one using
+the Infiniband RDMA API and one using the Ramcloud key-value store.
+
+\subsection{Current Solutions}
+The need to preserve critical data in the event of a hardware failure is not
+new. There are a number of popular methods of addressing this problem. One is to
+checkpoint the entire operating system process using a tool like the Berkeley
+Lab Checkpoint Restart library\cite{BLCR} or Condor\cite{Condor}). Process
+checkpointing is appealing because it requires little to no changes in the
+application. For this convenience, the technique sacrifices efficiency. All data
+must be checkpointed, not just the critical state, and operating system state
+must be quiesced. A common practice to avoid avoid copying the entire program
+state is to manually serialize critical data structures and write them to a
+file. While, in theory, this technique copies the minimum amount of data, in
+practice it can be difficult to identify which state has actually changed. The
+user is forced to pessimistically replicate most critical state on each
+checkpoint. Manual serialization also leads to significant increases in code
+complexity. Each data structure must have two definitions, one for on-disk and
+the other for in-memory. Maintaining this serialization code can be
+time-consuming and error-prone. Finally, databases are commonly used to
+replicate critial state.
+Databases provide clean transactional semantics that can be appealing for
+high-availability applications. Databases, however, often have a complex
+interface that requires manual serialization. They also provide more features
+than are required for state replication, which leads to poor performance.
+
+\subsection{RVM Interface}
+The RVM interface is designed to be as unobtrusive as possbile. Users should be
+able to preserve just their critical state without worrying about re-writing
+pointers or packing data into a file. To do this our framework requires only
+that the user identify which memory is considered critical, and identify points
+of consistency in their code. By marking a point of consistency the user
+certifies that, if the program we're to restart with the critical memory in the
+current state, the program would be able to continue execution. Critical state
+is identified by allocating it from a special recoverable malloc function and
+consistency points are identified through a transactional interface. Users may
+also save a special \bf{user\_data} pointer that survives failures. This pointer
+typically stores a state structure that can address the recoverable state in an
+application-dependent fashion. Table \ref{RVM API} lists the entire required API.
+
+\tabular{ | l | l | }
+rvm_cfg\_\[create/destroy\]() & Initialize the system and recover memory if
+needed.
+\\
+\hline rvm\_\[alloc/free\]() & Allocate a region of recoverable memory. \\
+\hline rvm_txn\_\[start/commit\]() & Mark a point of consistency in the program.
+\\
+\hline rvm\_\[set/get\]\_usr\_data() & Register a pointer to your state. \\
+\end{tabular}
+
+In practice, of course, it is not this simple. Code must be written in such a
+way that recovery is possible. In addition, while critical local state is
+preserved, external state (like open files or sockets) is not. RVM is intended
+as a low-level library that can be exploited by more full-featured recovery
+libraries. An analogous relationship can be seen in the GASNet \cite{GASNET}
+library which can be used directly, but is really intended as a low-level
+interface for global address space langauges.
