@@ -4,7 +4,7 @@ The essential operations in the RMEM layer are \texttt{malloc()},
 \texttt{free()}, \texttt{put()}, \texttt{get()}, and \texttt{atomic\_commit()}.
 
 The \texttt{malloc()} function allocates memory in the backing store.
-The function arguments include the number of bytes to allocate, as well as
+The function arguments include the number of bytes to allocate as well as
 a unique tag that is associated with that memory region. If the tag has not
 already been taken, \texttt{malloc()} allocates a new memory region and returns
 the starting address. If a memory region with that tag already exists, the

@@ -8,15 +8,22 @@
 \label{fig:inmem_fs_design}
 \end{figure}
 
-To demonstrate the flexibility and applicability of our framework we have applied our framework to RvmFS, a VFS compliant in-memory file system (see Figure~\ref{fig:inmem_fs_design}). 
-RvmFS uses main memory as the only storage medium to provide very fast writes and reads. 
-To be able to use our framework we have developed the file system using FUSE, a kernel module that allows the creation of user-space file systems.
-RvmFS performs a commit of the file system in different situations: 1) an inode is created, 2) when a file is closed and 3) when a {\emph sync} operation is performed.
+To demonstrate the flexibility and applicability of our framework we have
+applied our framework to RvmFS, a VFS compliant in-memory file system (see
+Figure~\ref{fig:inmem_fs_design}).  RvmFS uses main memory as the only storage
+medium to provide very fast writes and reads.  To be able to use our framework
+we have developed the file system using FUSE, a kernel module that allows the
+creation of user-space file systems.  RvmFS performs a commit of the file
+system in different situations: 1) an inode is created, 2) when a file is
+closed and 3) when a {\emph sync} operation is performed.
 
-To evaluate the performance of the system we ran a subset of the benchmarks in the Filebench~\cite{filebench} benchmark suite. 
-We compare the performance of the benchmark when running it against an ext4 file system backed by an SSD drive and when running on RvmFS backed by a remote server.
-Table~\ref{tab:description} describes each specific benchmark that we ran and table~\ref{tab:results} shows the performance obtained.
-We show the average latency of each operation in each benchmark.
+To evaluate the performance of the system we ran a subset of the benchmarks in
+the Filebench~\cite{filebench} benchmark suite.  We compare the performance of
+the benchmark when running it against an ext4 file system backed by an SSD
+drive and when running on RvmFS backed by a remote server.
+Table~\ref{tab:description} describes each specific benchmark that we ran and
+table~\ref{tab:results} shows the performance obtained.  We show the average
+latency of each operation in each benchmark.
 
 \begin{table}[h]
 \centering
@@ -60,23 +67,34 @@ We show the average latency of each operation in each benchmark.
 
 \paragraph{Discussion}
 
-As shown in Table~\ref{tab:results}, RvmFS is considerably slower for some specific benchmarks while obtaining similar performance in others.
-The poor performance of the file system stems from different reasons.
-First, some of the file system operations are not optimized for performance. For instance, when extending a file length, RvmFS allocates a new region of memory and copies all the file contents
-to the new region. Not only copying all the data is slow, this also means that the next commit operation will backup the whole file contents even if only a small part of the file changed.
-Secondly, RvmFS currently does not support multi-threaded access, common in modern file systems such as ext4.
-Thirdly, RvmFS is ultimately limited by the performance of RVM. Due to the high overheads involved when backing up large contiguous regions of memory in RVM, RvmFS suffers.
-Finally, RvmFS is not built with locality of storage in mind. This means that simple operations can touch many files.
+As shown in Table~\ref{tab:results}, RvmFS is considerably slower for some
+specific benchmarks while obtaining similar performance in others.  The poor
+performance of the file system stems from different reasons.  First, some of
+the file system operations are not optimized for performance. For instance,
+when extending a file length, RvmFS allocates a new region of memory and copies
+all the file contents to the new region. Not only copying all the data is slow,
+this also means that the next commit operation will backup the whole file
+contents even if only a small part of the file changed.  Secondly, RvmFS
+currently does not support multi-threaded access, common in modern file systems
+such as ext4.  Thirdly, RvmFS is ultimately limited by the performance of RVM.
+Due to the high overheads involved when backing up large contiguous regions of
+memory in RVM, RvmFS suffers.  Finally, RvmFS is not built with locality of
+storage in mind. This means that simple operations can touch many files.
 
 Next we comment on the performance of each benchmark.
 
-\paragraph{\bf \emph{file\_micro\_create}}
-The performance of RvmFS is far from the performance of ext4. This has to do with the inefficiency of RvmFS when extending the length of a file, as previously described.
-\paragraph{\bf \emph{randomread}} 
-In this benchmark RvmFS has similar performance to the ext4 file system. Because the file being used to benchmark the read operations is small it can fit in memory. This favours ext4, 
-which can rely on the kernel buffers to directly serve data.
-\paragraph{\bf \emph{openfiles}}
-In this benchmark the close operation in RvmFS is on par with the performance of ext4. On the other hand, the open operation is roughly four times slower.
+\paragraph{\bf \emph{file\_micro\_create}} The performance of RvmFS is far from
+the performance of ext4. This has to do with the inefficiency of RvmFS when
+extending the length of a file, as previously described.
+
+\paragraph{\bf \emph{randomread}} In this benchmark RvmFS has similar
+performance to the ext4 file system. Because the file being used to benchmark
+the read operations is small it can fit in memory. This favours ext4, which can
+rely on the kernel buffers to directly serve data.
+
+\paragraph{\bf \emph{openfiles}} In this benchmark the close operation in RvmFS
+is on par with the performance of ext4. On the other hand, the open operation
+is roughly four times slower.
 
 % filemicro_create.f ssd
 % 1808: 2.081: Per-Operation Breakdown

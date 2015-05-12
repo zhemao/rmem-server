@@ -23,20 +23,21 @@ processing, where in the current contig it was, and where in the output file it
 was writing. Each phase processed all 4 million kmers, for a total of 8 million
 processing steps.
 
-In figure \ref{fig:genome_total_time_commit} we vary the commit rate (in terms of number of
-processing steps) from every 10 thousand (out of 8 million) up to 4 million
-(one checkpoint per phase). At higher commit rates, RVM clearly outperforms
-BLCR. In the exreme, RVM was able to complete in 800 seconds with a commit rate
-of 10K, while we were forced to cancel the BLCR run after 30 minutes. Even at
-more reasonable commit rates such as 1 million (8 commits), RVM was nearly twice
-as fast as BLCR. It's only at the extreme low end of commit rates (4 million
-and no commit) that BLCR was faster. This is because RVM pays a significant
-up-front cost to allocate it's large recoverable state. Further analysis showed
-that of the 10 seconds spent at a 4 million commit rate, a full 5s were spent
-simply allocating memory, while build took only 2s and probe only 1s. This
-clearly indicates a performance bottlenect in our system, although we do not
-believe it is fundemental to the approach. See Section~\ref{sec:conclusion} for a
-discussion of possible performance improvements. 
+In figure \ref{fig:genome_total_time_commit} we vary the commit rate (in terms
+of number of processing steps) from every 10 thousand (out of 8 million) up to
+4 million (one checkpoint per phase). At higher commit rates, RVM clearly
+outperforms BLCR. In the exreme, RVM was able to complete in 800 seconds with a
+commit rate of 10K, while we were forced to cancel the BLCR run after 30
+minutes. Even at more reasonable commit rates such as 1 million (8 commits),
+RVM was nearly twice as fast as BLCR. It's only at the extreme low end of
+commit rates (4 million and no commit) that BLCR was faster. This is because
+RVM pays a significant up-front cost to allocate it's large recoverable state.
+Further analysis showed that of the 10 seconds spent at a 4 million commit
+rate, a full 5s were spent simply allocating memory, while build took only 2s
+and probe only 1s. This clearly indicates a performance bottlenect in our
+system, although we do not believe it is fundemental to the approach. See
+Section~\ref{sec:conclusion} for a discussion of possible performance
+improvements. 
 
 \begin{figure}[t!]
 \begin{center}

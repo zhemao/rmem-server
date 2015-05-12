@@ -24,10 +24,10 @@ Additionally, the schema model required by traditional DBMSs does not fit well
 with arbitrarily-sized regions of memory.
 
 \paragraph {\bf Virtual memory replication} Systems like Mojim~\cite{Mojim} or
-LRVM~\cite{LRVM} can be used to replicate virtual memory. However, Mojim's interface
-is considerably more complicated than ours. Mojim provides a virtual filesystem
-and the user allocates recoverable memory by memory mapping files. Mojim does
-not ensure that the recoverable pages are mapped into the same space in virtual
-memory, so pointers cannot be properly recovered. In addition, for each commit,
-the user must explicitly specify what memory to replicate, as the modified
-pages are not automatically detected as in our system.
+LRVM~\cite{LRVM} can be used to replicate virtual memory. However, Mojim's
+interface is considerably more complicated than ours. Mojim provides a virtual
+filesystem and the user allocates recoverable memory by memory mapping files.
+Mojim does not ensure that the recoverable pages are mapped into the same space
+in virtual memory, so pointers cannot be properly recovered. In addition, for
+each commit, the user must explicitly specify what memory to replicate, as the
+modified pages are not automatically detected as in our system.

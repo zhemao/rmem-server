@@ -2,7 +2,7 @@
 We used micro-benchmarks to test the performance of RVM commits and RVM
 recovery. To test commits, we allocated a number of pages, made modifications
 to each one of them, and measured the time it took for \verb|rvm_txn_commit()|
-to complete. To test recovery, we first allocate a number of pages and
+to complete. To test recovery, we first allocated a number of pages and
 close the connection to the server. We then restart the connection using the
 recovery flag and time how long it takes \verb|rvm_cfg_create()| to complete.
 When benchmarking the IB backend, we run three trials for each number of pages,
@@ -16,10 +16,10 @@ As can be seen in the graph, the relation between page count and commit time
 is fairly linear, with a slope of about 13.7 microseconds per page.
 From examining the performance of \verb|rvm_txn_commit()| using the profiler,
 we find that commit time is taken up mostly by sending the MULTI\_TXN\_CP
-commands to the server, as well as performing RDMA writes to the remote memory pool.
-Since these the number of commands and writes that need to be done scales
-linearly with the number of pages, this accounts for the linear increase.
-
+commands to the server, as well as performing RDMA writes to the remote memory
+pool.  Since these the number of commands and writes that need to be done
+scales linearly with the number of pages, this accounts for the linear
+increase.
 
 \begin{figure}[t!]
     \caption{IB Recovery Micro-Benchmark Results}
@@ -46,15 +46,23 @@ We are uncertain what is causing the non-linear increase in recovery time.
 It is possible that registering pages with the Infiniband driver takes
 longer as the total number of pages registered grows larger.
 
-Figure~\ref{fig:rc-commit-ubm} shows the results of the commit micro-benchmark when using the RAMCloud backend. 
-The end-to-end latency of a commit operation is dominated by the number of pages to be committed, as each page write requires a round-trip to the RAMCloud server.
-The RAMCloud backend also needs to save the table that contains the mapping between tags and keys in, but this only requires one interaction with the server.
-The RAMCloud backend requires roughly 10 microseconds to write a page to RAMCloud. As can be seen in the graph, the commit time grows linearly with the number of pages as expected.
+Figure~\ref{fig:rc-commit-ubm} shows the results of the commit micro-benchmark
+when using the RAMCloud backend.  The end-to-end latency of a commit operation
+is dominated by the number of pages to be committed, as each page write
+requires a round-trip to the RAMCloud server.  The RAMCloud backend also needs
+to save the table that contains the mapping between tags and keys in, but this
+only requires one interaction with the server.  The RAMCloud backend requires
+roughly 10 microseconds to write a page to RAMCloud. As can be seen in the
+graph, the commit time grows linearly with the number of pages as expected.
 
-Figure~\ref{fig:rc-recovery-ubm} shows the results of the recovery micro-benchmark.
-The end-to-end recovery time is mostly dominated by the time to establish a connection with the RAMCloud server (roughly 80ms).
-Once the connection is established the RAMCloud backend retrieves the pages previously committed. The time to do this is dominated by the communication with the server, as in the commit benchmark, which grows linear with the number of pages.
-Because of this we see a linear recovery time increase as the number of pages increases.
+Figure~\ref{fig:rc-recovery-ubm} shows the results of the recovery
+micro-benchmark.  The end-to-end recovery time is mostly dominated by the time
+to establish a connection with the RAMCloud server (roughly 80ms).  Once the
+connection is established the RAMCloud backend retrieves the pages previously
+committed. The time to do this is dominated by the communication with the
+server, as in the commit benchmark, which grows linear with the number of
+pages.  Because of this we see a linear recovery time increase as the number of
+pages increases.
 
 \subsection{BLCR Microbenchmark}
 
