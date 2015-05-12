@@ -52,19 +52,26 @@ certifies that, if the program we're to restart with the critical memory in the
 current state, the program would be able to continue execution. Critical state
 is identified by allocating it from a special recoverable malloc function and
 consistency points are identified through a transactional interface. Users may
-also save a special \bf{user\_data} pointer that survives failures. This pointer
+also save a special {\bf user\_data} pointer that survives failures. This pointer
 typically stores a state structure that can address the recoverable state in an
-application-dependent fashion. Table \ref{RVM API} lists the entire required API.
+application-dependent fashion. Table~\ref{rvm_api} lists the entire required API.
 
-\tabular{ | l | l | }
-rvm_cfg\_\[create/destroy\]() & Initialize the system and recover memory if
-needed.
-\\
-\hline rvm\_\[alloc/free\]() & Allocate a region of recoverable memory. \\
-\hline rvm_txn\_\[start/commit\]() & Mark a point of consistency in the program.
-\\
-\hline rvm\_\[set/get\]\_usr\_data() & Register a pointer to your state. \\
-\end{tabular}
+\begin{table}[t!]
+\centering
+\caption{RVM API}
+\label{tab:rvm_api}
+\resizebox{\columnwidth}{!}{%
+   \begin{tabular}{ | l | l | }
+     rvm\_cfg\_[create/destroy]() & \pbox{20cm}{Initialize the system \\and recover memory if
+     needed}
+     \\
+     \hline rvm\_[alloc/free]() & \pbox{20cm}{Allocate a region \\of recoverable memory} \\
+     \hline rvm\_txn\_[start/commit]() & \pbox{20cm}{Mark a point of \\consistency in the program}
+     \\
+     \hline rvm\_[set/get]\_usr\_data() & \pbox{20cm}{Register a pointer \\to your state.} \\
+     \end{tabular}
+   }
+\end{table}
 
 In practice, of course, it is not this simple. Code must be written in such a
 way that recovery is possible. In addition, while critical local state is

@@ -8,13 +8,6 @@
 \label{fig:ramcloud_backend_design}
 \end{figure}
 
-\begin{figure}[t!]
-\begin{center}
-\includegraphics[scale=0.60]{graphs/ramcloud_backend_commit.pdf}
-\end{center}
-\caption{Diagram of tag/key mapping transformation during commit for a single memory region.}
-\label{fig:ramcloud_backend_commit}
-\end{figure}
 
 To investigate the performance and suitability of a key-value store as a block device we developed a software layer on top of RAMCloud, a low-latency key-value store.
 In RAMCloud, blobs of memory (values) are identified by keys (strings). When running RAMCloud is composed of three main executing instances: a coordinator, a server and Zookeeper (see Figure~\ref{fig:ramcloud_backend_design}).
@@ -38,3 +31,11 @@ memory regions is made to point to the key of the old memory region (rephrase). 
 \paragraph{\bf Disconnect} To disconnect, the backend clears the main data structures (e.g., local tag-key map).
 
 Our design is simplified by the fact that our framework only replicates data to a single node. This means that we do not have to coordinate replicas.
+
+\begin{figure}[t!]
+\begin{center}
+\includegraphics[scale=0.60]{graphs/ramcloud_backend_commit.pdf}
+\end{center}
+\caption{Diagram of tag/key mapping transformation during commit for a single memory region.}
+\label{fig:ramcloud_backend_commit}
+\end{figure}
