@@ -68,7 +68,7 @@ longer as the total number of pages registered grows larger.
 \end{figure}
 
 Figure~\ref{fig:rc-commit-ubm} shows the results of the commit micro-benchmark when using the RAMCloud backend. 
-The end-to-end latency of a commit operation is dominated by the number of pages to be commited, as each page write requires a round-trip to the RAMCloud server.
+The end-to-end latency of a commit operation is dominated by the number of pages to be committed, as each page write requires a round-trip to the RAMCloud server.
 The RAMCloud backend also needs to save the table that contains the mapping between tags and keys in, but this only requires one interaction with the server.
 The RAMCloud backend requires roughly 10 microseconds to write a page to RAMCloud. As can be seen in the graph, the commit time grows linearly with the number of pages as expected.
 
