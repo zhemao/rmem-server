@@ -19,11 +19,14 @@ COMMON_FILES := common.o data/hash.o data/list.o data/stack.o
 SERVER_FILES := rmem_table.o rmem_multi_ops.o $(COMMON_FILES)
 CLIENT_FILES := rvm.o backends/rmem_backend.o backends/ramcloud_backend.o backends/stub_backend.o buddy_malloc.o malloc_simple.o block_table.o $(COMMON_FILES)
 RVM_LIB := -L. -lrvm
+SRCS    := $(wildcard *.c) $(wildcard tests/*.c) $(wildcard evaluation/*.c) 
 
 STATIC_LIB = librvm.a
 TARGETS = $(APPS) $(TESTS)
 
-all: $(TARGETS)
+all: depend $(TARGETS)
+
+include .depend
 
 librvm.a: $(CLIENT_FILES)
 	$(AR) rcs $@ $(CLIENT_FILES)
@@ -52,7 +55,7 @@ tests/rvm_test_big_commit: tests/rvm_test_big_commit.o $(STATIC_LIB)
 tests/rvm_test_size_alloc: tests/rvm_test_size_alloc.o $(STATIC_LIB)
 	${LD} -o $@ $< $(RVM_LIB) ${RMEM_LIBS}
 
-tests/dgemv_test: tests/dgemv_test.c $(STATIC_LIB)
+tests/dgemv_test: $@.c $(STATIC_LIB)
 	${LD} -o $@ $< -lblas $(RVM_LIB) ${RMEM_LIBS}
 
 tests/rvm_test_normal_rc: tests/rvm_test_normal_rc.o $(STATIC_LIB) $(RAMC_OBJS)
@@ -70,6 +73,12 @@ backends/ramcloud_backend.o: backends/ramcloud_backend.cpp
 tests/rvm_test_free_rc: tests/rvm_test_free_rc.o $(STATIC_LIB) $(RAMC_OBJS)
 	$(LD) -o $@ $< $(RAMC_OBJS) $(RVM_LIB) $(LINCLUDES) $(RAMC_LIBS)
 
+depend: .depend
+
+.depend: $(SRCS)
+	rm -f ./.depend
+	$(CC) $(CFLAGS) -MM $^ > ./.depend;
+
 clean:
-	rm -f data/*.o tests/*.o backends/*.o *.o $(STATIC_LIB) $(TARGETS)
+	rm -f data/*.o tests/*.o backends/*.o *.o $(STATIC_LIB) $(TARGETS) .depend
 
