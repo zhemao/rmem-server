@@ -119,10 +119,11 @@ static bool recover_blocks(rvm_cfg_t *cfg)
     return true;
 }
 
-static void check_cfg_fields(const rvm_cfg_t* cfg)
+static void check_cfg_fields(const rvm_opt_t* opt)
 {
-    CHECK_ERROR(cfg->free_fp == NULL, ("Forgot to set free_fp\n"));
-    CHECK_ERROR(cfg->alloc_fp == NULL, ("Forgot to set alloc_fp\n"));
+    CHECK_ERROR(opt->free_fp == NULL, ("Forgot to set free_fp\n"));
+    CHECK_ERROR(opt->alloc_fp == NULL, ("Forgot to set alloc_fp\n"));
+    CHECK_ERROR(opt->nentries <= 0, ("Forgot to set nentries\n"));
 }
 
 rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer_function)
@@ -139,7 +140,7 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer
     cfg->free_fp = opts->free_fp;
     cfg->alloc_data = NULL;
 
-    check_cfg_fields(cfg);
+    check_cfg_fields(opts);
         
     rmem_layer_t* rmem_layer = cfg->rmem_layer = create_rmem_layer_function();
 
