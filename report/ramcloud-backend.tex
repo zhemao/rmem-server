@@ -36,24 +36,6 @@ entry can be atomically written with a sngle {\emph put} operation.
 \label{fig:ramcloud_backend_commit}
 \end{figure}
 
-\subsection{RAMCloud Backend}
-\begin{figure}[t!]
-\begin{center}
-\includegraphics[scale=0.40]{graphs/commit_time_rc_latencies.pdf}
-\end{center}
-\caption{Commit time micro-benchmark when using the RAMCloud backend}
-\label{fig:rc-commit-ubm}
-\end{figure}
-
-\begin{figure}[t!]
-\begin{center}
-\includegraphics[scale=0.40]{graphs/recovery_time_rc_latencies.pdf}
-\end{center}
-\caption{Recovery time micro-benchmark when using the RAMCloud backend}
-\label{fig:rc-recovery-ubm}
-\end{figure}
-
-
 The RMEM's layer operations are implemented in the following way:
 
 \paragraph {\bf Connect} During connection the backend creates a RAMCloud
