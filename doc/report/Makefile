@@ -27,5 +27,5 @@ clean-latex:
 
 spell:
 	for i in $(TEXFILES) ; do \
-	aspell -t -c -p $(shell pwd)/dict.txt $$i ; \
+	aspell -t -c -p ../dict.txt $$i ; \
 	done;
