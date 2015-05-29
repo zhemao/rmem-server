@@ -1,0 +1,11 @@
+\begin{block}{Conclusion}
+    Our library is able to provide checkpoints with microsecond latencies over
+    complex in-memory data structures. In the case of DGEMV, natural runtime
+    variation completely masked the effect of frequent checkpointing. The
+    changes required to accommodate rvm were minimal, especially when compared
+    to manual serialization. In the case of the genome benchmark, we were
+    able to checkpoint a complicated data structure with lots of pointer with
+    minimal effort. However, with such a large number of pages being changed,
+    commit latency increased considerably. We still have a ways to go in
+    improving performance.
+\end{block}

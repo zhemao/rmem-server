@@ -1,0 +1,21 @@
+\begin{block}{Macro-Benchmarks}
+    \begin{itemize}
+        \item \textbf{DGEMV} - Multiply a matrix by a vector and repeat using
+            the result. We run using a 100,000 x 100 matrix over 1000
+            iterations.  We measure how the total runtime is affected by
+            failure rate (the number iterations between restarts) and commit
+            rate (number of iterations between commits) and compare the
+            results to simply saving the data to a file.
+        \item \textbf{Gene Assembly} - Assemble gene sequences from a set of
+            k-mers (fixed size gene sequences). We measure how the total
+            runtime is affected by commit rate and compare the results to
+            process state checkpointing using BLCR.
+    \end{itemize}
+
+    \centering
+
+    \includegraphics[width=0.45\textwidth]{dgemv_total_time_commit.pdf}
+    \includegraphics[width=0.45\textwidth]{dgemv_total_time_fail.pdf}
+
+    \includegraphics[width=0.45\textwidth]{genome_total_time_commit.pdf}
+\end{block}
