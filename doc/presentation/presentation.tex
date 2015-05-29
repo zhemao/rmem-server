@@ -60,7 +60,7 @@
 \begin{frame}{Two Backends}
     \begin{itemize}
         \item Infiniband RDMA
-        \item RamCloud
+        \item RAMCloud
     \end{itemize}
 \end{frame}
 
@@ -83,7 +83,7 @@
     \includegraphics[scale=0.75]{ib-backend-arch.pdf}
 \end{frame}
 
-\begin{frame}{RamCloud Backend}
+\begin{frame}{RAMCloud Backend}
     \centering
     \includegraphics[scale=0.7]{ramcloud_backend_design_final.pdf}
     \vspace{2em}
@@ -137,6 +137,22 @@
 \begin{frame}{Gene Assembly Benchmark}
     \centering
     \includegraphics[scale=0.25]{genome_total_time_commit.pdf}
+\end{frame}
+
+\begin{frame}{Future Work}
+    \begin{itemize}
+        \item Improve performance
+        \item Explore alternative backends
+        \item Explore different consistency semantics
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Custom RDMA Controller}
+    \begin{itemize}
+        \item Prototype of Firebox RDMA controller on FPGA
+        \item Simpler API than Infiniband
+        \item Remove need for page table pinning
+    \end{itemize}
 \end{frame}
 
 \end{document}
