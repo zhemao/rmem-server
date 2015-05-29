@@ -1,0 +1,47 @@
+\documentclass[final,hyperref={pdfpagelabels=false},xcolor=table]{beamer}
+\mode<presentation>{
+	\usetheme{ucb}
+}
+\usepackage[size=custom,width=101.6,height=76.2,scale=1.5]{beamerposter}
+\usepackage{multicol}
+\usepackage{graphicx}
+\usepackage{textcomp}
+%\usepackage{booktabs}
+%\usepackage{multirow}
+%\usepackage{listings}
+%\usepackage{siunitx}
+\usepackage{blindtext}
+
+\graphicspath{{../figures/}}
+
+\definecolor{ucb-pacific}{HTML}{5B6770}
+
+\newcommand{\uT}{{\textmu}T}
+\setlength{\leftmargini}{4em}
+
+\title{Nephele: A Simple Solution for Data Replication}
+\author{Joao Carreira, Howard Mao, and Nathan Pemberton}
+\advisor{Randy Katz}
+\institute[UC Berkeley]{\textsc{University of California, Berkeley}}
+
+\begin{document}
+\begin{frame}
+\vspace{-1.5em}
+\begin{columns}[t]
+	\begin{column}{0.3\linewidth}
+            \input{motivation.tex}
+            \vspace{1ex}
+            \input{rvm-overview.tex}
+            \vspace{1ex}
+            \input{backends.tex}
+	\end{column}
+
+	\begin{column}{0.3\linewidth}
+            \input{architecture.tex}
+	\end{column}
+
+	\begin{column}{0.3\linewidth}
+	\end{column}
+\end{columns}
+\end{frame}
+\end{document}
