@@ -4,13 +4,17 @@
     user simply identifies recovery points in their code through a
     transactional API.
 
-    \begin{itemize}
-        \item \verb|rvm_cfg_create()| - Initialize the system and recover
-            memory if needed.
-        \item \verb|rvm_alloc()| - Allocate a region of recoverable memory.
-        \item \verb|rvm_free()| - Free a region of recoverable memory.
-        \item \verb|rvm_txn_start()| - Mark the beginning of a transaction.
-        \item \verb|rvm_txn_commit()| - Atomically commit any changes made
-            to recoverable memory since the last call to \verb|rvm_txn_start()|.
-    \end{itemize}
+    \vspace{1ex}
+
+    \begin{tabular}{ | l | l | }
+        \hline rvm\_cfg\_[create/destroy]() & \pbox{20cm}{Initialize the system \\
+        and recover memory if needed} \\
+        \hline rvm\_[alloc/free]() & \pbox{20cm}{Allocate a region \\
+        of recoverable memory} \\
+        \hline rvm\_txn\_[start/commit]() & \pbox{20cm}{Mark a point of \\
+        consistency in the program} \\
+        \hline rvm\_[set/get]\_usr\_data() & \pbox{20cm}{Register a pointer \\
+        to your state.} \\
+        \hline
+    \end{tabular}
 \end{block}
