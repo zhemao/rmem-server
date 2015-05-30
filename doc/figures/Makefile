@@ -1,5 +1,4 @@
-GRAPH_DATA=$(wildcard *.csv)
-GRAPHS=$(GRAPH_DATA:.csv=.pdf)
+GRAPHS=commit-results.pdf recovery-results.pdf
 DRAWING_SOURCES=$(wildcard *.svg)
 DRAWINGS=$(DRAWING_SOURCES:.svg=.pdf)
 FIGURES=$(GRAPHS) $(DRAWINGS)
@@ -9,8 +8,8 @@ PYTHON=python
 
 all: $(FIGURES)
 
-%.pdf: %.csv
-	$(PYTHON) plot_results.py $<
+%.pdf: %-rm.csv %-rc.csv %-blcr.csv
+	$(PYTHON) plot_results.py $@ $^
 
 %.pdf: %.svg
 	$(INKSCAPE) -D $< -A $@

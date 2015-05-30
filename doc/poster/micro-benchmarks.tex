@@ -1,37 +1,17 @@
 \begin{block}{Micro-Benchmarks}
-    In the micro-benchmarks, we measure how long it takes to commit changes to
-    a set of pages and how long it takes to recover a set of pages after a
-    crash. We measure these times as we increase the number of pages used.
+    \begin{itemize}
+        \item In the micro-benchmarks, we measure how long it takes to commit
+            changes to a set of pages and how long it takes to recover a set
+            of pages after a crash.
+        \item Took measurements for both backends and compared with BLCR.
+        \item Commit latency increases linearly with number of pages.
+        \item Recovery latency also increases, but not as neatly.
+    \end{itemize}
 
     \vspace{1em}
 
     \centering
-    \begin{minipage}{0.45\textwidth}
-        \centering
-        \tiny{\textbf{Commit Latency (Infiniband backend)}}
+    \includegraphics[width=\textwidth]{commit-results.pdf}
 
-        \includegraphics[width=\textwidth]{commit-results-rm.pdf}
-    \end{minipage}
-    \begin{minipage}{0.45\textwidth}
-        \centering
-        \tiny{\textbf{Recovery Latency (Infiniband backend)}}
-
-        \includegraphics[width=\textwidth]{recovery-results-rm.pdf}
-    \end{minipage}
-
-    \includegraphics[width=0.45\textwidth]{commit_time_rc_latencies.pdf}
-    \includegraphics[width=0.45\textwidth]{recovery_time_rc_latencies.pdf}
-
-    \begin{minipage}{0.45\textwidth}
-        \centering
-        \tiny{\textbf{Commit Latency (BLCR)}}
-
-        \includegraphics[width=\textwidth]{commit-results-blcr.pdf}
-    \end{minipage}
-    \begin{minipage}{0.45\textwidth}
-        \centering
-        \tiny{\textbf{Recovery Latency (BLCR)}}
-
-        \includegraphics[width=\textwidth]{recovery-results-blcr.pdf}
-    \end{minipage}
+    \includegraphics[width=\textwidth]{recovery-results.pdf}
 \end{block}
