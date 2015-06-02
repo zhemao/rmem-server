@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <errno.h>
 
+#include "buddy_malloc.h"
 #include <backends/rmem_backend.h>
 #include <rvm.h>
 #include <log.h>
@@ -20,6 +21,8 @@ rvm_cfg_t* initialize_rvm(char* host, char* port) {
     rvm_opt_t opt;
     opt.host = host;
     opt.port = port;
+    opt.alloc_fp = buddy_malloc;
+    opt.free_fp = buddy_free;
 
     /* Non-recovery case */
     opt.recovery = false;
@@ -34,12 +37,14 @@ rvm_cfg_t* initialize_rvm(char* host, char* port) {
 int main(int argc, char **argv)
 {
     if (argc != 3) {
-        printf("usage: %s <server-address> <server-port> <restart? (y/n)>\n",
+        printf("usage: %s <server-address> <server-port>\n",
                 argv[0]);
         return EXIT_FAILURE;
     }
 
     rvm_cfg_t* cfg = initialize_rvm(argv[1], argv[2]);
+
+    rvm_txid_t txid = rvm_txn_begin(cfg);
 
     int *safe_arr0 = (int*)rvm_alloc(cfg, ARR_SIZE*sizeof(int));
     CHECK_ERROR(safe_arr0 == NULL, 

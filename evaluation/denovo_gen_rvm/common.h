@@ -3,6 +3,7 @@
 
 #include <errno.h>
 #include <assert.h>
+#include <unistd.h>
 #include <utils/error.h>
 #include <rvm.h>
 #include "contig_generation.h"
@@ -13,7 +14,8 @@ extern int fa_freq;
 extern int cp_freq;
 
 /* How frequently to print progress updates (in #kmers) */
-#define PRINT_FREQ 1000000
+#define PRINT_FREQ 10000000000
+//#define PRINT_FREQ 1000000
 
 typedef enum
 {
@@ -45,8 +47,29 @@ typedef struct
         } while(0)
 
 #define TX_COMMIT(TXID)   do {                                             \
-        bool TX_COMMIT_res = rvm_txn_commit(cfg, TXID);                    \
+        bool TX_COMMIT_res = checkpoint(TXID);                    \
         CHECK_ERROR(!TX_COMMIT_res, ("FAILURE: Could not commit txn\n"))   \
         } while(0)
 
 #endif
+
+#if 0
+/* RVM Checkpoint */
+static inline bool checkpoint(rvm_txid_t txid)
+{
+    return rvm_txn_commit(cfg, txid);
+}
+#endif
+
+/* BLCR Checkpoint */
+static inline bool checkpoint(rvm_txid_t txid)
+{
+    int ret;
+    char cmd[256];
+    ret = sprintf(cmd, "cr_checkpont --file gen.blcr %d", getpid());
+    assert(ret > 0);
+    ret = system(cmd);
+    assert(ret == EXIT_SUCCESS);
+
+    return true;
+}

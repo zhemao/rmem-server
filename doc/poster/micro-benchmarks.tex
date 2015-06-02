@@ -1,0 +1,17 @@
+\begin{block}{Micro-Benchmarks}
+    \begin{itemize}
+        \item In the micro-benchmarks, we measure how long it takes to commit
+            changes to a set of pages and how long it takes to recover a set
+            of pages after a crash.
+        \item Took measurements for both backends and compared with BLCR.
+        \item Commit latency increases linearly with number of pages.
+        \item Recovery latency also increases, but not as neatly.
+    \end{itemize}
+
+    \vspace{1em}
+
+    \centering
+    \includegraphics[width=\textwidth]{commit-results.pdf}
+
+    \includegraphics[width=\textwidth]{recovery-results.pdf}
+\end{block}

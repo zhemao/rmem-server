@@ -119,6 +119,13 @@ static bool recover_blocks(rvm_cfg_t *cfg)
     return true;
 }
 
+static void check_cfg_fields(const rvm_opt_t* opt)
+{
+    CHECK_ERROR(opt->free_fp == NULL, ("Forgot to set free_fp\n"));
+    CHECK_ERROR(opt->alloc_fp == NULL, ("Forgot to set alloc_fp\n"));
+    CHECK_ERROR(opt->nentries <= 0, ("Forgot to set nentries\n"));
+}
+
 rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer_function)
 {
     bool res;
@@ -133,6 +140,8 @@ rvm_cfg_t *rvm_cfg_create(rvm_opt_t *opts, create_rmem_layer_f create_rmem_layer
     cfg->free_fp = opts->free_fp;
     cfg->alloc_data = NULL;
 
+    check_cfg_fields(opts);
+        
     rmem_layer_t* rmem_layer = cfg->rmem_layer = create_rmem_layer_function();
 
     rmem_layer->connect(rmem_layer, opts->host, opts->port);
@@ -418,7 +427,10 @@ void *rvm_get_alloc_data(rvm_cfg_t *cfg)
 
 void *rvm_alloc(rvm_cfg_t *cfg, size_t size)
 {
-    return cfg->alloc_fp(cfg, size);
+    if(cfg->alloc_fp == NULL)
+        return rvm_blk_alloc(cfg, size);
+    else
+        return cfg->alloc_fp(cfg, size);
 }
 
 /* Can now allocate more than one page. It still allocates in multiples of the
@@ -519,7 +531,11 @@ void *rvm_blk_alloc(rvm_cfg_t* cfg, size_t size)
 
 bool rvm_free(rvm_cfg_t *cfg, void *buf)
 {
-    return cfg->free_fp(cfg, buf);
+    if(cfg->free_fp == NULL) {
+        return rvm_blk_free(cfg, buf);
+    } else {
+        return cfg->free_fp(cfg, buf);
+    }
 }
 
 bool rvm_blk_free(rvm_cfg_t* cfg, void *buf)

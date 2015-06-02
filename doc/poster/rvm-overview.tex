@@ -1,0 +1,20 @@
+\begin{block}{RVM API}
+    RVM allows the user to allocate recoverable regions of memory and
+    atomically replicate changes to that memory to a remote node’s DRAM. The
+    user simply identifies recovery points in their code through a
+    transactional API.
+
+    \vspace{1ex}
+
+    \begin{tabular}{ | l | l | }
+        \hline rvm\_cfg\_[create/destroy]() & \pbox{20cm}{Initialize the system \\
+        and recover memory if needed} \\
+        \hline rvm\_[alloc/free]() & \pbox{20cm}{Allocate a region \\
+        of recoverable memory} \\
+        \hline rvm\_txn\_[start/commit]() & \pbox{20cm}{Mark a point of \\
+        consistency in the program} \\
+        \hline rvm\_[set/get]\_usr\_data() & \pbox{20cm}{Register a pointer \\
+        to your state.} \\
+        \hline
+    \end{tabular}
+\end{block}

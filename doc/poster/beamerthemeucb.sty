@@ -1,0 +1,120 @@
+\ProvidesPackage{beamerthemeucb}
+% Author: Albert Ou <aou@eecs.berkeley.edu>
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\selectcolormodel{cmyk}
+\mode<presentation>
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\definecolor{ucb-blue}{HTML}{003A70}
+\definecolor{ucb-yellow}{HTML}{FCAF3E}
+\definecolor{ucb-gold}{HTML}{DAB22E}
+\definecolor{ucb-medalist}{HTML}{D19000}
+\definecolor{ucb-orange}{HTML}{F57900}
+\definecolor{ucb-muted-blue}{HTML}{B9CBCF}
+\definecolor{ucb-vivid-blue}{HTML}{719FCF}
+\definecolor{ucb-founder-blue}{HTML}{4F758B}
+\definecolor{ucb-sather}{HTML}{9ABEAA}
+\definecolor{ucb-golden-gate}{HTML}{ED4E33}
+
+\setbeamercolor{header}{fg=black,bg=white}
+\setbeamercolor{header:title}{fg=black}
+\setbeamercolor{header:author}{fg=ucb-orange}
+\setbeamercolor{header:institute}{fg=black}
+\setbeamercolor{header:bottom-rule}{bg=ucb-yellow}
+
+\setbeamerfont{footline}{size=\normalsize}
+\setbeamercolor{footer}{fg=black,bg=white}
+\setbeamercolor{footer:top-rule}{bg=ucb-orange}
+
+\setbeamercolor*{normal text}{fg=black,bg=white}
+
+\setbeamercolor*{block title}{fg=ucb-blue,bg=white}
+\setbeamercolor*{block body}{bg=white,fg=black}
+\setbeamerfont{block title}{size=\large,series=\bfseries}
+\setbeamerfont{block body}{size=\small}
+
+\setbeamercolor{alerted text}{fg=purple}
+
+\setbeamertemplate{itemize items}[triangle]
+\setbeamertemplate{navigation symbols}{}  % no navigation on a poster
+
+\newsavebox\blockbox
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\setbeamertemplate{block begin}{
+	\begin{beamercolorbox}[leftskip=0cm,colsep*=0.75ex,center]{block title}%
+	{\usebeamerfont{block title}\insertblocktitle}
+	\end{beamercolorbox}%
+	{\ifbeamercolorempty[bg]{block body}{}{\nointerlineskip\vskip-0.5pt}}%
+	\usebeamerfont{block body}%
+	\begin{beamercolorbox}[colsep*=0.75ex,sep=0.75ex,vmode]{block body}%
+	\ifbeamercolorempty[bg]{block body}{\vskip-0.25ex}{\vskip-0.75ex}\vbox{}%
+}
+\setbeamertemplate{block end}{
+	\end{beamercolorbox}
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand\advisor[1]{\renewcommand\@advisor{#1}}
+\newcommand\@advisor{\@latex@error{No \noexpand\advisor given}\@ehc}
+
+\setbeamertemplate{headline}{  
+	\leavevmode
+
+	\begin{beamercolorbox}[wd=\paperwidth]{header}
+	\begin{center}
+		\begin{columns}[c]
+
+		\begin{column}{0.18\linewidth}
+		\raggedleft\includegraphics[height=6.75cm]{aspire.pdf}
+		\end{column}
+
+		\begin{column}{0.63\linewidth}
+		\vspace{\baselineskip}
+
+		\centering\usebeamercolor{header:title}{\color{fg}\huge\bfseries\inserttitle}
+
+		\vspace{\baselineskip}
+		\usebeamercolor{header:author}{\color{fg}\Large\insertauthor}
+		\hspace{3cm}
+		{\large Advisor:} \usebeamercolor{header:author}{\color{fg}\Large\@advisor}
+		\end{column}
+
+		\begin{column}{0.18\linewidth}
+		\hspace{6cm}
+		\includegraphics[height=6.75cm]{berkeley-seal.pdf}
+		\end{column}
+		\end{columns}
+	\end{center}
+	\end{beamercolorbox}
+  
+	\begin{beamercolorbox}[wd=\paperwidth]{header:bottom-rule}
+	\rule{0pt}{5mm}
+	\end{beamercolorbox}
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\setbeamertemplate{footline}{
+	\begin{beamercolorbox}[wd=\paperwidth]{footer:top-rule}
+	\rule{0pt}{2mm}
+	\end{beamercolorbox}
+  
+	\begin{beamercolorbox}[ht=2.5em,leftskip=10cm,rightskip=10cm]{footer}
+	\usebeamercolor{header:institute}{\color{fg}{\insertinstitute}}
+	\hfill\insertdate\hfill
+	Department of Electrical Engineering \& Computer Sciences
+	\vspace{0.75em}
+	\end{beamercolorbox}
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\mode<all>
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Local Variables: 
+%%% mode: latex
+%%% TeX-master: "poster"
+%%% TeX-PDF-mode: t
+%%% End: 

@@ -1,0 +1,30 @@
+Underlying the RVM API is the remote memory (RMEM) layer, which provides the
+basic operations that RVM uses to communicate with the backing data store.
+The essential operations in the RMEM layer are \texttt{malloc()},
+\texttt{free()}, \texttt{put()}, \texttt{get()}, and \texttt{atomic\_commit()}.
+
+The \texttt{malloc()} function allocates memory in the backing store.
+The function arguments include the number of bytes to allocate as well as
+a unique tag that is associated with that memory region. If the tag has not
+already been taken, \texttt{malloc()} allocates a new memory region and returns
+the starting address. If a memory region with that tag already exists, the
+starting address of the previously allocated region is returned.
+
+The \texttt{free()} function takes a tag as its argument and frees the memory
+region associated with that tag.
+
+There are also \texttt{multi\_malloc()} and \texttt{multi\_free()} functions
+which allocate and free multiple memory blocks. Depending on the backend,
+these functions might coalesce \texttt{malloc()} and \texttt{free()} requests
+in order to decrease the number of round trips to the backing store.
+
+The \texttt{put()} and \texttt{get()} functions copy data to and from the
+backing store, respectively. These operations are not atomic, so the RVM
+layer always performs puts and gets onto a shadow page and then copies the
+data to the real page using \texttt{atomic\_commit()}.
+
+As mentioned before, \texttt{atomic\_commit()} takes an array of source tags
+and an array of destination tags. It instructs the server to copy the data
+in the source memory regions to the destination regions. This copying is
+done atomically, so there is no danger of only a portion of the pages
+being copied due to the client crashing.

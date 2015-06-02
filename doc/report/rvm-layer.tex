@@ -1,0 +1,57 @@
+The RVM layer is responsible for implementing the custom allocator and
+identifying changes to memory. It is also responsible for tracking commit
+points.
+
+\subsubsection{The Block Table}
+The RVM layer thinks in terms of \emph{blocks}, fixed-sized regions of
+memory that are persisted atomically. Most functionality is based around the
+\emph{block table}, a persistent data structure that keeps track of each
+allocated block in the system. This table is replicated using the same
+mechanism as any other recoverable memory. Like a filesystem master boot record,
+the first page of the block table is always stored with a constant identifier
+in the RMEM layer. After that, the block table is self-describing and can be
+recovered using the mechanisms described below.
+
+Each entry in the block table contains a local address where the active block
+lives on the client and a remote identifier that can be used to identify the
+block in the RMEM layer. 
+
+\subsubsection{Initialization and Recovery Procedure}
+
+When \verb|rvm_cfg_create()| is called the first time, it initializes the block
+table to an empty state and persists it in the RMEM layer. When recovering,
+\verb|rvm_cfg_create()| fetches the first block of the block table from the
+RMEM layer. The block table is walked from start to finish, fetching each block
+as it goes. Even if the block table takes up multiple blocks, each one is
+fetched in order, ensuring that all data can be found eventually. When RVM
+fetches a remote block, it must ensure that it is loaded to the same address it
+was at before failure, otherwise pointers in the data would no longer be valid.
+The original address is read from the block table and then allocated using the
+\emph{mmap()} system call. To ensure that these addresses are always available,
+RVM requires that any OS address space layout randomization be disabled, and
+that \verb|rvm_cfg_create()| be called before any other local allocations.
+
+\subsubsection{Allocation}
+
+To ensure that memory is recoverable, the user must allocate it using a special
+\verb|rvm_alloc()| function. The \verb|rvm_alloc()| function allocates memory
+both locally and on the remote node. Any modifications to the local pages
+allocated by \verb|rvm_alloc()| are automatically detected and copied to the
+remote node at commit time. Detection is achieved through the use of
+\emph{mprotect()}, a Linux system call that can be used to make the application
+take an interrupt whenever a page is written. Our custom interrupt handler
+then marks the page as changed, removes the memory protection and returns. This
+means that RVM needs to be involved only in the first modification to a page.
+
+\subsubsection{Marking a Point of Consistency}
+
+The user is required to identify points in their code where the state of
+recoverable memory is considered \"consistent\". This means that recovery is
+possible from that particular state. \verb|rvm_txn_commit()| can be called at
+these points to ensure that memory is atomically persisted. Upon entering
+\verb|rvm_txn_commit()|, RVM goes through the list of changed pages and copies
+them to a shadow page in the RMEM layer. This ensures that a consistent version
+of memory is always available, even if the client crashes during checkpointing.
+When all the pages have been copied, an \verb|atomic_commit()| function
+(provided by the RMEM layer) is called to persist the changes.
+

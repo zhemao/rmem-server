@@ -7,9 +7,23 @@ gmon.out
 /rmem-test
 /librvm.a
 /.depend
+
+# test executables
 /tests/rvm_test_big_commit
 /tests/rvm_test_free
 /tests/rvm_test_normal
 /tests/rvm_test_recovery
 /tests/rvm_test_size_alloc
 /tests/rvm_test_txn_commit
+tests/rvm_test_free_rc
+tests/rvm_test_full
+tests/rvm_test_full_rc
+tests/rvm_test_normal_rc
+tests/rvm_test_txn_commit_rc
+
+# evaluation executables
+evaluation/dgemv/dgemv_rvm
+evaluation/denovo_gen_rvm/gen_assemble
+evaluation/denovo_gen_rvm/test
+evaluation/dgemv/dgemv
+evaluation/dgemv/dgemv_file

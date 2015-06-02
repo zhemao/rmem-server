@@ -6,6 +6,8 @@
 #include <map>
 #include <algorithm>
 
+#define RAMC_DEBUG
+
 #define ONE_MB (1024*1024)
 #define EIGHT_MB (8*ONE_MB)
 #define VALUE_MAX_SIZE (4*1024)
@@ -149,7 +151,7 @@ uint64_t rc_malloc(rmem_layer_t *rmem_layer, size_t size, uint32_t tag)
 int rc_put(rmem_layer_t *rmem_layer, uint32_t tag,
         void *src, void *data_mr, size_t size)
 {
-#ifdef DEBUG
+#ifdef RAMC_DEBUG
     fprintf(stderr, "rc_put\n");
 #endif
     double put_start_time = gettime();
@@ -247,7 +249,7 @@ int rc_get(rmem_layer_t *rmem_layer, void *dst, void *data_mr,
  */ 
 int rc_free(rmem_layer_t *rmem_layer, uint32_t tag)
 {
-#ifdef DEBUG
+#ifdef RAMC_DEBUG
     fprintf(stderr, "rc_free\n");
 #endif
     ramcloud_data_t* data = (ramcloud_data_t*)rmem_layer->layer_data;
@@ -401,11 +403,17 @@ int rc_atomic_commit(rmem_layer_t* rmem_layer, uint32_t* tags_src,
 int rc_multi_malloc(rmem_layer_t* rmem_layer, uint64_t *addrs,
         uint64_t size, uint32_t *tags, uint32_t n)
 {
+#ifdef RAMC_DEBUG
+    fprintf(stderr, "rc_multi_malloc\n");
+#endif
     for (int i = 0; i < n; i++) {
         addrs[i] = rc_malloc(rmem_layer, size, tags[i]);
         if (addrs[i] == 0)
             return -1;
     }
+#ifdef RAMC_DEBUG
+    fprintf(stderr, "rc_multi_malloc done\n");
+#endif
     return 0;
 }
 

@@ -22,7 +22,8 @@
 
 /** Size of the pool of recoverable pages used for buddy allocation. Must be
  * a multiple of the page size and a power of 2 */
-#define POOL_SZ (1 << 18)
+//#define POOL_SZ (1 << 18)
+#define POOL_SZ (0)
 
 /** Minimum allocation returned by the buddy allocator in bytes. Must be a
  * power of 2 and < POOL_SZ. */

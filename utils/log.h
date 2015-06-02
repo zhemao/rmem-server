@@ -1,7 +1,7 @@
 #ifndef _LOG_H_
 #define _LOG_H_
 
-//#define DEBUG
+#define DEBUG
 
 #include <stdio.h>
 
@@ -17,7 +17,9 @@
     if ((LEVEL) < LOG_LEVEL) {\
         printf("%-20s | %3d |  ",__FUNCTION__,__LINE__); \
         printf STR; \
+        flush(stdout); \
     } \
 } while(0);
 
 #endif // _LOG_H_
+

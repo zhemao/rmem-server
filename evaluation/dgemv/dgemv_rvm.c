@@ -117,7 +117,7 @@ int main(int argc, char *argv[])
     if(out_filename == NULL) {
         out = stdout;
     } else {
-        FILE *out = fopen(out_filename, "w");
+        out = fopen(out_filename, "w");
         if(out == NULL) {
             printf("Failed to open output file: %s\n", out_filename);
             return EXIT_FAILURE;
@@ -128,9 +128,10 @@ int main(int argc, char *argv[])
     rvm_opt_t opt;
     opt.host = host;
     opt.port = port;
-    opt.alloc_fp = buddy_malloc;
-    opt.free_fp = buddy_free;
+    opt.alloc_fp = NULL;
+    opt.free_fp = NULL;
     opt.recovery = recover;
+    opt.nentries = (nrow*sizeof(double) / 4096) + 100;
     rvm_cfg_t *cfg = rvm_cfg_create(&opt, create_rmem_layer);
     if(cfg == NULL) {
         printf("Failed to initialize rvm: %s\n", strerror(errno));
@@ -208,10 +209,8 @@ int main(int argc, char *argv[])
         }
     }
 
-    txid = rvm_txn_begin(cfg);
     printf("Result:\n");
     print_vec(out, state->vec, nrow);
-    rvm_txn_commit(cfg, txid);
 
     return EXIT_SUCCESS;
 }

@@ -1,0 +1,8 @@
+\begin{block}{Backends}
+    Underneath the RVM layer is a remote memory backend, which handles
+    communication with the remote node. The rmem layer implements basic
+    functions like \texttt{malloc()}, \texttt{free()}, \texttt{put()},
+    \texttt{get()}, and \texttt{commit()}. So far we have implemented two
+    different backends. One uses a custom protocol based on Infiniband RDMA.
+    The other uses RAMCloud, an Infiniband-based key-value store.
+\end{block}

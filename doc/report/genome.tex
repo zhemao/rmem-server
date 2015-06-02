@@ -1,0 +1,50 @@
+% Genome Assembly
+For a more complex benchmark, we ported the de novo genome assembly code that
+was the basis of homework 3. This code involves the use of a large hash-table
+(rough 100MB with our test input) as well as several linked-lists and other
+complex data structures. In some ways, this is a best-case scenario for RVM. On
+each checkpoint, only a fraction of the data is changed, and much of the memory
+is constant (the input file). While we initially intended to implement a manual
+serialization as we had done for DGEMV, it quickly became apparent that such an
+undertaking would be almost as involved as writing the application in the first
+place. We instead decided to compare it against a popular process-level
+checkpointer called BLCR\cite{BLCR}. While DGEMV needed only to store the vector
+and an iteration number, the genome assembly code was considerably more
+complicated. Execution consists of two main phases. In the build phase, kmers
+are read from a file and inserted into a hash table. The probe phase probes into
+this hash table in order to construct the final contigs. To capture this
+pattern, a global state structure was allocated from recoverable memory. This
+global state stores shared structures such as the hash table and start-kmer
+list, which phase is currently being executed (build or probe), and then
+provides an opaque phase state pointer to be filled in by phase-specific code.
+ The build phase keeps track of where in the input file it was, while probes
+state is more complex. It needs to preserve which start-kmer it was
+processing, where in the current contig it was, and where in the output file it
+was writing. Each phase processed all 4 million kmers, for a total of 8 million
+processing steps.
+
+In figure \ref{fig:genome_total_time_commit} we vary the commit rate (in terms
+of number of processing steps) from every 10 thousand (out of 8 million) up to
+4 million (one checkpoint per phase). At higher commit rates, RVM clearly
+outperforms BLCR. In the exreme, RVM was able to complete in 800 seconds with a
+commit rate of 10K, while we were forced to cancel the BLCR run after 30
+minutes. Even at more reasonable commit rates such as 1 million (8 commits),
+RVM was nearly twice as fast as BLCR. It's only at the extreme low end of
+commit rates (4 million and no commit) that BLCR was faster. This is because
+RVM pays a significant up-front cost to allocate it's large recoverable state.
+Further analysis showed that of the 10 seconds spent at a 4 million commit
+rate, a full 5s were spent simply allocating memory, while build took only 2s
+and probe only 1s. This clearly indicates a performance bottlenect in our
+system, although we do not believe it is fundemental to the approach. See
+Section~\ref{sec:conclusion} for a discussion of possible performance
+improvements. 
+
+\begin{figure}[t!]
+\begin{center}
+%\resizebox{\columnwidth}{!}{%
+\includegraphics[scale=0.40]{genome_total_time_commit.pdf}
+%}
+\end{center}
+\caption{Total time of genomic assembly application when committing at different rates. Total time when running BLCR at a rate of 10K is not shown}
+\label{fig:genome_total_time_commit}
+\end{figure}

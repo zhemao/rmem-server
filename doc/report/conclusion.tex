@@ -1,0 +1,29 @@
+In this paper, we presented Recoverable Virtual Memory, our solution for easy
+replication and recovery of application state. We have attempted to provide our
+implementation with features we believe are highly desirable for the
+application programmer, such as a simple and understandable API; restoration of
+virtual address locations, which allows for recovery of complex data structures
+without the need for serialization; and reasonably low overhead.  Of these
+three goals, we have accomplished the first two, but there is still
+considerable work to be done in regards to performance.
+
+The most obvious optimization we could make is to coalesce RDMA operations for
+contiguous pages. In our current infiniband backend, allocation of the backing
+memory for multiple contiguous pages must be done a page at a time.  However,
+it would be much more efficient to perform a single contiguous allocation on
+the server side. That way, the number of RDMA write calls and TXN\_MULTI\_CP
+messages does not need to increase as the number of pages increases. There are
+probably other areas for performance improvement that we could discover through
+more intensive profiling of the benchmark programs.
+
+Another avenue we could explore are alternative backends for the RMEM layer.
+There are various networking and non-volatile memory technologies that we could
+investigate, such as SSDs and RDMA over Converged Ethernet. We could also
+implement different consistency semantics to explore the tradeoffs of
+performance and consistency.
+
+Finally, we would like to integrate RVM with existing runtimes and recovery
+frameworks to provide a more complete data replication and recovery solution.
+
+The complete code for our RVM implementation is available on GitHub at
+https://github.com/zhemao/rmem-server.

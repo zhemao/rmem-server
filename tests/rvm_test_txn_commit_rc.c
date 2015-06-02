@@ -15,6 +15,7 @@
 #include <backends/ramcloud_backend.h>
 #include <log.h>
 #include <error.h>
+#include "buddy_malloc.h"
 
 #define ARR_SIZE 10
 
@@ -34,6 +35,9 @@ rvm_cfg_t* initialize_rvm(char* host, char* port)
     rvm_opt_t opt;
     opt.host = host;
     opt.port = port;
+    opt.alloc_fp = buddy_malloc;
+    opt.free_fp = buddy_free;
+    opt.nentries = DEFAULT_BLK_TBL_NENT;
 
     /* Non-recovery case */
     opt.recovery = false;

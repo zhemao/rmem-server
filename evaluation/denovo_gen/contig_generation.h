@@ -24,8 +24,8 @@
 #define LINE_SIZE (KMER_LENGTH+4)
 #endif
 
-static int64_t gettime(void) {
-    int64_t retval;
+static double gettime(void) {
+    double retval;
     struct timeval tv;
     if (gettimeofday(&tv, NULL)) {
 	perror("gettimeofday");

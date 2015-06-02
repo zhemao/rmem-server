@@ -80,7 +80,7 @@ int main(int argc, char *argv[])
     if(out_filename == NULL) {
         out = stdout;
     } else {
-        FILE *out = fopen(out_filename, "w");
+        out = fopen(out_filename, "w");
         if(out == NULL) {
             printf("Failed to open output file: %s\n", out_filename);
             return EXIT_FAILURE;

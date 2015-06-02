@@ -1,0 +1,33 @@
+The library consists of two main layers on the client side. An upper layer
+to implement the RVM-specific logic and a lower-layer remote memory (RMEM)
+backend to implement low-level transport and atomicity. This relationship is
+described in Figure \ref{fig:lasagna}. This modularization allows for a number of
+different backends to be tried independently of user code and the RVM layer.
+This enhances portability and simplifies future efforts to improve performance
+or semantics.
+
+\begin{figure}[t]
+\begin{center}
+\resizebox{\columnwidth}{!}{%
+\includegraphics[scale=0.80]{lasagna.pdf}
+}
+\end{center}
+\caption{RVM lasagna diagram}
+\label{fig:lasagna}
+\end{figure}
+
+\subsection{The RVM API}
+
+\input{rvm-layer}
+
+\subsection{The Remote Memory Layer}
+
+\input{rmem-layer}
+
+\subsection{Infiniband Backend}
+
+\input{ib-backend}
+
+\subsection{RAMCloud Backend}
+
+\input{ramcloud-backend}

@@ -1,3 +1,0 @@
-As the number of nodes in distributed computing clusters increases, so does the probability of failures. Therefore, it is important for distributed applications to be resilient to single-node failures. 
-One important feature necessary for fault-tolerance is the ability to replicate the application's working state to another failure domain. In this report, we present an implementation of Recoverable Virtual Memory (RVM), an API that allows the programmer to easily add state checkpointing and recovery to their application. RVM operates by detecting modifications to recoverable memory regions and replicating the memory to a remote node. So far, we have implemented two backends, one using the Infiniband RDMA API and one using the Ramcloud key-value store.
-
