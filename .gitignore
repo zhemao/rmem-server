@@ -1,5 +1,8 @@
 *.o
 *.gch
+gmon.out
+*.log
+*.csv
 /rmem-server
 /rmem-test
 /librvm.a
