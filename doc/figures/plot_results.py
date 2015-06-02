@@ -25,13 +25,14 @@ def main():
         plot_file(fname, label)
 
     if "commit" in outfname:
-        plt.title("Commit Micro-benchmark")
+        plt.title("Commit Micro-benchmark", fontsize = 24)
     else:
-        plt.title("Recovery Micro-benchmark")
+        plt.title("Recovery Micro-benchmark", fontsize = 24)
 
-    plt.xlabel("Num. Pages")
-    plt.ylabel("Time (s)")
-    plt.legend()
+    plt.xlabel("Num. Pages", fontsize = 20)
+    plt.ylabel("Time (s)", fontsize = 20)
+    plt.tick_params('both', labelsize = 16)
+    plt.legend(fontsize = 16)
     plt.savefig(outfname)
 
 if __name__ == "__main__":
